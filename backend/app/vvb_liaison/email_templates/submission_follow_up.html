@@ -1,0 +1,28 @@
+{% extends "vvb_communications.html" %}
+
+{% block body %}
+<p>This is a friendly follow-up regarding the monitoring report for <strong>{{ project_name }}</strong> 
+submitted on {{ submission_date }}.</p>
+
+<div class="metric">
+    <strong>Registry:</strong> {{ registry_name }}<br>
+    <strong>Report ID:</strong> {{ report_id }}<br>
+    <strong>Status:</strong> {{ current_status }}<br>
+    <strong>Days since submission:</strong> {{ days_pending }}
+</div>
+
+<p>We understand that verification processes require thorough review. We wanted to confirm that 
+all required documentation has been provided and to offer any clarification that may assist 
+with the verification process.</p>
+
+<p><strong>Key metrics from this monitoring period:</strong></p>
+<ul>
+    <li>Emission reductions: <strong>{{ emissions_reduction }} tCO₂e</strong></li>
+    <li>Monitoring period: {{ monitoring_period_start }} to {{ monitoring_period_end }}</li>
+    <li>Methodology: {{ methodology }}</li>
+    <li>Methodology compliance score: {{ compliance_score }}%</li>
+</ul>
+
+<p>If there are any technical queries or data clarification requests, our team is prepared to 
+respond promptly with supporting evidence and calculation details.</p>
+{% endblock %}

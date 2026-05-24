@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report_title }}</title>
+    <style>
+        @page { size: A4; margin: 2.5cm; }
+        body { font-family: "Times New Roman", Georgia, serif; font-size: 11pt; line-height: 1.6; color: #333; }
+        h1 { font-size: 20pt; text-align: center; margin-top: 0; border-bottom: 2px solid #2c5282; padding-bottom: 10px; color: #2c5282; }
+        h2 { font-size: 14pt; color: #2c5282; margin-top: 24pt; border-bottom: 1px solid #cbd5e0; padding-bottom: 4px; }
+        h3 { font-size: 12pt; color: #4a5568; margin-top: 18pt; }
+        h4 { font-size: 11pt; color: #4a5568; font-style: italic; }
+        table { width: 100%; border-collapse: collapse; margin: 12pt 0; font-size: 10pt; }
+        th, td { border: 1px solid #a0aec0; padding: 6px 8px; text-align: left; }
+        th { background-color: #edf2f7; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f7fafc; }
+        .caption { font-size: 10pt; font-style: italic; text-align: center; margin-top: 4pt; color: #4a5568; }
+        .executive-summary { background: #f7fafc; border-left: 4px solid #2c5282; padding: 16px; margin: 16px 0; }
+        .citation { font-size: 9pt; color: #718096; vertical-align: super; }
+        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 9pt; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+        .page-break { page-break-before: always; }
+        .metric-box { display: inline-block; background: #edf2f7; border-radius: 4px; padding: 8px 12px; margin: 4px; text-align: center; }
+        .metric-value { font-size: 16pt; font-weight: bold; color: #2c5282; }
+        .metric-label { font-size: 9pt; color: #4a5568; }
+        .alert { background: #fffaf0; border-left: 4px solid #dd6b20; padding: 12px; margin: 12px 0; }
+        .alert-title { font-weight: bold; color: #c05621; }
+        ul, ol { margin: 8px 0; padding-left: 24px; }
+        p { margin: 8px 0; }
+        .appendix-header { background: #2c5282; color: white; padding: 8px 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="footer">
+        CarbonVerify Automated MRV Report | {{ project_name }} | Page <span class="pageNumber"></span>
+    </div>
+    {% block content %}{% endblock %}
+</body>
+</html>

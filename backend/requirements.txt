@@ -1,0 +1,40 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+sqlalchemy[asyncio]==2.0.31
+asyncpg==0.29.0
+alembic==1.13.2
+pydantic==2.7.4
+pydantic-settings==2.3.4
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+celery==5.4.0
+redis==5.0.6
+boto3==1.34.131
+structlog==24.2.0
+orjson==3.10.5
+websockets==12.0
+httpx==0.27.0
+email-validator==2.1.1
+
+# Data ingestion & processing
+pandas==2.2.2
+openpyxl==3.1.5
+python-magic==0.4.27
+PyPDF2==3.0.1
+pdfplumber==0.11.1
+pillow==10.4.0
+pytesseract==0.3.10
+shapely==2.0.4
+jsonschema==4.22.0
+python-dateutil==2.9.0
+
+# For geo boundary checks
+geojson==3.1.0
+
+# Report generation
+jinja2==3.1.4
+weasyprint==62.3
+
+# VVB liaison
+httpx==0.27.0

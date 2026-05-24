@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- COVER PAGE -->
+<h1>Verra VM0050<br>Methodology for Metered and Measured Energy Cooking Devices<br>Monitoring Report</h1>
+
+<div style="text-align: center; margin: 40px 0;">
+    <p style="font-size: 16pt; font-weight: bold; color: #2c5282;">{{ project.name }}</p>
+    <p style="font-size: 12pt;">Verra Project ID: {{ project.verra_id or "Pending" }}</p>
+    <p style="font-size: 12pt;">Monitoring Period: {{ monitoring_period_start }} to {{ monitoring_period_end }}</p>
+    <p style="font-size: 11pt; color: #718096;">Report generated: {{ generated_at }} by CarbonVerify v{{ cv_version }}</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- EXECUTIVE SUMMARY -->
+<h2>1. Executive Summary</h2>
+<div class="executive-summary">
+    <p>This monitoring report documents the emission reductions achieved by <strong>{{ project.name }}</strong> 
+    during the period {{ monitoring_period_start }} to {{ monitoring_period_end }}, in accordance with 
+    Verra's VM0050 methodology.</p>
+    
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; margin: 16px 0;">
+        <div class="metric-box">
+            <div class="metric-value">{{ calc.emissions_reduction_tco2e | round(1) }}</div>
+            <div class="metric-label">tCO₂e Reduced</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-value">{{ calc.uncertainty_95CI | round(2) if calc.uncertainty_95CI else "N/A" }}</div>
+            <div class="metric-label">95% CI Width</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-value">{{ methodology.compliance_score }}%</div>
+            <div class="metric-label">VM0050 Compliance</div>
+        </div>
+    </div>
+    
+    <p><strong>Key Findings:</strong> {{ executive_summary_text }}</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- BASELINE SCENARIO -->
+<h2>2. Baseline Scenario</h2>
+
+<h3>2.1 Baseline Fuel and Technology</h3>
+<p>Prior to project implementation, households in the project area used 
+<strong>{{ project_data.baseline_stove_type or "traditional biomass stoves" }}</strong> 
+with a demonstrated thermal efficiency of {{ (project_data.baseline_efficiency or 0.10) * 100 }}%.</p>
+
+<h3>2.2 Baseline Fuel Consumption</h3>
+<table>
+    <tr><th>Parameter</th><th>Value</th><th>Source</th></tr>
+    <tr><td>Baseline Fuel Type</td><td>{{ project_data.baseline_fuel_type or "wood/charcoal" }}</td><td>Baseline Survey</td></tr>
+    <tr><td>Daily Fuel Consumption</td><td>{{ project_data.baseline_fuel_kg_day or "[X]" }} kg/day</td><td>KPT</td></tr>
+    <tr><td>Annual Fuel per Household</td><td>{{ (project_data.baseline_fuel_kg_day or 0) * 350 | round(1) }} kg/year</td><td>Calculation</td></tr>
+    <tr><td>Baseline Emissions Factor</td><td>{{ project_data.baseline_ef or "IPCC default" }}</td><td>IPCC 2006</td></tr>
+</table>
+<p class="caption">Table 1: Baseline scenario parameters</p>
+
+<h3>2.3 Baseline Emissions</h3>
+<p>Baseline emissions were calculated using IPCC Tier 1 emission factors with the 
+applied fNRB of {{ calc.fNRB_value }}:</p>
+
+<table>
+    <tr><th>Component</th><th>Emissions (tCO₂e/year)</th></tr>
+    <tr><td>CO₂ from non-renewable biomass</td><td>{{ calc.baseline_co2 | round(2) if calc.baseline_co2 else "N/A" }}</td></tr>
+    <tr><td>CH₄ emissions</td><td>{{ calc.baseline_ch4 | round(4) if calc.baseline_ch4 else "N/A" }}</td></tr>
+    <tr><td>N₂O emissions</td><td>{{ calc.baseline_n2o | round(4) if calc.baseline_n2o else "N/A" }}</td></tr>
+    <tr><td><strong>Total Baseline Emissions</strong></td><td><strong>{{ calc.baseline_emissions_tco2e | round(2) if calc.baseline_emissions_tco2e else "N/A" }}</strong></td></tr>
+</table>
+<p class="caption">Table 2: Baseline emissions breakdown</p>
+
+<div class="page-break"></div>
+
+<!-- PROJECT SCENARIO -->
+<h2>3. Project Scenario</h2>
+
+<h3>3.1 Project Technology</h3>
+<p>The project disseminates <strong>{{ project_data.stove_type or "improved cookstoves" }}</strong> 
+with the following verified performance characteristics:</p>
+
+<table>
+    <tr><th>Characteristic</th><th>Value</th><th>Test Standard</th></tr>
+    <tr><td>Thermal Efficiency</td><td>{{ (project_data.thermal_efficiency or 0) * 100 }}%</td><td>{{ project_data.lab_test_type or "WBT" }}</td></tr>
+    <tr><td>CO Emissions (g/MJ delivered)</td><td>{{ project_data.co_emissions or "[X]" }}</td><td>ISO 19867</td></tr>
+    <tr><td>PM2.5 Emissions (mg/MJ delivered)</td><td>{{ project_data.pm_emissions or "[X]" }}</td><td>ISO 19867</td></tr>
+</table>
+<p class="caption">Table 3: Project stove performance characteristics</p>
+
+<h3>3.2 Laboratory Testing</h3>
+<p>Laboratory testing was conducted at {{ project_data.test_lab or "[Laboratory]" }} in accordance 
+with {{ project_data.lab_test_type or "Water Boiling Test (WBT)" }} protocols. 
+The efficiency result of {{ (project_data.thermal_efficiency or 0) * 100 }}% meets the 
+VM0050 requirement for laboratory-verified performance data.</p>
+
+<h3>3.3 Usage Monitoring</h3>
+<p>Stove usage was monitored using <strong>{{ project_data.usage_monitoring_method or "[method]" }}</strong>. 
+The applied usage rate of {{ (project_data.usage_rate or 0) * 100 }}% is within the 
+VM0050 cap of {{ methodology.usage_rate_cap * 100 if methodology.usage_rate_cap else "[N%]" }}% for this monitoring method.</p>
+
+<div class="page-break"></div>
+
+<!-- MONITORING DATA -->
+<h2>4. Monitoring Data and Parameters</h2>
+
+<h3>4.1 Data Sources</h3>
+<table>
+    <tr>
+        <th>Data Source</th>
+        <th>Type</th>
+        <th>Parameter Monitored</th>
+        <th>Frequency</th>
+        <th>Quality</th>
+    </tr>
+    {% for ds in data_sources %}
+    <tr>
+        <td>{{ ds.source_type }}</td>
+        <td>{{ ds.schema_version }}</td>
+        <td>{{ ds.parameter or "Multiple" }}</td>
+        <td>{{ ds.frequency or "Continuous" }}</td>
+        <td>{{ ds.validation_status }}</td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 4: Monitoring data sources</p>
+
+<h3>4.2 KPT Results</h3>
+<p>The Kitchen Performance Test (KPT) was conducted with n={{ project_data.kpt_sample_size or "[N]" }} 
+households over {{ project_data.kpt_duration_weeks or "[N]" }} weeks. The sample size 
+{% if project_data.kpt_sample_size and project_data.kpt_sample_size >= 30 %}meets{% else %}is below{% endif %} 
+the VM0050 minimum requirement of 30 households.</p>
+
+<table>
+    <tr><th>Parameter</th><th>Baseline</th><th>Project</th><th>Difference</th></tr>
+    <tr><td>Daily Fuel (kg)</td><td>{{ kpt.baseline_fuel_kg_day or "[X]" }}</td><td>{{ kpt.project_fuel_kg_day or "[Y]" }}</td><td>{{ kpt.fuel_savings_pct or "[Z%]" }}</td></tr>
+    <tr><td>Cooking Events</td><td>{{ kpt.baseline_events_day or "[X]" }}</td><td>{{ kpt.project_events_day or "[Y]" }}</td><td>{{ kpt.events_diff or "[Z]" }}</td></tr>
+    <tr><td>Cooking Time (hrs)</td><td>{{ kpt.baseline_hours_day or "[X]" }}</td><td>{{ kpt.project_hours_day or "[Y]" }}</td><td>{{ kpt.time_savings_pct or "[Z%]" }}</td></tr>
+</table>
+<p class="caption">Table 5: KPT results summary</p>
+
+<div class="page-break"></div>
+
+<!-- EMISSIONS REDUCTIONS -->
+<h2>5. Emission Reductions</h2>
+
+<h3>5.1 Calculation Method</h3>
+<p>Emission reductions were calculated as the difference between baseline and project emissions, 
+minus leakage, in accordance with VM0050 Section 8:</p>
+<p style="text-align: center; font-style: italic; margin: 16px 0;">
+    ER = BE - PE - LK
+</p>
+<p>Where ER = emission reductions, BE = baseline emissions, PE = project emissions, LK = leakage.</p>
+
+<h3>5.2 Results</h3>
+<table>
+    <tr><th>Parameter</th><th>Value (tCO₂e/year)</th><th>Uncertainty (±)</th></tr>
+    <tr><td>Baseline Emissions (BE)</td><td>{{ calc.baseline_emissions_tco2e | round(2) if calc.baseline_emissions_tco2e else "N/A" }}</td><td>{{ calc.baseline_uncertainty or "N/A" }}</td></tr>
+    <tr><td>Project Emissions (PE)</td><td>{{ calc.project_emissions_tco2e | round(2) if calc.project_emissions_tco2e else "N/A" }}</td><td>{{ calc.project_uncertainty or "N/A" }}</td></tr>
+    <tr><td>Gross Reduction (BE - PE)</td><td>{{ calc.gross_reduction_tco2e | round(2) if calc.gross_reduction_tco2e else "N/A" }}</td><td>—</td></tr>
+    <tr><td>Leakage (LK)</td><td>{{ calc.leakage_tco2e | round(3) if calc.leakage_tco2e else "0" }}</td><td>{{ calc.leakage_uncertainty or "N/A" }}</td></tr>
+    <tr><td><strong>Net Emission Reductions</strong></td><td><strong>{{ calc.emissions_reduction_tco2e | round(2) if calc.emissions_reduction_tco2e else "N/A" }}</strong></td><td><strong>{{ calc.uncertainty_95CI | round(2) if calc.uncertainty_95CI else "N/A" }}</strong></td></tr>
+</table>
+<p class="caption">Table 6: Emission reduction calculation results</p>
+
+<div class="page-break"></div>
+
+<!-- LEAKAGE -->
+<h2>6. Leakage</h2>
+
+<h3>6.1 Leakage Assessment</h3>
+<p>Leakage was assessed for market effects, activity-shifting, and spatial displacement in accordance 
+with VM0050 Section 9 and the Verra Tool VT0007.</p>
+
+{% if calc.leakage_assessment and calc.leakage_assessment.leakage_types %}
+<table>
+    <tr><th>Leakage Type</th><th>Detected</th><th>Magnitude (tCO₂e)</th><th>Confidence</th></tr>
+    {% for lt in calc.leakage_assessment.leakage_types %}
+    <tr>
+        <td>{{ lt.type.replace('_', ' ').title() }}</td>
+        <td>{{ "Yes" if lt.detected else "No" }}</td>
+        <td>{{ lt.magnitude_tco2e | round(4) }}</td>
+        <td>{{ (lt.confidence * 100) | round(1) }}%</td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 7: Leakage assessment results</p>
+{% else %}
+<p>No leakage detected during this monitoring period.</p>
+{% endif %}
+
+<h3>6.2 Leakage Mitigation</h3>
+<p>{{ calc.leakage_assessment.mitigation_recommendation or "Standard leakage mitigation measures have been implemented." }}</p>
+
+<div class="page-break"></div>
+
+<!-- UNCERTAINTY -->
+<h2>7. Uncertainty Assessment</h2>
+
+<h3>7.1 Monte Carlo Analysis</h3>
+<p>Uncertainty was quantified using Monte Carlo simulation with {{ mc.n_iterations or "10,000" }} iterations. 
+Key parameters were modeled as probability distributions:</p>
+<ul>
+    <li>Fuel consumption: Lognormal distribution (CV = 20%)</li>
+    <li>Thermal efficiency: Lognormal distribution (CV = 15%)</li>
+    <li>fNRB: Beta distribution (μ = {{ calc.fNRB_value }}, σ = {{ calc.fnrb_uncertainty or "0.10" }})</li>
+</ul>
+
+<table>
+    <tr><th>Statistic</th><th>Value (tCO₂e/year)</th></tr>
+    <tr><td>Mean</td><td>{{ mc.mean_reduction_tco2e | round(2) }}</td></tr>
+    <tr><td>Median</td><td>{{ mc.median_reduction_tco2e | round(2) }}</td></tr>
+    <tr><td>Standard Deviation</td><td>{{ mc.std_dev | round(2) }}</td></tr>
+    <tr><td>2.5th Percentile (Lower CI)</td><td>{{ mc.ci_lower | round(2) }}</td></tr>
+    <tr><td>97.5th Percentile (Upper CI)</td><td>{{ mc.ci_upper | round(2) }}</td></tr>
+    <tr><td><strong>Conservative Estimate</strong></td><td><strong>{{ mc.conservative_estimate_tco2e | round(2) }}</strong></td></tr>
+</table>
+<p class="caption">Table 8: Uncertainty analysis results</p>
+
+<h3>7.2 Sensitivity Analysis</h3>
+<p>Tornado sensitivity analysis identified the following parameters as having the greatest impact 
+on emission reduction estimates:</p>
+
+<table>
+    <tr><th>Rank</th><th>Parameter</th><th>Swing (tCO₂e)</th><th>Swing (%)</th></tr>
+    {% for param in sensitivity[:5] %}
+    <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ param.parameter }}</td>
+        <td>{{ param.swing | round(2) }}</td>
+        <td>{{ param.swing_percentage | round(1) }}%</td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 9: Tornado sensitivity analysis (top 5 parameters)</p>
+
+<div class="page-break"></div>
+
+<!-- CO-BENEFITS -->
+<h2>8. Sustainable Development Co-benefits</h2>
+
+<h3>8.1 SDG Contributions</h3>
+<table>
+    <tr><th>SDG</th><th>Indicator</th><th>Value</th></tr>
+    <tr><td>SDG 3: Good Health</td><td>Households with reduced indoor air pollution</td><td>{{ co_benefits.households_benefiting or "[N]" }}</td></tr>
+    <tr><td>SDG 5: Gender Equality</td><td>Time saved (women and girls)</td><td>{{ co_benefits.time_saved_minutes or "[N]" }} min/day</td></tr>
+    <tr><td>SDG 7: Clean Energy</td><td>Clean cooking access provided</td><td>{{ project_data.household_count or "[N]" }} households</td></tr>
+    <tr><td>SDG 13: Climate Action</td><td>tCO₂e reduced</td><td>{{ calc.emissions_reduction_tco2e | round(1) if calc.emissions_reduction_tco2e else "N/A" }}</td></tr>
+</table>
+<p class="caption">Table 10: Sustainable Development Goal contributions</p>
+
+<div class="page-break"></div>
+
+<!-- APPENDICES -->
+<h2>9. Appendices</h2>
+
+{% for appendix in appendices %}
+<div class="appendix-header">Appendix {{ loop.index }}: {{ appendix.title }}</div>
+<div style="padding: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+    <p>{{ appendix.description }}</p>
+    {% if appendix.table %}
+    <table>
+        {% for row in appendix.table %}
+        {% if loop.first %}
+        <tr>{% for col in row %}<th>{{ col }}</th>{% endfor %}</tr>
+        {% else %}
+        <tr>{% for col in row %}<td>{{ col }}</td>{% endfor %}</tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% if appendix.file_ref %}
+    <p><em>Supporting document: {{ appendix.file_ref }}</em></p>
+    {% endif %}
+</div>
+{% endfor %}
+
+<h3>9.1 Citation Index</h3>
+<table>
+    <tr><th>Citation ID</th><th>Reference</th></tr>
+    {% for cite in citations %}
+    <tr><td>[{{ cite.id }}]</td><td>{{ cite.text }}</td></tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 11: Complete citation index</p>
+
+{% endblock %}

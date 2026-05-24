@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- COVER PAGE -->
+<h1>Gold Standard TPDDTEC v4<br>Monitoring Report</h1>
+
+<div style="text-align: center; margin: 40px 0;">
+    <p style="font-size: 16pt; font-weight: bold; color: #2c5282;">{{ project.name }}</p>
+    <p style="font-size: 12pt;">GS Project ID: {{ project.gs_id or "Pending" }}</p>
+    <p style="font-size: 12pt;">Monitoring Period: {{ monitoring_period_start }} to {{ monitoring_period_end }}</p>
+    <p style="font-size: 11pt; color: #718096;">Report generated: {{ generated_at }} by CarbonVerify v{{ cv_version }}</p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- EXECUTIVE SUMMARY -->
+<h2>1. Executive Summary</h2>
+<div class="executive-summary">
+    <p><strong>Project:</strong> {{ project.name }} operates in {{ project.location or "[location]" }} distributing 
+    {{ project.stove_type or "improved cookstoves" }} to {{ project.household_count or "[N]" }} households.</p>
+    
+    <p><strong>Monitoring Period:</strong> {{ monitoring_period_start }} – {{ monitoring_period_end }}</p>
+    
+    <div style="display: flex; flex-wrap: wrap; justify-content: center; margin: 16px 0;">
+        <div class="metric-box">
+            <div class="metric-value">{{ calc.emissions_reduction_tco2e | round(1) }}</div>
+            <div class="metric-label">tCO₂e Reduced</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-value">{{ calc.uncertainty_95CI | round(2) if calc.uncertainty_95CI else "N/A" }}</div>
+            <div class="metric-label">95% CI Width</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-value">{{ calc.fNRB_value }}</div>
+            <div class="metric-label">fNRB Applied</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-value">{{ methodology.compliance_score }}%</div>
+            <div class="metric-label">Methodology Compliance</div>
+        </div>
+    </div>
+    
+    <p><strong>Key Findings:</strong> {{ executive_summary_text }}</p>
+    
+    {% if calc.leakage_assessment and calc.leakage_assessment.total_leakage_tco2e > 0 %}
+    <div class="alert">
+        <div class="alert-title">Leakage Assessment</div>
+        <p>Total assessed leakage: {{ calc.leakage_assessment.total_leakage_tco2e | round(3) }} tCO₂e 
+        ({{ calc.leakage_assessment.leakage_as_pct_of_baseline }}% of baseline). 
+        Buffer recommendation: {{ calc.leakage_assessment.buffer_recommendation_pct }}%.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="page-break"></div>
+
+<!-- PROJECT DESCRIPTION -->
+<h2>2. Project Description</h2>
+
+<h3>2.1 Project Overview</h3>
+<p>{{ project.name }} is registered under the Gold Standard TPDDTEC v4 methodology for the dissemination of 
+{{ project.stove_type or "improved cookstoves" }}. The project aims to reduce greenhouse gas emissions 
+by replacing traditional inefficient cooking practices with modern fuel-efficient technologies.</p>
+
+<h3>2.2 Location and Boundary</h3>
+<table>
+    <tr><th>Attribute</th><th>Value</th></tr>
+    <tr><td>Project Name</td><td>{{ project.name }}</td></tr>
+    <tr><td>Methodology</td><td>{{ project.methodology }}</td></tr>
+    <tr><td>Crediting Period Start</td><td>{{ project.crediting_period_start }}</td></tr>
+    <tr><td>Crediting Period End</td><td>{{ project.crediting_period_end }}</td></tr>
+    <tr><td>fNRB Value</td><td>{{ calc.fNRB_value }} ± {{ calc.uncertainty_95CI or "N/A" }}</td></tr>
+    <tr><td>Confidence Threshold</td><td>{{ project.confidence_threshold }}</td></tr>
+</table>
+
+<h3>2.3 Technology Description</h3>
+<p>The project disseminates {{ project.stove_type or "improved biomass cookstoves" }} with a demonstrated 
+thermal efficiency of {{ project_data.thermal_efficiency or "[X%]" }} compared to a baseline efficiency 
+of {{ project_data.baseline_efficiency or "[Y%]" }} for traditional {{ project_data.baseline_stove_type or "three-stone fires" }}.</p>
+
+<div class="page-break"></div>
+
+<!-- MONITORING PERIOD -->
+<h2>3. Monitoring Period and Data Collection</h2>
+
+<h3>3.1 Monitoring Period</h3>
+<p>This report covers the monitoring period from <strong>{{ monitoring_period_start }}</strong> to 
+<strong>{{ monitoring_period_end }}</strong>, comprising {{ monitoring_days }} days.</p>
+
+<h3>3.2 Data Sources Summary</h3>
+<table>
+    <tr>
+        <th>Data Source ID</th>
+        <th>Type</th>
+        <th>Schema Version</th>
+        <th>Validation Status</th>
+        <th>Records</th>
+    </tr>
+    {% for ds in data_sources %}
+    <tr>
+        <td>{{ ds.id[:8] }}...</td>
+        <td>{{ ds.source_type }}</td>
+        <td>{{ ds.schema_version }}</td>
+        <td>{{ ds.validation_status }}</td>
+        <td>{{ ds.record_count or "N/A" }}</td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 1: Data sources used in this monitoring period</p>
+
+<h3>3.3 Data Quality Assessment</h3>
+<p>All data sources were validated through the CarbonVerify automated ingestion pipeline. 
+{% if flagged_sources > 0 %}{{ flagged_sources }} source(s) were flagged for human review.{% else %}All sources passed automated validation.{% endif %}</p>
+
+<div class="page-break"></div>
+
+<!-- STOVE DISTRIBUTION -->
+<h2>4. Stove Distribution and Adoption</h2>
+
+<h3>4.1 Stove Dissemination Summary</h3>
+<table>
+    <tr><th>Metric</th><th>Value</th><th>Source</th></tr>
+    <tr><td>Total Stoves Distributed</td><td>{{ project_data.stoves_distributed or "[N]" }}</td><td>Project Database</td></tr>
+    <tr><td>Active Stoves (monitored)</td><td>{{ project_data.active_stoves or "[N]" }}</td><td>SUMs / Survey</td></tr>
+    <tr><td>Tracking Completeness</td><td>{{ project_data.tracking_completeness or "[N%]" }}</td><td>GPS Database</td></tr>
+    <tr><td>Dissemination Rate</td><td>{{ project_data.dissemination_rate or "[N%]" }}</td><td>Sales Records</td></tr>
+</table>
+<p class="caption">Table 2: Stove distribution and adoption metrics</p>
+
+<h3>4.2 Adoption Rate Verification</h3>
+<p>The adoption rate was verified through {{ project_data.verification_method or "a combination of Stove Use Monitors (SUMs) and household surveys" }}. 
+The minimum tracking completeness requirement of 90% under TPDDTEC v4 {% if project_data.tracking_completeness and project_data.tracking_completeness >= 0.9 %}is satisfied{% else %}requires attention{% endif %}.</p>
+
+<div class="page-break"></div>
+
+<!-- KPT RESULTS -->
+<h2>5. Kitchen Performance Test Results</h2>
+
+<h3>5.1 KPT Methodology</h3>
+<p>Kitchen Performance Tests were conducted over {{ project_data.kpt_duration_weeks or "[N]" }} weeks 
+with a sample size of n={{ project_data.kpt_sample_size or "[N]" }} households. 
+The sample was selected using {{ project_data.sampling_method or "stratified random sampling" }}.</p>
+
+<h3>5.2 Fuel Consumption Results</h3>
+<table>
+    <tr><th>Parameter</th><th>Baseline</th><th>Project</th><th>Difference</th><th>Unit</th></tr>
+    <tr><td>Daily Fuel Consumption</td><td>{{ kpt.baseline_fuel_kg_day or "[X]" }}</td><td>{{ kpt.project_fuel_kg_day or "[Y]" }}</td><td>{{ kpt.fuel_savings_pct or "[Z%]" }}</td><td>kg/day</td></tr>
+    <tr><td>Cooking Events per Day</td><td>{{ kpt.baseline_events_day or "[X]" }}</td><td>{{ kpt.project_events_day or "[Y]" }}</td><td>{{ kpt.events_diff or "[Z]" }}</td><td>events</td></tr>
+    <tr><td>Cooking Time per Day</td><td>{{ kpt.baseline_hours_day or "[X]" }}</td><td>{{ kpt.project_hours_day or "[Y]" }}</td><td>{{ kpt.time_savings_pct or "[Z%]" }}</td><td>hours</td></tr>
+</table>
+<p class="caption">Table 3: KPT fuel consumption and usage metrics</p>
+
+<h3>5.3 Statistical Analysis</h3>
+<p>The paired t-test on daily fuel consumption showed a statistically significant reduction 
+(p &lt; 0.001) with a mean difference of {{ kpt.mean_fuel_reduction or "[X]" }} kg/day 
+(95% CI: {{ kpt.ci_lower or "[L]" }} to {{ kpt.ci_upper or "[U]" }}).</p>
+
+<div class="page-break"></div>
+
+<!-- EMISSIONS REDUCTIONS -->
+<h2>6. Thermal Efficiency and Emissions Reductions</h2>
+
+<h3>6.1 Thermal Efficiency</h3>
+<table>
+    <tr><th>Stove Type</th><th>Thermal Efficiency (%)</th><th>Test Method</th><th>Lab</th></tr>
+    <tr><td>Baseline ({{ project_data.baseline_stove_type or "three-stone" }})</td><td>{{ (project_data.baseline_efficiency or 0) * 100 }}%</td><td>WBT</td><td>{{ project_data.test_lab or "[Lab]" }}</td></tr>
+    <tr><td>Project ({{ project_data.stove_type or "improved" }})</td><td>{{ (project_data.thermal_efficiency or 0) * 100 }}%</td><td>WBT</td><td>{{ project_data.test_lab or "[Lab]" }}</td></tr>
+</table>
+<p class="caption">Table 4: Thermal efficiency test results</p>
+
+<h3>6.2 Emissions Calculation</h3>
+<table>
+    <tr><th>Parameter</th><th>Value</th><th>Unit</th><th>Source</th></tr>
+    <tr><td>Baseline Emissions</td><td>{{ calc.baseline_emissions_tco2e | round(2) if calc.baseline_emissions_tco2e else "N/A" }}</td><td>tCO₂e/year</td><td>IPCC 2006 Vol.2 Ch.2</td></tr>
+    <tr><td>Project Emissions</td><td>{{ calc.project_emissions_tco2e | round(2) if calc.project_emissions_tco2e else "N/A" }}</td><td>tCO₂e/year</td><td>IPCC 2006 Vol.2 Ch.2</td></tr>
+    <tr><td>Gross Reduction</td><td>{{ calc.gross_reduction_tco2e | round(2) if calc.gross_reduction_tco2e else "N/A" }}</td><td>tCO₂e/year</td><td>Calculation</td></tr>
+    <tr><td>Leakage</td><td>{{ calc.leakage_tco2e | round(3) if calc.leakage_tco2e else "0" }}</td><td>tCO₂e/year</td><td>Leakage Assessment</td></tr>
+    <tr><td><strong>Net Reduction</strong></td><td><strong>{{ calc.emissions_reduction_tco2e | round(2) if calc.emissions_reduction_tco2e else "N/A" }}</strong></td><td><strong>tCO₂e/year</strong></td><td><strong>Final</strong></td></tr>
+</table>
+<p class="caption">Table 5: Emissions reduction calculation summary</p>
+
+<h3>6.3 Uncertainty Assessment</h3>
+<p>Monte Carlo simulation ({{ mc.n_iterations or "10,000" }} iterations) was performed to propagate 
+uncertainty in fuel consumption, thermal efficiency, and fNRB.</p>
+
+<table>
+    <tr><th>Statistic</th><th>Value (tCO₂e/year)</th></tr>
+    <tr><td>Mean Reduction</td><td>{{ mc.mean_reduction_tco2e | round(2) }}</td></tr>
+    <tr><td>Median Reduction</td><td>{{ mc.median_reduction_tco2e | round(2) }}</td></tr>
+    <tr><td>Standard Deviation</td><td>{{ mc.std_dev | round(2) }}</td></tr>
+    <tr><td>95% CI Lower</td><td>{{ mc.ci_lower | round(2) }}</td></tr>
+    <tr><td>95% CI Upper</td><td>{{ mc.ci_upper | round(2) }}</td></tr>
+    <tr><td><strong>Conservative Estimate (2.5%)</strong></td><td><strong>{{ mc.conservative_estimate_tco2e | round(2) }}</strong></td></tr>
+</table>
+<p class="caption">Table 6: Monte Carlo uncertainty analysis results</p>
+
+<div class="page-break"></div>
+
+<!-- LEAKAGE -->
+<h2>7. Leakage Assessment</h2>
+
+<h3>7.1 Summary</h3>
+<p>The leakage assessment identified the following potential sources:</p>
+
+{% if calc.leakage_assessment and calc.leakage_assessment.leakage_types %}
+<table>
+    <tr><th>Leakage Type</th><th>Detected</th><th>Magnitude (tCO₂e)</th><th>Confidence</th></tr>
+    {% for lt in calc.leakage_assessment.leakage_types %}
+    <tr>
+        <td>{{ lt.type.replace('_', ' ').title() }}</td>
+        <td>{{ "Yes" if lt.detected else "No" }}</td>
+        <td>{{ lt.magnitude_tco2e | round(4) }}</td>
+        <td>{{ (lt.confidence * 100) | round(1) }}%</td>
+    </tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 7: Leakage assessment by type</p>
+{% else %}
+<p>No leakage data available for this monitoring period.</p>
+{% endif %}
+
+<h3>7.2 Mitigation Measures</h3>
+<p>{{ calc.leakage_assessment.mitigation_recommendation or "Standard leakage mitigation measures apply." }}</p>
+
+<div class="page-break"></div>
+
+<!-- CO-BENEFITS -->
+<h2>8. Co-benefits Summary</h2>
+
+<h3>8.1 Health Impacts</h3>
+<p>Reduced indoor air pollution from improved cookstoves is estimated to avert 
+{{ co_benefits.daly_averted or "[N]" }} DALYs annually based on 
+{{ co_benefits.households_benefiting or "[N]" }} beneficiary households.</p>
+
+<h3>8.2 Gender and Economic</h3>
+<table>
+    <tr><th>Indicator</th><th>Value</th><th>Source</th></tr>
+    <tr><td>Female-headed households served</td><td>{{ co_benefits.female_headed_hh or "[N%]" }}</td><td>Baseline Survey</td></tr>
+    <tr><td>Time saved per household/day</td><td>{{ co_benefits.time_saved_minutes or "[N]" }} min</td><td>KPT / Survey</td></tr>
+    <tr><td>Fuel cost savings per household/year</td><td>${{ co_benefits.fuel_savings_usd or "[N]" }}</td><td>Market Price Data</td></tr>
+</table>
+<p class="caption">Table 8: Co-benefits indicators</p>
+
+<div class="page-break"></div>
+
+<!-- APPENDICES -->
+<h2>9. Appendices</h2>
+
+{% for appendix in appendices %}
+<div class="appendix-header">Appendix {{ loop.index }}: {{ appendix.title }}</div>
+<div style="padding: 12px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+    <p>{{ appendix.description }}</p>
+    {% if appendix.table %}
+    <table>
+        {% for row in appendix.table %}
+        {% if loop.first %}
+        <tr>{% for col in row %}<th>{{ col }}</th>{% endfor %}</tr>
+        {% else %}
+        <tr>{% for col in row %}<td>{{ col }}</td>{% endfor %}</tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% if appendix.file_ref %}
+    <p><em>Supporting document: {{ appendix.file_ref }}</em></p>
+    {% endif %}
+</div>
+{% endfor %}
+
+<h3>9.1 Citation Index</h3>
+<table>
+    <tr><th>Citation ID</th><th>Reference</th></tr>
+    {% for cite in citations %}
+    <tr><td>[{{ cite.id }}]</td><td>{{ cite.text }}</td></tr>
+    {% endfor %}
+</table>
+<p class="caption">Table 9: Complete citation index</p>
+
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "vvb_communications.html" %}
+
+{% block body %}
+<p>Thank you for your query dated {{ query_date }} regarding the monitoring report for 
+<strong>{{ project_name }}</strong>.</p>
+
+<div class="alert">
+    <strong>Your Query:</strong><br>
+    {{ query_text }}
+</div>
+
+<p><strong>Our Response:</strong></p>
+<div style="background: #f7fafc; padding: 16px; border-radius: 4px;">
+    {{ response_text }}
+</div>
+
+{% if supporting_data %}
+<p><strong>Supporting Data:</strong></p>
+<table>
+    <tr><th>Parameter</th><th>Value</th><th>Source</th></tr>
+    {% for row in supporting_data %}
+    <tr>
+        <td>{{ row.parameter }}</td>
+        <td>{{ row.value }}</td>
+        <td>{{ row.source }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+{% if attachments %}
+<p><strong>Attachments:</strong></p>
+<ul>
+    {% for att in attachments %}
+    <li>{{ att.name }} ({{ att.description }})</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<p>We trust this addresses your query. Should you require any further information, 
+please let us know and we will provide additional detail within 48 hours.</p>
+{% endblock %}
