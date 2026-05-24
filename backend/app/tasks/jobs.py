@@ -98,6 +98,30 @@ def process_data_source_validation(ds_id: str):
 
 
 @celery_app.task(bind=True, max_retries=3)
+def generate_report_async(self, report_id: str):
+    """Generate a report PDF asynchronously."""
+    logger.info("task_generate_report_started", report_id=report_id)
+
+    async def _generate():
+        async with AsyncSessionLocal() as db:
+            from app.models import Report
+            result = await db.execute(select(Report).where(Report.id == report_id))
+            report = result.scalar_one_or_none()
+            if not report:
+                return {"error": "report not found"}
+            # Placeholder: actual PDF generation would happen here
+            report.status = "approved"
+            await db.commit()
+            return {"report_id": report_id, "status": "generated"}
+
+    try:
+        return run_async(_generate())
+    except Exception as exc:
+        logger.error("generate_report_failed", report_id=report_id, error=str(exc))
+        raise self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(bind=True, max_retries=3)
 def process_uploaded_file(self, upload_id: str):
     """Process an uploaded file based on its detected type."""
     logger.info("task_process_upload_started", upload_id=upload_id)

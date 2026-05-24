@@ -19,6 +19,9 @@ from app.api.uploads import router as uploads_router
 from app.api.webhooks import router as webhooks_router
 from app.api.vvb_liaison import router as vvb_router
 from app.api.orchestrator import router as orchestrator_router
+from app.api.whatsapp import router as whatsapp_router
+from app.api.audit import router as audit_router
+from app.api.compliance import router as compliance_router
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -35,7 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="CarbonVerify API",
     description="Automated carbon credit MRV preparation platform",
-    version="1.1.0",
+    version="1.2.0",
     lifespan=lifespan,
 )
 
@@ -62,8 +65,10 @@ app.include_router(webhooks_router)
 app.include_router(vvb_router)
 app.include_router(orchestrator_router)
 app.include_router(whatsapp_router)
+app.include_router(audit_router)
+app.include_router(compliance_router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "CarbonVerify API", "version": "1.1.0"}
+    return {"message": "CarbonVerify API", "version": "1.2.0"}

@@ -16,6 +16,11 @@ orjson==3.10.5
 websockets==12.0
 httpx==0.27.0
 email-validator==2.1.1
+pyotp==2.9.0
+qrcode==7.4.2
+cryptography==42.0.8
+aiosqlite==0.20.0
+pytest-asyncio==0.23.7
 
 # Data ingestion & processing
 pandas==2.2.2

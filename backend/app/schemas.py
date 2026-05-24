@@ -260,6 +260,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    session_id: Optional[str] = None
 
 
 class TokenPayload(BaseModel):
@@ -270,6 +271,11 @@ class TokenPayload(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class MFAVerifyRequest(BaseModel):
+    temp_token: str
+    totp_code: str
 
 
 class RefreshRequest(BaseModel):

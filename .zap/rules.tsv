@@ -1,0 +1,10 @@
+# OWASP ZAP Scan Rules
+# Format: rule_id\talert_level\treason
+# alert_level: IGNORE, WARN, FAIL
+
+# Ignore known false positives for CarbonVerify
+10027	IGNORE	Informational: Suspicious comments in static assets
+10096	IGNORE	Informational: Timestamp disclosure in headers
+10015	IGNORE	Informational: Incomplete or no cache-control header set
+40025	WARN	Active scan: Proxy disclosure
+90022	WARN	Application Error Disclosure

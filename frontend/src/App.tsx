@@ -11,6 +11,9 @@ import CalculationsPage from './pages/CalculationsPage';
 import ReportsPage from './pages/ReportsPage';
 import ReviewQueuePage from './pages/ReviewQueuePage';
 import { FieldDashboardPage } from './pages/FieldDashboardPage';
+import { SecuritySettingsPage } from './pages/SecuritySettingsPage';
+import { AuditLogPage } from './pages/AuditLogPage';
+import { ComplianceDashboardPage } from './pages/ComplianceDashboardPage';
 import CommandLayout from './components/CommandLayout';
 import { InboxPage } from './pages/command/InboxPage';
 import { ProjectsGridPage } from './pages/command/ProjectsGridPage';
@@ -41,6 +44,9 @@ function App() {
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/review-queue" element={<ReviewQueuePage />} />
               <Route path="/field" element={<FieldDashboardPage />} />
+              <Route path="/security" element={<SecuritySettingsPage />} />
+              <Route path="/audit" element={<AuditLogPage />} />
+              <Route path="/compliance" element={<ComplianceDashboardPage />} />
             </Route>
             <Route element={<CommandLayout />}>
               <Route path="/command-center/inbox" element={<InboxPage />} />

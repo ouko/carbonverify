@@ -1,0 +1,112 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Sundays at 02:00 UTC
+    - cron: '0 2 * * 0'
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and start services
+        run: |
+          docker compose -f docker-compose.yml up -d --build
+          sleep 30
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:8000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-baseline-report
+          path: report_*.html
+
+  zap-api:
+    name: OWASP ZAP API Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and start services
+        run: |
+          docker compose -f docker-compose.yml up -d --build
+          sleep 30
+
+      - name: ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.8.0
+        with:
+          target: 'http://localhost:8000/openapi.json'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+      - name: Upload ZAP API report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-api-report
+          path: report_*.html
+
+  dependency-check:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install safety bandit
+
+      - name: Run Safety check
+        run: |
+          cd backend
+          safety check -r requirements.txt || true
+
+      - name: Run Bandit
+        run: |
+          cd backend
+          bandit -r app/ -f json -o bandit-report.json || true
+
+      - name: Upload Bandit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: backend/bandit-report.json
+
+  secrets-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import List, Optional
 from enum import Enum as PyEnum
 
@@ -172,8 +172,13 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRoleEnum] = mapped_column(Enum(UserRoleEnum, name="user_role"), nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     developer_profile: Mapped[Optional["Developer"]] = relationship("Developer", back_populates="user", uselist=False)
 
@@ -207,7 +212,7 @@ class Project(Base):
     )
     complexity_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     confidence_threshold: Mapped[float] = mapped_column(Float, default=0.85)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     developer: Mapped["Developer"] = relationship("Developer", back_populates="projects")
     data_sources: Mapped[List["DataSource"]] = relationship("DataSource", back_populates="project")
@@ -239,7 +244,7 @@ class FileUpload(Base):
     validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     provenance: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship("Project", back_populates="file_uploads")
@@ -262,7 +267,7 @@ class DataSource(Base):
     validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
     provenance: Mapped[dict] = mapped_column(JSONB, default=dict)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="data_sources")
 
@@ -284,7 +289,7 @@ class CalculationRun(Base):
         Enum(CalculationStatusEnum, name="calculation_status"), default=CalculationStatusEnum.draft, nullable=False
     )
     approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="calculation_runs")
     approver: Mapped[Optional["User"]] = relationship("User")
@@ -306,7 +311,7 @@ class Report(Base):
         Enum(ReportStatusEnum, name="report_status"), default=ReportStatusEnum.draft, nullable=False
     )
     vvb_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="reports")
     calculation_run: Mapped["CalculationRun"] = relationship("CalculationRun", back_populates="reports")
@@ -336,7 +341,7 @@ class HumanReviewQueue(Base):
     learning_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     time_in_queue_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     response_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     assignee: Mapped[Optional["User"]] = relationship("User")
@@ -365,7 +370,7 @@ class AgentRun(Base):
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     execution_time_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     project: Mapped["Project"] = relationship("Project", back_populates="agent_runs")
@@ -384,7 +389,7 @@ class OrchestratorEvent(Base):
     agent_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     details: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="orchestrator_events")
 
@@ -428,7 +433,7 @@ class Enumerator(Base):
     submissions_count: Mapped[int] = mapped_column(Integer, default=0)
     rejections_count: Mapped[int] = mapped_column(Integer, default=0)
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
 
 class WhatsAppConversation(Base):
@@ -448,8 +453,8 @@ class WhatsAppConversation(Base):
     message_history: Mapped[list] = mapped_column(JSONB, default=list)
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     assigned_enumerator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("enumerators.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
@@ -473,7 +478,7 @@ class SurveyResponse(Base):
     validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     submitted_via: Mapped[str] = mapped_column(String(50), default="whatsapp", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
 
 class SupportTicket(Base):
@@ -489,4 +494,201 @@ class SupportTicket(Base):
     status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+
+
+# ─── Audit Trail ──────────────────────────────────────────────────────────────
+
+class AuditActionEnum(str, PyEnum):
+    data_ingested = "data_ingested"
+    calculation_run = "calculation_run"
+    report_generated = "report_generated"
+    human_reviewed = "human_reviewed"
+    report_approved = "report_approved"
+    vvb_submitted = "vvb_submitted"
+    vvb_responded = "vvb_responded"
+    methodology_updated = "methodology_updated"
+    user_login = "user_login"
+    user_logout = "user_logout"
+    mfa_enabled = "mfa_enabled"
+    mfa_disabled = "mfa_disabled"
+    data_exported = "data_exported"
+    consent_given = "consent_given"
+    consent_revoked = "consent_revoked"
+    dsr_received = "dsr_received"
+    dsr_fulfilled = "dsr_fulfilled"
+    breach_reported = "breach_reported"
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    action_type: Mapped[AuditActionEnum] = mapped_column(
+        Enum(AuditActionEnum, name="audit_action_type"), nullable=False
+    )
+    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    actor_type: Mapped[str] = mapped_column(String(20), default="user")  # user | agent | system
+    target_type: Mapped[str] = mapped_column(String(50), nullable=False)  # project | calculation | report | user
+    target_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    input_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    output_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    radix_tx_ref: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    actor: Mapped[Optional["User"]] = relationship("User")
+
+    __table_args__ = (
+        CheckConstraint("actor_type IN ('user', 'agent', 'system')", name="check_actor_type"),
+    )
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    device_fingerprint: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+
+
+# ─── Compliance ───────────────────────────────────────────────────────────────
+
+class ConsentTypeEnum(str, PyEnum):
+    data_processing = "data_processing"
+    marketing = "marketing"
+    third_party_sharing = "third_party_sharing"
+    photo_retention = "photo_retention"
+    biometric = "biometric"
+
+
+class ConsentRecord(Base):
+    __tablename__ = "consent_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subject_id: Mapped[str] = mapped_column(String(255), nullable=False)  # phone, email, or internal ID
+    subject_type: Mapped[str] = mapped_column(String(50), nullable=False)  # enumerator | household | developer
+    consent_type: Mapped[ConsentTypeEnum] = mapped_column(
+        Enum(ConsentTypeEnum, name="consent_type"), nullable=False
+    )
+    granted: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    granted_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    project_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
+    method: Mapped[str] = mapped_column(String(50), default="explicit")  # explicit | implied | verbal
+    document_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class DSRTypeEnum(str, PyEnum):
+    access = "access"
+    rectification = "rectification"
+    erasure = "erasure"
+    restriction = "restriction"
+    portability = "portability"
+    objection = "objection"
+
+
+class DSRStatusEnum(str, PyEnum):
+    received = "received"
+    under_review = "under_review"
+    fulfilled = "fulfilled"
+    rejected = "rejected"
+    escalated = "escalated"
+
+
+class DataSubjectRequest(Base):
+    __tablename__ = "data_subject_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_type: Mapped[DSRTypeEnum] = mapped_column(
+        Enum(DSRTypeEnum, name="dsr_type"), nullable=False
+    )
+    status: Mapped[DSRStatusEnum] = mapped_column(
+        Enum(DSRStatusEnum, name="dsr_status"), default=DSRStatusEnum.received, nullable=False
+    )
+    subject_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    sla_deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    fulfilled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    fulfillment_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
+class BreachStatusEnum(str, PyEnum):
+    detected = "detected"
+    under_investigation = "under_investigation"
+    contained = "contained"
+    notified_regulator = "notified_regulator"
+    notified_subjects = "notified_subjects"
+    resolved = "resolved"
+
+
+class BreachNotification(Base):
+    __tablename__ = "breach_notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)  # low | medium | high | critical
+    status: Mapped[BreachStatusEnum] = mapped_column(
+        Enum(BreachStatusEnum, name="breach_status"), default=BreachStatusEnum.detected, nullable=False
+    )
+    detected_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    detected_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    affected_subjects_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    affected_data_types: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    containment_measures: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    regulator_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    subjects_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class ConflictOfInterest(Base):
+    __tablename__ = "conflicts_of_interest"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String(100), nullable=False)  # financial | familial | employment | other
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    disclosed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    approved: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# ─── Methodology Versioning ───────────────────────────────────────────────────
+
+class MethodologyVersion(Base):
+    __tablename__ = "methodology_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    methodology_name: Mapped[str] = mapped_column(String(100), nullable=False)  # TPDDTEC_v4, VM0050, etc.
+    version: Mapped[str] = mapped_column(String(50), nullable=False)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    rules_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    change_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    superseded_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("methodology_name", "version", name="uq_methodology_version"),
+    )
