@@ -1,16 +1,23 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Layout } from './components/Layout';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { ProjectsPage } from './pages/ProjectsPage';
-import { ProjectDetailPage } from './pages/ProjectDetailPage';
-import { DataSourcesPage } from './pages/DataSourcesPage';
-import { CalculationsPage } from './pages/CalculationsPage';
-import { ReportsPage } from './pages/ReportsPage';
-import { ReviewQueuePage } from './pages/ReviewQueuePage';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import DataSourcesPage from './pages/DataSourcesPage';
+import CalculationsPage from './pages/CalculationsPage';
+import ReportsPage from './pages/ReportsPage';
+import ReviewQueuePage from './pages/ReviewQueuePage';
 import { FieldDashboardPage } from './pages/FieldDashboardPage';
+import CommandLayout from './components/CommandLayout';
+import { InboxPage } from './pages/command/InboxPage';
+import { ProjectsGridPage } from './pages/command/ProjectsGridPage';
+import { VVBPipelinePage } from './pages/command/VVBPipelinePage';
+import { QualityMetricsPage } from './pages/command/QualityMetricsPage';
+import { AgentPerformancePage } from './pages/command/AgentPerformancePage';
+import { SettingsPage } from './pages/command/SettingsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +41,15 @@ function App() {
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/review-queue" element={<ReviewQueuePage />} />
               <Route path="/field" element={<FieldDashboardPage />} />
+            </Route>
+            <Route element={<CommandLayout />}>
+              <Route path="/command-center/inbox" element={<InboxPage />} />
+              <Route path="/command-center/projects" element={<ProjectsGridPage />} />
+              <Route path="/command-center/vvb" element={<VVBPipelinePage />} />
+              <Route path="/command-center/quality" element={<QualityMetricsPage />} />
+              <Route path="/command-center/agents" element={<AgentPerformancePage />} />
+              <Route path="/command-center/settings" element={<SettingsPage />} />
+              <Route path="/command-center" element={<Navigate to="/command-center/inbox" replace />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

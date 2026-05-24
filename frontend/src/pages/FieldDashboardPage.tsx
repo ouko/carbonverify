@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StatCard } from '../components/StatCard';
+import StatCard from '../components/StatCard';
 import { useFieldData } from '../hooks/useFieldData';
 
 export function FieldDashboardPage() {
