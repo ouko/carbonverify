@@ -61,6 +61,7 @@ app.include_router(uploads_router)
 app.include_router(webhooks_router)
 app.include_router(vvb_router)
 app.include_router(orchestrator_router)
+app.include_router(whatsapp_router)
 
 
 @app.get("/")

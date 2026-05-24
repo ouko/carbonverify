@@ -293,3 +293,61 @@ class DashboardStats(BaseModel):
     pending_reviews: int
     recent_calculations: int
     total_emissions_reduced: float
+
+
+# ─── WhatsApp Bot Schemas ─────────────────────────────────────────────────────
+
+class EnumeratorCreate(BaseModel):
+    project_id: uuid.UUID
+    name: str
+    phone_number: str
+    language_preference: str = "en"
+
+
+class EnumeratorOut(ORMBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    phone_number: str
+    language_preference: str
+    active: bool
+    data_quality_score: Optional[float]
+    submissions_count: int
+    rejections_count: int
+    last_sync_at: Optional[datetime]
+    created_at: datetime
+
+
+class SurveyResponseOut(ORMBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    conversation_id: uuid.UUID
+    enumerator_id: Optional[uuid.UUID]
+    household_id: Optional[str]
+    stove_id: Optional[str]
+    village_name: Optional[str]
+    responses: Dict[str, Any]
+    gps_latitude: Optional[float]
+    gps_longitude: Optional[float]
+    validation_status: str
+    confidence_score: Optional[float]
+    submitted_via: str
+    created_at: datetime
+
+
+class SupportTicketOut(ORMBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    phone_number: str
+    issue_type: str
+    description: str
+    status: str
+    assigned_to: Optional[uuid.UUID]
+    created_at: datetime
+    resolved_at: Optional[datetime]
+
+
+class WhatsAppMessageIn(BaseModel):
+    phone_number: str
+    message: str
+    message_type: str = "text"

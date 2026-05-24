@@ -387,3 +387,106 @@ class OrchestratorEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     project: Mapped["Project"] = relationship("Project", back_populates="orchestrator_events")
+
+
+# ─── WhatsApp Bot & Field Operations Models ───────────────────────────────────
+
+class ConversationFlowEnum(str, PyEnum):
+    survey = "survey"
+    photo_collection = "photo_collection"
+    support = "support"
+    onboarding = "onboarding"
+    idle = "idle"
+
+
+class ConversationStateEnum(str, PyEnum):
+    active = "active"
+    completed = "completed"
+    abandoned = "abandoned"
+    waiting_human = "waiting_human"
+
+
+class SurveyQuestionTypeEnum(str, PyEnum):
+    text = "text"
+    number = "number"
+    choice = "choice"
+    image = "image"
+    location = "location"
+    voice = "voice"
+
+
+class Enumerator(Base):
+    __tablename__ = "enumerators"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    language_preference: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    data_quality_score: Mapped[Optional[float]] = mapped_column(Float, default=1.0)
+    submissions_count: Mapped[int] = mapped_column(Integer, default=0)
+    rejections_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class WhatsAppConversation(Base):
+    __tablename__ = "whatsapp_conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    flow_type: Mapped[ConversationFlowEnum] = mapped_column(
+        Enum(ConversationFlowEnum, name="conversation_flow"), default=ConversationFlowEnum.idle, nullable=False
+    )
+    state: Mapped[ConversationStateEnum] = mapped_column(
+        Enum(ConversationStateEnum, name="conversation_state"), default=ConversationStateEnum.active, nullable=False
+    )
+    current_question_index: Mapped[int] = mapped_column(Integer, default=0)
+    context_data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    message_history: Mapped[list] = mapped_column(JSONB, default=list)
+    language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
+    assigned_enumerator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("enumerators.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class SurveyResponse(Base):
+    __tablename__ = "survey_responses"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
+    enumerator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("enumerators.id"), nullable=True)
+    household_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    stove_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    village_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    responses: Mapped[dict] = mapped_column(JSONB, default=dict)
+    photos: Mapped[list] = mapped_column(JSONB, default=list)
+    gps_latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    gps_longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    validation_status: Mapped[ValidationStatusEnum] = mapped_column(
+        Enum(ValidationStatusEnum, name="survey_validation_status"), default=ValidationStatusEnum.pending, nullable=False
+    )
+    validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    submitted_via: Mapped[str] = mapped_column(String(50), default="whatsapp", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
+    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    issue_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    context_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
+    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
