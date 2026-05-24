@@ -174,11 +174,11 @@ class User(Base):
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     mfa_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
-    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
-    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     developer_profile: Mapped[Optional["Developer"]] = relationship("Developer", back_populates="user", uselist=False)
 
@@ -214,7 +214,7 @@ class Project(Base):
     confidence_threshold: Mapped[float] = mapped_column(Float, default=0.85)
     brokerage_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tokenization_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     developer: Mapped["Developer"] = relationship("Developer", back_populates="projects")
     data_sources: Mapped[List["DataSource"]] = relationship("DataSource", back_populates="project")
@@ -246,8 +246,8 @@ class FileUpload(Base):
     validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     provenance: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
-    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     project: Mapped["Project"] = relationship("Project", back_populates="file_uploads")
 
@@ -269,7 +269,7 @@ class DataSource(Base):
     validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
     provenance: Mapped[dict] = mapped_column(JSONB, default=dict)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="data_sources")
 
@@ -291,7 +291,7 @@ class CalculationRun(Base):
         Enum(CalculationStatusEnum, name="calculation_status"), default=CalculationStatusEnum.draft, nullable=False
     )
     approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="calculation_runs")
     approver: Mapped[Optional["User"]] = relationship("User")
@@ -313,7 +313,7 @@ class Report(Base):
         Enum(ReportStatusEnum, name="report_status"), default=ReportStatusEnum.draft, nullable=False
     )
     vvb_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="reports")
     calculation_run: Mapped["CalculationRun"] = relationship("CalculationRun", back_populates="reports")
@@ -330,7 +330,7 @@ class HumanReviewQueue(Base):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
     priority_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    sla_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    sla_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     status: Mapped[QueueStatusEnum] = mapped_column(
         Enum(QueueStatusEnum, name="queue_status"), default=QueueStatusEnum.pending, nullable=False
@@ -343,8 +343,8 @@ class HumanReviewQueue(Base):
     learning_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     time_in_queue_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     response_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     assignee: Mapped[Optional["User"]] = relationship("User")
 
@@ -372,8 +372,8 @@ class AgentRun(Base):
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     execution_time_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     project: Mapped["Project"] = relationship("Project", back_populates="agent_runs")
 
@@ -391,7 +391,7 @@ class OrchestratorEvent(Base):
     agent_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     details: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="orchestrator_events")
 
@@ -434,8 +434,8 @@ class Enumerator(Base):
     data_quality_score: Mapped[Optional[float]] = mapped_column(Float, default=1.0)
     submissions_count: Mapped[int] = mapped_column(Integer, default=0)
     rejections_count: Mapped[int] = mapped_column(Integer, default=0)
-    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
 
 class WhatsAppConversation(Base):
@@ -455,9 +455,9 @@ class WhatsAppConversation(Base):
     message_history: Mapped[list] = mapped_column(JSONB, default=list)
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     assigned_enumerator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("enumerators.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class SurveyResponse(Base):
@@ -480,7 +480,7 @@ class SurveyResponse(Base):
     validation_errors: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text), nullable=True)
     confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     submitted_via: Mapped[str] = mapped_column(String(50), default="whatsapp", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
 
 class SupportTicket(Base):
@@ -495,8 +495,8 @@ class SupportTicket(Base):
     context_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
 
 # ─── Audit Trail ──────────────────────────────────────────────────────────────
@@ -533,7 +533,7 @@ class AuditLog(Base):
     actor_type: Mapped[str] = mapped_column(String(20), default="user")  # user | agent | system
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)  # project | calculation | report | user
     target_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     input_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     output_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     radix_tx_ref: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
@@ -555,9 +555,9 @@ class RefreshToken(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    issued_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     device_fingerprint: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
@@ -582,8 +582,8 @@ class ConsentRecord(Base):
         Enum(ConsentTypeEnum, name="consent_type"), nullable=False
     )
     granted: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    granted_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     project_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     method: Mapped[str] = mapped_column(String(50), default="explicit")  # explicit | implied | verbal
     document_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -621,11 +621,11 @@ class DataSubjectRequest(Base):
     subject_type: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    sla_deadline: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    fulfilled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    sla_deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fulfilled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     fulfillment_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -650,15 +650,15 @@ class BreachNotification(Base):
     status: Mapped[BreachStatusEnum] = mapped_column(
         Enum(BreachStatusEnum, name="breach_status"), default=BreachStatusEnum.detected, nullable=False
     )
-    detected_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     detected_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     affected_subjects_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     affected_data_types: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
     containment_measures: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    regulator_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    subjects_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    regulator_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    subjects_notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class ConflictOfInterest(Base):
@@ -669,7 +669,7 @@ class ConflictOfInterest(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     relationship_type: Mapped[str] = mapped_column(String(100), nullable=False)  # financial | familial | employment | other
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    disclosed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    disclosed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     approved: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -689,7 +689,7 @@ class MethodologyVersion(Base):
     approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     is_current: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     superseded_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("methodology_name", "version", name="uq_methodology_version"),
@@ -745,7 +745,7 @@ class BrokerageListing(Base):
     )
     minimum_purchase: Mapped[float] = mapped_column(Float, default=1.0)
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -769,7 +769,7 @@ class BuyerProfile(Base):
     preferred_locations: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
     delivery_timeline_preference_days: Mapped[int] = mapped_column(Integer, default=90)
     auto_match_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     user: Mapped["User"] = relationship("User")
 
@@ -786,7 +786,7 @@ class TradeMatch(Base):
     location_match: Mapped[bool] = mapped_column(Boolean, default=False)
     timeline_match: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(50), default="suggested", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     listing: Mapped["BrokerageListing"] = relationship("BrokerageListing")
     buyer: Mapped["User"] = relationship("User")
@@ -814,7 +814,7 @@ class BrokerageTransaction(Base):
     escrow_release_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     vvb_certificate_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -832,9 +832,9 @@ class Escrow(Base):
     amount_usd: Mapped[float] = mapped_column(Float, nullable=False)
     buyer_deposited: Mapped[bool] = mapped_column(Boolean, default=False)
     seller_transferred: Mapped[bool] = mapped_column(Boolean, default=False)
-    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="holding", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     transaction: Mapped["BrokerageTransaction"] = relationship("BrokerageTransaction")
 
@@ -848,8 +848,8 @@ class Commission(Base):
     rate: Mapped[float] = mapped_column(Float, nullable=False)
     invoiced: Mapped[bool] = mapped_column(Boolean, default=False)
     invoice_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     transaction: Mapped["BrokerageTransaction"] = relationship("BrokerageTransaction")
 
@@ -883,7 +883,7 @@ class CarbonCreditToken(Base):
     )
     is_fractional: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     parent_token_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     project: Mapped["Project"] = relationship("Project")
     calculation_run: Mapped["CalculationRun"] = relationship("CalculationRun")
@@ -898,7 +898,7 @@ class TokenListing(Base):
     price_per_tonne_usd: Mapped[float] = mapped_column(Float, nullable=False)
     amount_available: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -919,7 +919,7 @@ class TokenRetirement(Base):
     beneficiary_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     radix_burn_tx_ref: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
     retirement_certificate_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")
     retiree: Mapped["User"] = relationship("User")
@@ -934,7 +934,7 @@ class CorporatePortfolio(Base):
     total_credits_retired: Mapped[float] = mapped_column(Float, default=0.0)
     portfolio_value_usd: Mapped[float] = mapped_column(Float, default=0.0)
     esg_report_config: Mapped[dict] = mapped_column(JSONB, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -951,7 +951,7 @@ class PortfolioHolding(Base):
     tonnes_held: Mapped[float] = mapped_column(Float, nullable=False)
     tonnes_retired: Mapped[float] = mapped_column(Float, default=0.0)
     acquisition_price_usd: Mapped[float] = mapped_column(Float, nullable=False)
-    acquired_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     portfolio: Mapped["CorporatePortfolio"] = relationship("CorporatePortfolio")
     token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")

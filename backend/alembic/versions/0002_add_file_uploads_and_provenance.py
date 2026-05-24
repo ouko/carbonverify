@@ -1,6 +1,6 @@
 """Add file_uploads table and provenance enhancements
 
-Revision ID: 0002_add_file_uploads_and_provenance
+Revision ID: 0002_file_uploads
 Revises: 0001_initial
 Create Date: 2024-01-02 00:00:00.000000
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "0002_add_file_uploads_and_provenance"
+revision: str = "0002_file_uploads"
 down_revision: Union[str, None] = "0001_initial"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

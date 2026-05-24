@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carbonverify-celery-beat
+  namespace: carbonverify
+  labels:
+    app: carbonverify-celery-beat
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: carbonverify-celery-beat
+  template:
+    metadata:
+      labels:
+        app: carbonverify-celery-beat
+    spec:
+      containers:
+        - name: beat
+          image: <ECR_REGISTRY>/carbonverify-app:latest
+          imagePullPolicy: Always
+          command: ["celery"]
+          args:
+            - "-A"
+            - "app.tasks.celery_app"
+            - "beat"
+            - "--loglevel=info"
+          envFrom:
+            - configMapRef:
+                name: carbonverify-config
+            - secretRef:
+                name: carbonverify-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "ps aux | grep 'celery beat' | grep -v grep || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          emptyDir: {}

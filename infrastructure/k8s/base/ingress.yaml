@@ -1,0 +1,83 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: carbonverify-ingress
+  namespace: carbonverify
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.carbonverify.io
+        - app.carbonverify.io
+      secretName: carbonverify-tls
+  rules:
+    - host: api.carbonverify.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: carbonverify-app
+                port:
+                  number: 8000
+    - host: app.carbonverify.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: carbonverify-frontend
+                port:
+                  number: 80
+---
+# Staging ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: carbonverify-ingress
+  namespace: carbonverify-staging
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - staging-api.carbonverify.io
+        - staging-app.carbonverify.io
+      secretName: carbonverify-staging-tls
+  rules:
+    - host: staging-api.carbonverify.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: carbonverify-app
+                port:
+                  number: 8000
+    - host: staging-app.carbonverify.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: carbonverify-frontend
+                port:
+                  number: 80

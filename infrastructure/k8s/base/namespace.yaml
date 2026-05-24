@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: carbonverify
+  labels:
+    name: carbonverify
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: carbonverify-staging
+  labels:
+    name: carbonverify-staging
+    environment: staging

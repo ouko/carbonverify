@@ -1,7 +1,7 @@
 """Add Kimi Claw orchestrator models
 
-Revision ID: 0003
-Revises: 0002
+Revision ID: 0003_orchestrator
+Revises: 0002_file_uploads
 Create Date: 2025-05-24 20:45:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = "0003"
-down_revision = "0002"
+revision = "0003_orchestrator"
+down_revision = "0002_file_uploads"
 branch_labels = None
 depends_on = None
 

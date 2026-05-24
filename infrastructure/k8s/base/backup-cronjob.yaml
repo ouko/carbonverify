@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: carbonverify
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: amazon/aws-cli:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apk add --no-cache postgresql-client gzip
+                  export PGPASSWORD="$(cat /secrets/db-password)"
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="carbonverify_production_${TIMESTAMP}.sql.gz"
+                  pg_dump -h postgres -U carbonverify -d carbonverify --verbose | gzip > /tmp/$BACKUP_FILE
+                  aws s3 cp /tmp/$BACKUP_FILE s3://$S3_BUCKET/postgres/daily/
+                  aws s3 cp s3://$S3_BUCKET/postgres/daily/$BACKUP_FILE s3://$S3_BUCKET/postgres/latest.sql.gz
+                  aws s3 ls s3://$S3_BUCKET/postgres/daily/ | awk '{print $4}' | while read file; do
+                    FILE_DATE=$(echo $file | grep -oP '\d{8}')
+                    if [ -n "$FILE_DATE" ]; then
+                      FILE_EPOCH=$(date -d "$FILE_DATE" +%s)
+                      CUTOFF_EPOCH=$(date -d "30 days ago" +%s)
+                      if [ "$FILE_EPOCH" -lt "$CUTOFF_EPOCH" ]; then
+                        aws s3 rm s3://$S3_BUCKET/postgres/daily/$file
+                      fi
+                    fi
+                  done
+              env:
+                - name: AWS_REGION
+                  value: "us-east-1"
+                - name: S3_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: carbonverify-config
+                      key: S3_BUCKET_NAME
+                - name: PGHOST
+                  value: "postgres"
+                - name: PGUSER
+                  value: "carbonverify"
+                - name: PGDATABASE
+                  value: "carbonverify"
+              volumeMounts:
+                - name: db-password
+                  mountPath: /secrets
+                  readOnly: true
+          volumes:
+            - name: db-password
+              secret:
+                secretName: carbonverify-secrets
+                items:
+                  - key: DB_PASSWORD
+                    path: db-password

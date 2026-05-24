@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: carbonverify-production
+
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      - job_name: 'carbonverify-app'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - carbonverify
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: carbonverify-app
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: 8000
+
+      - job_name: 'celery-worker'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - carbonverify
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: carbonverify-celery-worker
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ['alertmanager:9093']
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  carbonverify-alerts.yml: |
+    groups:
+      - name: carbonverify
+        rules:
+          - alert: HighErrorRate
+            expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is above 5% for {{ \$labels.service }}"
+
+          - alert: HighLatency
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High latency detected"
+              description: "95th percentile latency is above 2s"
+
+          - alert: CeleryQueueBacklog
+            expr: celery_queue_length > 100
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Celery queue backlog"
+              description: "Queue {{ \$labels.queue }} has {{ \$value }} pending tasks"
+
+          - alert: LowAgentConfidence
+            expr: avg(carbonverify_agent_confidence_score) < 0.7
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Low agent confidence"
+              description: "Average agent confidence is below 70%"
+
+          - alert: DatabaseConnectionPoolExhausted
+            expr: sqlalchemy_pool_available_connections == 0
+            for: 2m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Database connection pool exhausted"
+
+          - alert: VVBDeadlineMissed
+            expr: carbonverify_vvb_deadline_missed > 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "VVB deadline missed"
+              description: "Project {{ \$labels.project_id }} has missed VVB submission deadline"
+
+          - alert: PotentialDataBreach
+            expr: carbonverify_suspicious_access_count > 10
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Potential data breach detected"
+              description: "{{ \$value }} suspicious access attempts detected"

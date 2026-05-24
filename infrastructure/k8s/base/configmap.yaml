@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: carbonverify-config
+  namespace: carbonverify
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  MFA_ISSUER_NAME: "CarbonVerify"
+  MFA_REQUIRED_ROLES: "admin,operator"
+  SESSION_INACTIVITY_TIMEOUT_MINUTES: "30"
+  AWS_REGION: "us-east-1"
+  S3_BUCKET_NAME: "carbonverify-uploads"
+  BREACH_NOTIFICATION_SLA_HOURS: "72"
+  DATA_RETENTION_YEARS_RAW_PHOTOS: "3"
+  DSR_RESPONSE_SLA_DAYS: "30"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+  FRONTEND_URL: "https://app.carbonverify.io"
+  RADIX_ENABLED: "false"
+  RADIX_TOKEN_ENABLED: "false"

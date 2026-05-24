@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carbonverify-celery-worker
+  namespace: carbonverify
+  labels:
+    app: carbonverify-celery-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: carbonverify-celery-worker
+  template:
+    metadata:
+      labels:
+        app: carbonverify-celery-worker
+    spec:
+      containers:
+        - name: worker
+          image: <ECR_REGISTRY>/carbonverify-app:latest
+          imagePullPolicy: Always
+          command: ["celery"]
+          args:
+            - "-A"
+            - "app.tasks.celery_app"
+            - "worker"
+            - "--loglevel=info"
+            - "--concurrency=4"
+          envFrom:
+            - configMapRef:
+                name: carbonverify-config
+            - secretRef:
+                name: carbonverify-secrets
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "celery -A app.tasks.celery_app inspect ping || exit 1"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          emptyDir: {}
+      terminationGracePeriodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: carbonverify-celery-worker-pdb
+  namespace: carbonverify
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: carbonverify-celery-worker
