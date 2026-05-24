@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
 
+    # Kimi API (Moonshot AI)
+    KIMI_API_KEY: str = ""
+    KIMI_API_BASE: str = "https://api.moonshot.cn/v1"
+    KIMI_MODEL: str = "moonshot-v1-8k"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

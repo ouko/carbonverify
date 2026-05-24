@@ -18,6 +18,7 @@ from app.api.websocket import router as websocket_router
 from app.api.uploads import router as uploads_router
 from app.api.webhooks import router as webhooks_router
 from app.api.vvb_liaison import router as vvb_router
+from app.api.orchestrator import router as orchestrator_router
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -59,6 +60,7 @@ app.include_router(websocket_router)
 app.include_router(uploads_router)
 app.include_router(webhooks_router)
 app.include_router(vvb_router)
+app.include_router(orchestrator_router)
 
 
 @app.get("/")

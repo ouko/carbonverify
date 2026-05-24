@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, date
 from typing import List, Optional
+from enum import Enum as PyEnum
 
 from sqlalchemy import (
     Column,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     ARRAY,
     CheckConstraint,
     UniqueConstraint,
+    Interval,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -24,14 +26,14 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 
 
-class MethodologyEnum(str, Enum):
+class MethodologyEnum(str, PyEnum):
     TPDDTEC_v4 = "TPDDTEC_v4"
     VM0050 = "VM0050"
     VMR0006 = "VMR0006"
     AMS_II_G = "AMS-II.G"
 
 
-class ProjectStatusEnum(str, Enum):
+class ProjectStatusEnum(str, PyEnum):
     onboarding = "onboarding"
     data_collection = "data_collection"
     calculation = "calculation"
@@ -41,7 +43,7 @@ class ProjectStatusEnum(str, Enum):
     monitoring = "monitoring"
 
 
-class SourceTypeEnum(str, Enum):
+class SourceTypeEnum(str, PyEnum):
     satellite = "satellite"
     iot = "iot"
     mobile_survey = "mobile_survey"
@@ -49,21 +51,21 @@ class SourceTypeEnum(str, Enum):
     manual_entry = "manual_entry"
 
 
-class ValidationStatusEnum(str, Enum):
+class ValidationStatusEnum(str, PyEnum):
     pending = "pending"
     valid = "valid"
     flagged = "flagged"
     rejected = "rejected"
 
 
-class CalculationStatusEnum(str, Enum):
+class CalculationStatusEnum(str, PyEnum):
     draft = "draft"
     review_pending = "review_pending"
     approved = "approved"
     rejected = "rejected"
 
 
-class ReportStatusEnum(str, Enum):
+class ReportStatusEnum(str, PyEnum):
     draft = "draft"
     human_review = "human_review"
     approved = "approved"
@@ -72,40 +74,41 @@ class ReportStatusEnum(str, Enum):
     rejected = "rejected"
 
 
-class ReportTemplateTypeEnum(str, Enum):
+class ReportTemplateTypeEnum(str, PyEnum):
     GoldStandard_TPDDTEC = "GoldStandard_TPDDTEC"
     Verra_VM0050 = "Verra_VM0050"
 
 
-class QueueItemTypeEnum(str, Enum):
+class QueueItemTypeEnum(str, PyEnum):
     calculation = "calculation"
     report = "report"
     vvb_response = "vvb_response"
     data_anomaly = "data_anomaly"
+    agent_review = "agent_review"
 
 
-class QueueStatusEnum(str, Enum):
+class QueueStatusEnum(str, PyEnum):
     pending = "pending"
     in_review = "in_review"
     resolved = "resolved"
     escalated = "escalated"
 
 
-class UserRoleEnum(str, Enum):
+class UserRoleEnum(str, PyEnum):
     admin = "admin"
     operator = "operator"
     developer = "developer"
     viewer = "viewer"
 
 
-class FileUploadStatusEnum(str, Enum):
+class FileUploadStatusEnum(str, PyEnum):
     uploaded = "uploaded"
     processing = "processing"
     completed = "completed"
     failed = "failed"
 
 
-class DetectedFileTypeEnum(str, Enum):
+class DetectedFileTypeEnum(str, PyEnum):
     excel = "excel"
     csv = "csv"
     pdf = "pdf"
@@ -113,7 +116,7 @@ class DetectedFileTypeEnum(str, Enum):
     unknown = "unknown"
 
 
-class ImageCategoryEnum(str, Enum):
+class ImageCategoryEnum(str, PyEnum):
     stove_installation = "stove_installation"
     kpt_weighing = "kpt_weighing"
     stove_condition = "stove_condition"
@@ -121,12 +124,44 @@ class ImageCategoryEnum(str, Enum):
     other = "other"
 
 
-class DocumentTypeEnum(str, Enum):
+class DocumentTypeEnum(str, PyEnum):
     monitoring_report = "monitoring_report"
     kpt_results = "kpt_results"
     sales_receipt = "sales_receipt"
     survey_form = "survey_form"
     other = "other"
+
+
+# ─── Kimi Claw Orchestrator Enums ─────────────────────────────────────────────
+
+class AgentTypeEnum(str, PyEnum):
+    ingestion = "ingestion"
+    validation = "validation"
+    calculation = "calculation"
+    reporting = "reporting"
+    vvb_liaison = "vvb_liaison"
+    quality_control = "quality_control"
+    client_success = "client_success"
+
+
+class AgentStatusEnum(str, PyEnum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    queued_for_review = "queued_for_review"
+
+
+class OrchestratorEventTypeEnum(str, PyEnum):
+    state_transition = "state_transition"
+    agent_dispatch = "agent_dispatch"
+    agent_complete = "agent_complete"
+    confidence_check = "confidence_check"
+    human_review_queued = "human_review_queued"
+    human_review_resolved = "human_review_resolved"
+    auto_advance = "auto_advance"
+    escalation = "escalation"
+    error = "error"
 
 
 class User(Base):
@@ -179,6 +214,8 @@ class Project(Base):
     calculation_runs: Mapped[List["CalculationRun"]] = relationship("CalculationRun", back_populates="project")
     reports: Mapped[List["Report"]] = relationship("Report", back_populates="project")
     file_uploads: Mapped[List["FileUpload"]] = relationship("FileUpload", back_populates="project")
+    agent_runs: Mapped[List["AgentRun"]] = relationship("AgentRun", back_populates="project")
+    orchestrator_events: Mapped[List["OrchestratorEvent"]] = relationship("OrchestratorEvent", back_populates="project")
 
 
 class FileUpload(Base):
@@ -285,11 +322,20 @@ class HumanReviewQueue(Base):
     item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    priority_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sla_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     status: Mapped[QueueStatusEnum] = mapped_column(
         Enum(QueueStatusEnum, name="queue_status"), default=QueueStatusEnum.pending, nullable=False
     )
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    context_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    suggested_action: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    confidence_gap: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    human_decision: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    learning_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    time_in_queue_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    response_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -298,3 +344,46 @@ class HumanReviewQueue(Base):
     __table_args__ = (
         CheckConstraint("priority BETWEEN 1 AND 5", name="check_priority_range"),
     )
+
+
+# ─── Kimi Claw Orchestrator Models ────────────────────────────────────────────
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    agent_type: Mapped[AgentTypeEnum] = mapped_column(
+        Enum(AgentTypeEnum, name="agent_type"), nullable=False
+    )
+    status: Mapped[AgentStatusEnum] = mapped_column(
+        Enum(AgentStatusEnum, name="agent_status"), default=AgentStatusEnum.pending, nullable=False
+    )
+    trigger_event: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    output_data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    execution_time_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="agent_runs")
+
+
+class OrchestratorEvent(Base):
+    __tablename__ = "orchestrator_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    event_type: Mapped[OrchestratorEventTypeEnum] = mapped_column(
+        Enum(OrchestratorEventTypeEnum, name="orchestrator_event_type"), nullable=False
+    )
+    from_state: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    to_state: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    agent_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("agent_runs.id"), nullable=True)
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    details: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    project: Mapped["Project"] = relationship("Project", back_populates="orchestrator_events")
