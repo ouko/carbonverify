@@ -8,7 +8,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
-from sqlalchemy import JSON, String, Text
+from sqlalchemy import JSON, String, Text, TypeDecorator
 
 # Set test database URL BEFORE any app imports
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
@@ -17,6 +17,23 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 mock_magic = MagicMock()
 mock_magic.from_buffer = lambda buf, mime=False: "application/octet-stream"
 sys.modules["magic"] = mock_magic
+
+
+class UUIDAsString(TypeDecorator):
+    """Store UUIDs as strings but return them as UUID objects."""
+    impl = String(36)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return str(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return uuid.UUID(value)
+        return value
+
 
 # Patch PostgreSQL-specific types for SQLite compatibility
 import app.models as models_module
@@ -29,7 +46,7 @@ for attr_name in dir(models_module):
             if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'ARRAY':
                 col.type = JSON()
             if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'UUID':
-                col.type = String(36)
+                col.type = UUIDAsString()
 
 from app.main import app
 from app.database import Base, get_db
@@ -40,31 +57,6 @@ from app.models import User, UserRoleEnum
 import sqlite3
 sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
 sqlite3.register_converter("uuid", lambda s: uuid.UUID(s.decode() if isinstance(s, bytes) else s))
-
-# Add bind parameter processing for UUID -> String in SQLAlchemy
-from sqlalchemy import TypeDecorator
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
-
-class StringUUID(TypeDecorator):
-    impl = String(36)
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        if value is None:
-            return None
-        return str(value)
-
-# Re-patch UUID columns with proper bind processing
-for attr_name in dir(models_module):
-    obj = getattr(models_module, attr_name)
-    if isinstance(obj, type) and hasattr(obj, '__tablename__'):
-        for col in obj.__table__.columns:
-            if isinstance(col.type, String) and col.name.endswith('_id') and col.name != 'id':
-                # Foreign keys already patched to String
-                pass
-            elif hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'UUID':
-                # Already patched above, but let's ensure it's consistent
-                pass
 
 
 def _create_mock_user(role: UserRoleEnum = UserRoleEnum.admin, suffix: str = ""):
@@ -82,8 +74,9 @@ def _create_mock_user(role: UserRoleEnum = UserRoleEnum.admin, suffix: str = "")
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def engine():
+    """Create a fresh in-memory engine for each test."""
     engine = create_async_engine(
         TEST_DATABASE_URL,
         connect_args={"check_same_thread": False},
@@ -100,13 +93,15 @@ async def db_session(engine):
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         yield session
-        await session.rollback()
 
 
 @pytest_asyncio.fixture
-async def client(db_session):
+async def client(engine):
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
     async def override_get_db():
-        yield db_session
+        async with async_session() as session:
+            yield session
 
     app.dependency_overrides[get_db] = override_get_db
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -115,16 +110,24 @@ async def client(db_session):
 
 
 @pytest_asyncio.fixture
-async def authenticated_client(db_session):
-    mock_user = _create_mock_user(UserRoleEnum.admin, suffix=str(uuid.uuid4())[:8])
-    db_session.add(mock_user)
-    await db_session.commit()
+async def authenticated_client(engine):
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        mock_user = _create_mock_user(UserRoleEnum.admin, suffix=str(uuid.uuid4())[:8])
+        session.add(mock_user)
+        await session.commit()
 
     async def override_get_db():
-        yield db_session
+        async with async_session() as session:
+            yield session
 
     async def override_get_current_user():
-        return mock_user
+        async with async_session() as session:
+            result = await session.execute(
+                __import__("sqlalchemy").select(User).where(User.email.like("test%@carbonverify.io")).order_by(User.created_at.desc())
+            )
+            return result.scalar_one()
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
@@ -135,7 +138,7 @@ async def authenticated_client(db_session):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop

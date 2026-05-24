@@ -212,6 +212,8 @@ class Project(Base):
     )
     complexity_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     confidence_threshold: Mapped[float] = mapped_column(Float, default=0.85)
+    brokerage_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    tokenization_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
 
     developer: Mapped["Developer"] = relationship("Developer", back_populates="projects")
@@ -692,3 +694,264 @@ class MethodologyVersion(Base):
     __table_args__ = (
         UniqueConstraint("methodology_name", "version", name="uq_methodology_version"),
     )
+
+
+# ─── Brokerage & Tokenization ─────────────────────────────────────────────────
+
+class ListingStatusEnum(str, PyEnum):
+    draft = "draft"
+    active = "active"
+    sold = "sold"
+    withdrawn = "withdrawn"
+
+
+class TradeTypeEnum(str, PyEnum):
+    spot = "spot"
+    forward = "forward"
+    escrow = "escrow"
+
+
+class TransactionStatusEnum(str, PyEnum):
+    pending = "pending"
+    confirmed = "confirmed"
+    in_escrow = "in_escrow"
+    completed = "completed"
+    cancelled = "cancelled"
+    disputed = "disputed"
+
+
+class BuyerTypeEnum(str, PyEnum):
+    corporate = "corporate"
+    retailer = "retailer"
+    offset_seeker = "offset_seeker"
+    wholesaler = "wholesaler"
+
+
+class BrokerageListing(Base):
+    __tablename__ = "brokerage_listings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    seller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    available_credits: Mapped[float] = mapped_column(Float, nullable=False)
+    price_per_credit_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    vintage_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    methodology: Mapped[str] = mapped_column(String(100), nullable=False)
+    co_benefits: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    delivery_timeline_days: Mapped[int] = mapped_column(Integer, default=30)
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[ListingStatusEnum] = mapped_column(
+        Enum(ListingStatusEnum, name="listing_status"), default=ListingStatusEnum.draft, nullable=False
+    )
+    minimum_purchase: Mapped[float] = mapped_column(Float, default=1.0)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    project: Mapped["Project"] = relationship("Project")
+    seller: Mapped["User"] = relationship("User")
+
+
+class BuyerProfile(Base):
+    __tablename__ = "buyer_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    buyer_type: Mapped[BuyerTypeEnum] = mapped_column(
+        Enum(BuyerTypeEnum, name="buyer_type"), nullable=False
+    )
+    company_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    preferred_methodologies: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    price_range_min_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    price_range_max_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    preferred_locations: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    delivery_timeline_preference_days: Mapped[int] = mapped_column(Integer, default=90)
+    auto_match_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user: Mapped["User"] = relationship("User")
+
+
+class TradeMatch(Base):
+    __tablename__ = "trade_matches"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("brokerage_listings.id"), nullable=False)
+    buyer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    match_score: Mapped[float] = mapped_column(Float, nullable=False)
+    methodology_match: Mapped[bool] = mapped_column(Boolean, default=False)
+    price_match: Mapped[bool] = mapped_column(Boolean, default=False)
+    location_match: Mapped[bool] = mapped_column(Boolean, default=False)
+    timeline_match: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(50), default="suggested", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    listing: Mapped["BrokerageListing"] = relationship("BrokerageListing")
+    buyer: Mapped["User"] = relationship("User")
+
+
+class BrokerageTransaction(Base):
+    __tablename__ = "brokerage_transactions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("brokerage_listings.id"), nullable=False)
+    buyer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    seller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    trade_type: Mapped[TradeTypeEnum] = mapped_column(
+        Enum(TradeTypeEnum, name="trade_type"), nullable=False
+    )
+    credits_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    price_per_credit_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    total_value_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    commission_rate: Mapped[float] = mapped_column(Float, default=0.025)
+    commission_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[TransactionStatusEnum] = mapped_column(
+        Enum(TransactionStatusEnum, name="transaction_status"), default=TransactionStatusEnum.pending, nullable=False
+    )
+    delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    escrow_release_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    vvb_certificate_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    listing: Mapped["BrokerageListing"] = relationship("BrokerageListing")
+    buyer: Mapped["User"] = relationship("User", foreign_keys=[buyer_id])
+    seller: Mapped["User"] = relationship("User", foreign_keys=[seller_id])
+
+
+class Escrow(Base):
+    __tablename__ = "escrows"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    transaction_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("brokerage_transactions.id"), nullable=False)
+    amount_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    buyer_deposited: Mapped[bool] = mapped_column(Boolean, default=False)
+    seller_transferred: Mapped[bool] = mapped_column(Boolean, default=False)
+    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="holding", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    transaction: Mapped["BrokerageTransaction"] = relationship("BrokerageTransaction")
+
+
+class Commission(Base):
+    __tablename__ = "commissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    transaction_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("brokerage_transactions.id"), nullable=False)
+    amount_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    rate: Mapped[float] = mapped_column(Float, nullable=False)
+    invoiced: Mapped[bool] = mapped_column(Boolean, default=False)
+    invoice_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    transaction: Mapped["BrokerageTransaction"] = relationship("BrokerageTransaction")
+
+
+# ─── Tokenization ─────────────────────────────────────────────────────────────
+
+class TokenStatusEnum(str, PyEnum):
+    minted = "minted"
+    listed = "listed"
+    sold = "sold"
+    retired = "retired"
+    fractional = "fractional"
+
+
+class CarbonCreditToken(Base):
+    __tablename__ = "carbon_credit_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    calculation_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calculation_runs.id"), nullable=False)
+    tonnes_co2e: Mapped[float] = mapped_column(Float, nullable=False)
+    vintage_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    methodology: Mapped[str] = mapped_column(String(100), nullable=False)
+    vvb_registry: Mapped[str] = mapped_column(String(100), nullable=False)
+    vvb_certificate_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    radix_token_address: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    radix_resource_address: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[TokenStatusEnum] = mapped_column(
+        Enum(TokenStatusEnum, name="token_status"), default=TokenStatusEnum.minted, nullable=False
+    )
+    is_fractional: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    parent_token_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    project: Mapped["Project"] = relationship("Project")
+    calculation_run: Mapped["CalculationRun"] = relationship("CalculationRun")
+
+
+class TokenListing(Base):
+    __tablename__ = "token_listings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("carbon_credit_tokens.id"), nullable=False)
+    seller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    price_per_tonne_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    amount_available: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")
+    seller: Mapped["User"] = relationship("User")
+
+
+class TokenRetirement(Base):
+    __tablename__ = "token_retirements"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("carbon_credit_tokens.id"), nullable=False)
+    retired_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    tonnes_retired: Mapped[float] = mapped_column(Float, nullable=False)
+    purpose: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    beneficiary_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    beneficiary_location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    radix_burn_tx_ref: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    retirement_certificate_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")
+    retiree: Mapped["User"] = relationship("User")
+
+
+class CorporatePortfolio(Base):
+    __tablename__ = "corporate_portfolios"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    total_credits_held: Mapped[float] = mapped_column(Float, default=0.0)
+    total_credits_retired: Mapped[float] = mapped_column(Float, default=0.0)
+    portfolio_value_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    esg_report_config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+
+class PortfolioHolding(Base):
+    __tablename__ = "portfolio_holdings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("corporate_portfolios.id"), nullable=False)
+    token_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("carbon_credit_tokens.id"), nullable=False)
+    tonnes_held: Mapped[float] = mapped_column(Float, nullable=False)
+    tonnes_retired: Mapped[float] = mapped_column(Float, default=0.0)
+    acquisition_price_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    portfolio: Mapped["CorporatePortfolio"] = relationship("CorporatePortfolio")
+    token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")

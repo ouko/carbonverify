@@ -70,11 +70,15 @@ class ProjectUpdate(BaseModel):
     status: Optional[str] = None
     complexity_score: Optional[float] = None
     confidence_threshold: Optional[float] = None
+    brokerage_enabled: Optional[bool] = None
+    tokenization_enabled: Optional[bool] = None
 
 
 class ProjectOut(ProjectBase, ORMBase):
     id: uuid.UUID
     developer_id: uuid.UUID
+    brokerage_enabled: bool = False
+    tokenization_enabled: bool = False
     created_at: datetime
 
 
@@ -357,3 +361,221 @@ class WhatsAppMessageIn(BaseModel):
     phone_number: str
     message: str
     message_type: str = "text"
+
+
+# ─── Brokerage Schemas ────────────────────────────────────────────────────────
+
+class BrokerageListingCreate(BaseModel):
+    project_id: uuid.UUID
+    available_credits: float = Field(..., gt=0)
+    price_per_credit_usd: float = Field(..., gt=0)
+    vintage_year: int
+    methodology: str
+    co_benefits: List[str] = []
+    delivery_timeline_days: int = 30
+    location: Optional[str] = None
+    minimum_purchase: float = 1.0
+    metadata: Dict[str, Any] = {}
+
+
+class BrokerageListingOut(ORMBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    seller_id: uuid.UUID
+    available_credits: float
+    price_per_credit_usd: float
+    vintage_year: int
+    methodology: str
+    co_benefits: List[str]
+    delivery_timeline_days: int
+    location: Optional[str]
+    status: str
+    minimum_purchase: float
+    created_at: datetime
+
+
+class BuyerProfileCreate(BaseModel):
+    buyer_type: str
+    company_name: Optional[str] = None
+    preferred_methodologies: List[str] = []
+    price_range_min_usd: Optional[float] = None
+    price_range_max_usd: Optional[float] = None
+    preferred_locations: List[str] = []
+    delivery_timeline_preference_days: int = 90
+    auto_match_enabled: bool = True
+
+
+class BuyerProfileOut(ORMBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    buyer_type: str
+    company_name: Optional[str]
+    preferred_methodologies: List[str]
+    price_range_min_usd: Optional[float]
+    price_range_max_usd: Optional[float]
+    preferred_locations: List[str]
+    auto_match_enabled: bool
+    created_at: datetime
+
+
+class TradeMatchOut(ORMBase):
+    id: uuid.UUID
+    listing_id: uuid.UUID
+    buyer_id: uuid.UUID
+    match_score: float
+    methodology_match: bool
+    price_match: bool
+    location_match: bool
+    timeline_match: bool
+    status: str
+    created_at: datetime
+
+
+class TransactionCreate(BaseModel):
+    listing_id: uuid.UUID
+    credits_amount: float = Field(..., gt=0)
+    trade_type: str
+    delivery_date: Optional[date] = None
+
+
+class TransactionOut(ORMBase):
+    id: uuid.UUID
+    listing_id: uuid.UUID
+    buyer_id: uuid.UUID
+    seller_id: uuid.UUID
+    trade_type: str
+    credits_amount: float
+    price_per_credit_usd: float
+    total_value_usd: float
+    commission_rate: float
+    commission_usd: float
+    status: str
+    delivery_date: Optional[date]
+    created_at: datetime
+
+
+class EscrowOut(ORMBase):
+    id: uuid.UUID
+    transaction_id: uuid.UUID
+    amount_usd: float
+    buyer_deposited: bool
+    seller_transferred: bool
+    status: str
+    created_at: datetime
+
+
+class CommissionOut(ORMBase):
+    id: uuid.UUID
+    transaction_id: uuid.UUID
+    amount_usd: float
+    rate: float
+    invoiced: bool
+    created_at: datetime
+
+
+# ─── Tokenization Schemas ─────────────────────────────────────────────────────
+
+class TokenMintRequest(BaseModel):
+    project_id: uuid.UUID
+    calculation_run_id: uuid.UUID
+    tonnes_co2e: float = Field(..., gt=0)
+    vintage_year: int
+    methodology: str
+    vvb_registry: str
+    vvb_certificate_id: Optional[str] = None
+    metadata: Dict[str, Any] = {}
+
+
+class CarbonCreditTokenOut(ORMBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    calculation_run_id: uuid.UUID
+    tonnes_co2e: float
+    vintage_year: int
+    methodology: str
+    vvb_registry: str
+    vvb_certificate_id: Optional[str]
+    radix_token_address: Optional[str]
+    status: str
+    is_fractional: bool
+    parent_token_id: Optional[uuid.UUID]
+    created_at: datetime
+
+
+class TokenListingCreate(BaseModel):
+    token_id: uuid.UUID
+    price_per_tonne_usd: float = Field(..., gt=0)
+    amount_available: float = Field(..., gt=0)
+
+
+class TokenListingOut(ORMBase):
+    id: uuid.UUID
+    token_id: uuid.UUID
+    seller_id: uuid.UUID
+    price_per_tonne_usd: float
+    amount_available: float
+    status: str
+    created_at: datetime
+
+
+class TokenRetireRequest(BaseModel):
+    token_id: uuid.UUID
+    tonnes_retired: float = Field(..., gt=0)
+    purpose: Optional[str] = None
+    beneficiary_name: Optional[str] = None
+    beneficiary_location: Optional[str] = None
+
+
+class TokenRetirementOut(ORMBase):
+    id: uuid.UUID
+    token_id: uuid.UUID
+    retired_by: uuid.UUID
+    tonnes_retired: float
+    purpose: Optional[str]
+    beneficiary_name: Optional[str]
+    beneficiary_location: Optional[str]
+    radix_burn_tx_ref: Optional[str]
+    retirement_certificate_url: Optional[str]
+    created_at: datetime
+
+
+# ─── Corporate Buyer Schemas ──────────────────────────────────────────────────
+
+class CorporatePortfolioOut(ORMBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    total_credits_held: float
+    total_credits_retired: float
+    portfolio_value_usd: float
+    esg_report_config: Dict[str, Any]
+    updated_at: datetime
+
+
+class PortfolioHoldingOut(ORMBase):
+    id: uuid.UUID
+    portfolio_id: uuid.UUID
+    token_id: uuid.UUID
+    tonnes_held: float
+    tonnes_retired: float
+    acquisition_price_usd: float
+    acquired_at: datetime
+
+
+class ESGReportConfig(BaseModel):
+    company_name: str
+    reporting_period_start: date
+    reporting_period_end: date
+    scope: str = "Scope 3"
+    sdgs: List[str] = []
+
+
+class ESGReportOut(BaseModel):
+    company_name: str
+    reporting_period: str
+    total_offsets_tco2e: float
+    total_retired_tco2e: float
+    vintage_distribution: Dict[int, float]
+    methodology_breakdown: Dict[str, float]
+    sdg_impact_summary: Dict[str, Any]
+    project_contributions: List[Dict[str, Any]]
+    generated_at: datetime

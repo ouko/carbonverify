@@ -22,6 +22,9 @@ from app.api.orchestrator import router as orchestrator_router
 from app.api.whatsapp import router as whatsapp_router
 from app.api.audit import router as audit_router
 from app.api.compliance import router as compliance_router
+from app.api.brokerage import router as brokerage_router
+from app.api.tokenization import router as tokenization_router
+from app.api.corporate import router as corporate_router
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -67,6 +70,9 @@ app.include_router(orchestrator_router)
 app.include_router(whatsapp_router)
 app.include_router(audit_router)
 app.include_router(compliance_router)
+app.include_router(brokerage_router)
+app.include_router(tokenization_router)
+app.include_router(corporate_router)
 
 
 @app.get("/")

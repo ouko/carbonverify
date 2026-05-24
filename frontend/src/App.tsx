@@ -14,6 +14,9 @@ import { FieldDashboardPage } from './pages/FieldDashboardPage';
 import { SecuritySettingsPage } from './pages/SecuritySettingsPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { ComplianceDashboardPage } from './pages/ComplianceDashboardPage';
+import { BrokeragePage } from './pages/BrokeragePage';
+import { TokenizationPage } from './pages/TokenizationPage';
+import { CorporateDashboardPage } from './pages/CorporateDashboardPage';
 import CommandLayout from './components/CommandLayout';
 import { InboxPage } from './pages/command/InboxPage';
 import { ProjectsGridPage } from './pages/command/ProjectsGridPage';
@@ -47,6 +50,9 @@ function App() {
               <Route path="/security" element={<SecuritySettingsPage />} />
               <Route path="/audit" element={<AuditLogPage />} />
               <Route path="/compliance" element={<ComplianceDashboardPage />} />
+              <Route path="/brokerage" element={<BrokeragePage />} />
+              <Route path="/tokenization" element={<TokenizationPage />} />
+              <Route path="/corporate" element={<CorporateDashboardPage />} />
             </Route>
             <Route element={<CommandLayout />}>
               <Route path="/command-center/inbox" element={<InboxPage />} />
