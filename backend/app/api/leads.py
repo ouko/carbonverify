@@ -146,6 +146,25 @@ async def score_single_lead(
     return lead
 
 
+async def _scrape_one(source: str, country: str) -> tuple[str, list[dict], str | None]:
+    """Scrape a single registry source. Returns (source, leads, error)."""
+    scraper = get_scraper(source)
+    try:
+        raw_leads = await asyncio.wait_for(
+            asyncio.to_thread(scraper.scrape, country=country),
+            timeout=90.0,
+        )
+        return source, raw_leads, None
+    except asyncio.TimeoutError:
+        logger.warning("scrape_timeout", source=source, country=country)
+        return source, [], "Scrape timed out after 90s"
+    except Exception as exc:
+        logger.error("scrape_failed", source=source, error=str(exc))
+        return source, [], str(exc)
+    finally:
+        scraper.close()
+
+
 @router.post("/scrape")
 async def trigger_scrape(
     payload: LeadScrapeRequest,
@@ -153,29 +172,22 @@ async def trigger_scrape(
     user: User = Depends(require_operator),
 ):
     sources = [payload.registry_source] if payload.registry_source else list_scrapers()
+    country = payload.country or "Kenya"
+
+    # Run all scrapers concurrently
+    scrape_tasks = [_scrape_one(source, country) for source in sources]
+    scrape_results = await asyncio.gather(*scrape_tasks)
+
     total_created = 0
     total_updated = 0
     per_source: list[dict] = []
 
-    for source in sources:
-        scraper = get_scraper(source)
-        raw_leads: list[dict] = []
-        error_msg: str | None = None
+    for source, raw_leads, error_msg in scrape_results:
         data_source = "demo"
-
-        try:
-            raw_leads = await asyncio.to_thread(scraper.scrape, country=payload.country or "Kenya")
-        except Exception as exc:
-            error_msg = str(exc)
-            logger.error("scrape_failed", source=source, error=error_msg)
-        finally:
-            scraper.close()
-
         source_created = 0
         source_updated = 0
 
         for raw in raw_leads:
-            # Track whether this came from live or demo
             meta = raw.pop("_scrape_meta", {})
             data_source = meta.get("data_source", "demo")
 

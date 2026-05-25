@@ -1,19 +1,8 @@
 """Verra registry scraper.
 
-Verra Registry uses a JavaScript-heavy frontend with Cloudflare protection.
-Direct API access is limited. This scraper attempts live HTTP calls and
-falls back to demo data when blocked.
-
-Known endpoints:
-  - Search UI: https://registry.verra.org/app/search/VCS/All%20Projects
-  - Project detail (guest): https://registry.verra.org/ui/guest/projectSummary/VCS/VCU/{id}
-  - The registry does NOT expose a public REST API for unauthenticated bulk queries.
-
-To enable full live scraping, install Playwright:
-    uv pip install playwright
-    playwright install chromium
-
-Then set LEAD_SCRAPER_MODE=live in your .env file.
+Verra Registry uses a JavaScript-heavy Angular frontend with Cloudflare protection.
+Playwright is used to bypass bot detection, but the Angular app is complex and
+may not fully render in automated contexts. Falls back to demo data when blocked.
 """
 
 import time
@@ -29,7 +18,6 @@ from app.config import get_settings
 logger = get_logger(__name__)
 settings = get_settings()
 
-# Demo data for Kenya projects
 DEMO_VERRA_LEADS: List[Dict[str, Any]] = [
     {
         "external_id": "VCS-VCU-1952",
@@ -70,7 +58,7 @@ DEMO_VERRA_LEADS: List[Dict[str, Any]] = [
     {
         "external_id": "VCS-VCU-1543",
         "project_name": "Lake Turkana Wind Power",
-        "project_developer": "LTWP Kenya",
+        "project_developer": "LTWP Carbon Ltd",
         "developer_contact": "+254 20 1234567",
         "developer_email": "carbon@ltwp.co.ke",
         "country": "Kenya",
@@ -87,39 +75,39 @@ DEMO_VERRA_LEADS: List[Dict[str, Any]] = [
     },
     {
         "external_id": "VCS-VCU-2311",
-        "project_name": "Nairobi Improved Cookstoves Distribution",
-        "project_developer": "GreenChar Kenya",
-        "developer_contact": "+254 733 987654",
-        "developer_email": "mrv@greenchar.org",
+        "project_name": "Mau Forest Restoration Phase II",
+        "project_developer": "Kenya Forest Service",
+        "developer_contact": "+254 20 2345678",
+        "developer_email": "carbon@kenyaforestservice.org",
         "country": "Kenya",
-        "region": "Nairobi",
-        "methodology": "AMS-II.G",
-        "sector": "Energy Efficiency",
-        "status": "under_verification",
+        "region": "Mau Complex",
+        "methodology": "AR-ACM0003",
+        "sector": "Forestry",
+        "status": "under_validation",
         "crediting_period_start": "2023-01-01",
-        "crediting_period_end": "2032-12-31",
+        "crediting_period_end": "2053-12-31",
         "last_verification_date": None,
-        "estimated_credits_per_year": 8500.0,
+        "estimated_credits_per_year": 45000.0,
         "registry_url": "https://registry.verra.org/app/projectDetail/VCS/VCU/2311",
-        "days_in_status": 95,
+        "days_in_status": 180,
     },
     {
         "external_id": "VCS-VCU-1899",
-        "project_name": "Western Kenya Cookstove Project",
-        "project_developer": "EcoDev Ltd",
-        "developer_contact": "+254 722 111222",
-        "developer_email": "carbon@ecodev.co.ke",
+        "project_name": "Nairobi BRT Emissions Reduction",
+        "project_developer": "Transport Carbon Africa",
+        "developer_contact": "+254 722 998877",
+        "developer_email": "carbon@transportafrica.org",
         "country": "Kenya",
-        "region": "Kakamega",
-        "methodology": "TPDDTEC_v4",
-        "sector": "Household Devices",
-        "status": "registered",
-        "crediting_period_start": "2020-01-01",
-        "crediting_period_end": "2029-12-31",
-        "last_verification_date": "2021-08-20",
-        "estimated_credits_per_year": 18000.0,
+        "region": "Nairobi",
+        "methodology": "VM0055",
+        "sector": "Transport",
+        "status": "under_verification",
+        "crediting_period_start": "2024-01-01",
+        "crediting_period_end": "2034-12-31",
+        "last_verification_date": None,
+        "estimated_credits_per_year": 95000.0,
         "registry_url": "https://registry.verra.org/app/projectDetail/VCS/VCU/1899",
-        "days_in_status": 1050,
+        "days_in_status": 90,
     },
 ]
 
@@ -134,6 +122,94 @@ DEFAULT_HEADERS = {
     "DNT": "1",
     "Connection": "keep-alive",
 }
+
+
+def _scrape_verra_with_playwright(country: str) -> List[Dict[str, Any]]:
+    """Attempt to scrape Verra using Playwright.
+
+    Verra's Angular app is complex; this is a best-effort approach that
+    navigates the search page and tries to extract visible project data.
+    Uses the persistent browser singleton to avoid ~40s launch cost.
+    """
+    try:
+        from playwright_stealth import Stealth
+        from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
+    except ImportError:
+        logger.warning("playwright_not_installed")
+        return []
+
+    logger.info("verra_playwright_scrape_start", country=country)
+    leads = []
+
+    try:
+        browser = _get_or_launch_browser(headless=False)
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent=DEFAULT_HEADERS["User-Agent"],
+        )
+        page = context.new_page()
+        Stealth().apply_stealth_sync(page)
+
+        # Navigate to search page
+        page.goto(
+            "https://registry.verra.org/app/search/VCS/All%20Projects",
+            timeout=20000,
+            wait_until="domcontentloaded",
+        )
+        page.wait_for_timeout(10000)
+
+        # Try to interact with filters if they exist
+        try:
+            country_filter = page.query_selector('[placeholder*="Country"], input[formcontrolname*="country"]')
+            if country_filter:
+                country_filter.fill(country)
+                page.wait_for_timeout(2000)
+        except Exception:
+            pass
+
+        # Try clicking search
+        search_btn = page.query_selector('button[type=submit], .btn-search')
+        if search_btn:
+            search_btn.click()
+            page.wait_for_timeout(8000)
+
+        # Extract any visible project rows
+        html = page.content()
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Look for project links in the rendered DOM
+        for link in soup.find_all("a", href=True):
+            href = link.get("href", "")
+            if "/projectDetail/VCS/VCU/" in href:
+                project_id = href.split("/")[-1]
+                name = link.get_text(strip=True)
+                if name and project_id:
+                    leads.append({
+                        "external_id": f"VCS-VCU-{project_id}",
+                        "project_name": name,
+                        "project_developer": None,
+                        "developer_contact": None,
+                        "developer_email": None,
+                        "country": country,
+                        "region": None,
+                        "methodology": None,
+                        "sector": None,
+                        "status": "unknown",
+                        "crediting_period_start": None,
+                        "crediting_period_end": None,
+                        "last_verification_date": None,
+                        "estimated_credits_per_year": None,
+                        "registry_url": f"https://registry.verra.org/app/projectDetail/VCS/VCU/{project_id}",
+                        "days_in_status": None,
+                    })
+
+        context.close()
+    except Exception as exc:
+        logger.error("verra_playwright_failed", error=str(exc))
+
+    logger.info("verra_playwright_scrape_complete", count=len(leads))
+    return leads
 
 
 class VerraScraper(BaseRegistryScraper):
@@ -170,44 +246,34 @@ class VerraScraper(BaseRegistryScraper):
                 time.sleep(settings.LEAD_SCRAPER_RETRY_DELAY)
         return None
 
-    def _try_live_scrape(self, country: str, status_filter: str) -> List[Dict[str, Any]]:
-        """Attempt to scrape Verra live. Returns empty list if blocked."""
-        logger.info("verra_live_scrape_attempt", country=country)
-
-        # Verra's search page is JS-driven; without Playwright we can't execute the search.
-        # As a fallback, we attempt to fetch known Kenya project IDs from the registry.
-        # In production, this should be replaced with a Playwright-based crawler that:
-        #   1. Opens https://registry.verra.org/app/search/VCS/All%20Projects
-        #   2. Fills country=Kenya, clicks Search
-        #   3. Parses the paginated results table
-        #   4. Visits each project detail page for full data
-
-        known_ids = ["1525", "1543", "1899", "1952", "2087", "2311"]
-        leads = []
-        for vid in known_ids:
-            html = self._fetch_project_page(vid)
-            if html is None:
-                continue
-            # Basic HTML parsing would go here with BeautifulSoup
-            # For now, we detect if we got a real page vs a block page
-            if "Project Details" in html or "Project Name" in html or "crediting period" in html.lower():
-                logger.info("verra_page_fetched", project_id=vid)
-                # TODO: Parse HTML with BeautifulSoup to extract fields
-            else:
-                logger.warning("verra_page_blocked", project_id=vid, snippet=html[:200])
-
-        if not leads:
-            logger.warning("verra_live_scrape_blocked", country=country)
-        return leads
-
     def health_check(self) -> Dict[str, Any]:
         """Check if Verra scraping is functional."""
         if not self.live_mode:
             return {"status": "demo", "message": "Demo mode active — set LEAD_SCRAPER_MODE=live to enable real scraping"}
-        html = self._fetch_project_page("1525")
-        if html and "Project Details" in html:
-            return {"status": "healthy", "message": "Verra registry reachable"}
-        return {"status": "blocked", "message": "Verra registry blocked (Cloudflare/anti-bot). Install Playwright for headless scraping."}
+
+        # Try Playwright first
+        try:
+            from playwright_stealth import Stealth
+            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
+
+            browser = _get_or_launch_browser(headless=False)
+            context = browser.new_context(viewport={"width": 1920, "height": 1080})
+            page = context.new_page()
+            Stealth().apply_stealth_sync(page)
+            page.goto(
+                "https://registry.verra.org/app/search/VCS/All%20Projects",
+                timeout=20000,
+                wait_until="domcontentloaded",
+            )
+            page.wait_for_timeout(5000)
+            html = page.content()
+            context.close()
+            if "Project Search" in html or "Verified Carbon Standard" in html:
+                return {"status": "healthy", "message": "Verra registry reachable via Playwright"}
+        except Exception as exc:
+            logger.warning("verra_playwright_health_failed", error=str(exc))
+
+        return {"status": "blocked", "message": "Verra registry blocked. Angular app requires advanced Playwright interaction."}
 
     def scrape(self, country: str = "Kenya", status_filter: str = "all") -> List[Dict[str, Any]]:
         logger.info("verra_scrape_started", country=country, filter=status_filter, live_mode=self.live_mode)
@@ -216,7 +282,7 @@ class VerraScraper(BaseRegistryScraper):
         data_source = "demo"
 
         if self.live_mode:
-            live_leads = self._try_live_scrape(country, status_filter)
+            live_leads = _scrape_verra_with_playwright(country)
             if live_leads:
                 leads.extend(live_leads)
                 data_source = "live"
@@ -235,7 +301,6 @@ class VerraScraper(BaseRegistryScraper):
                 leads.append(raw.copy())
 
         logger.info("verra_scrape_completed", count=len(leads), live_mode=self.live_mode, data_source=data_source)
-        # Attach metadata so the API can report per-source status
         for lead in leads:
             lead["_scrape_meta"] = {"source": self.source, "data_source": data_source}
         return leads

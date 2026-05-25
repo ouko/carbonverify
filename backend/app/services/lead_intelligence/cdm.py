@@ -1,22 +1,15 @@
-"""CDM (UNFCCC) registry scraper.
+"""CDM registry scraper.
 
-CDM URL: https://cdm.unfccc.int/Projects/projsearch.html
-The CDM registry uses older ASP.NET web forms. It requires POST requests
-with viewstate/__EVENTVALIDATION tokens, making simple scraping difficult.
-
-To enable live scraping, either:
-  1. Use Playwright/Selenium to drive the form submission
-  2. Parse the HTML response with BeautifulSoup after form submission
-  3. Use the CDM project database XML export if available
-
-Set LEAD_SCRAPER_MODE=live in your .env to attempt live scraping.
+CDM (Clean Development Mechanism) project search at cdm.unfccc.int uses
+Incapsula bot protection. Playwright with non-headless mode is required
+to bypass the challenge and submit the search form.
 """
 
 import time
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-import httpx
+from bs4 import BeautifulSoup
 
 from app.services.lead_intelligence.base import BaseRegistryScraper
 from app.core.logging import get_logger
@@ -64,88 +57,181 @@ DEMO_CDM_LEADS: List[Dict[str, Any]] = [
     },
     {
         "external_id": "CDM-3987",
-        "project_name": "Kenya Off-Grid Solar",
-        "project_developer": "SunFunder Carbon",
-        "developer_contact": None,
-        "developer_email": "carbon@sunfunder.com",
+        "project_name": "Mombasa Landfill Gas Recovery",
+        "project_developer": "Waste Energy Kenya",
+        "developer_contact": "+254 722 445566",
+        "developer_email": "info@wasteenergy.co.ke",
         "country": "Kenya",
-        "region": "Nationwide",
-        "methodology": "VMR0006",
-        "sector": "Energy",
+        "region": "Mombasa",
+        "methodology": "ACM0001",
+        "sector": "Waste",
         "status": "registered",
-        "crediting_period_start": "2014-01-01",
-        "crediting_period_end": "2023-12-31",
-        "last_verification_date": "2017-11-20",
-        "estimated_credits_per_year": 12000.0,
-        "registry_url": "https://cdm.unfccc.int/Projects/DB/TUV-SUD1448555963.98/view",
-        "days_in_status": 2555,
+        "crediting_period_start": "2015-01-01",
+        "crediting_period_end": "2025-12-31",
+        "last_verification_date": "2021-09-10",
+        "estimated_credits_per_year": 55000.0,
+        "registry_url": "https://cdm.unfccc.int/Projects/DB/TUEV-SUD1310527229.48/view",
+        "days_in_status": 1100,
     },
 ]
 
-DEFAULT_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-}
+
+def _parse_cdm_results(html: str) -> List[Dict[str, Any]]:
+    """Parse CDM search result HTML and extract project data."""
+    soup = BeautifulSoup(html, "html.parser")
+    leads = []
+
+    # Find the results table — look for rows after the header
+    rows = soup.find_all("tr")
+    in_results = False
+
+    for row in rows:
+        cells = row.find_all(["td", "th"])
+        if not cells:
+            continue
+
+        texts = [c.get_text(strip=True) for c in cells]
+
+        # Detect header row
+        if "Title" in texts and "Host Parties" in texts:
+            in_results = True
+            continue
+
+        if not in_results:
+            continue
+
+        if len(texts) < 6:
+            continue
+
+        # CDM result row format:
+        # [Registered date, Title, Host Parties, Other Parties, Methodology, Reductions, Ref]
+        try:
+            registered_date = texts[0]
+            title = texts[1]
+            host_parties = texts[2]
+            other_parties = texts[3]
+            methodology = texts[4]
+            reductions = texts[5]
+            ref = texts[6] if len(texts) > 6 else ""
+
+            if not title or title == "Title":
+                continue
+
+            # Derive a project developer from host parties if available
+            developer = host_parties if host_parties else "Unknown Developer"
+
+            lead = {
+                "external_id": f"CDM-{ref}" if ref else f"CDM-{hash(title) & 0xFFFFFF}",
+                "project_name": title,
+                "project_developer": developer,
+                "developer_contact": None,
+                "developer_email": None,
+                "country": "Kenya" if "Kenya" in host_parties else host_parties.split(",")[0] if host_parties else None,
+                "region": None,
+                "methodology": methodology.split(" ver.")[0] if " ver." in methodology else methodology,
+                "sector": None,
+                "status": "registered",
+                "crediting_period_start": None,
+                "crediting_period_end": None,
+                "last_verification_date": None,
+                "estimated_credits_per_year": float(reductions.replace(",", "")) if reductions.replace(",", "").isdigit() else None,
+                "registry_url": f"https://cdm.unfccc.int/Projects/DB/{ref}/view" if ref else None,
+                "days_in_status": None,
+            }
+            leads.append(lead)
+        except Exception as exc:
+            logger.warning("cdm_parse_row_failed", texts=texts, error=str(exc))
+            continue
+
+    return leads
+
+
+def _scrape_cdm_with_playwright(country: str) -> List[Dict[str, Any]]:
+    """Use Playwright to submit the CDM search form and extract results.
+
+    Incapsula blocks headless browsers, so we use headless=False.
+    Uses the persistent browser singleton to avoid ~40s launch cost.
+    """
+    try:
+        from playwright_stealth import Stealth
+        from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
+    except ImportError:
+        logger.warning("playwright_not_installed")
+        return []
+
+    logger.info("cdm_playwright_scrape_start", country=country)
+
+    try:
+        browser = _get_or_launch_browser(headless=False)
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent=(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ),
+        )
+        page = context.new_page()
+        Stealth().apply_stealth_sync(page)
+
+        page.goto(
+            "https://cdm.unfccc.int/Projects/projsearch.html",
+            timeout=30000,
+            wait_until="domcontentloaded",
+        )
+        page.wait_for_timeout(2000)
+
+        # Fill search form
+        page.fill('input[name=titleFT]', country)
+        page.click('input[name=button][value=Search]')
+        page.wait_for_timeout(5000)
+
+        html = page.content()
+        final_url = page.url
+        context.close()
+
+        logger.info("cdm_playwright_page_fetched", url=final_url, html_length=len(html))
+
+        leads = _parse_cdm_results(html)
+        logger.info("cdm_playwright_parse_complete", count=len(leads))
+        return leads
+
+    except Exception as exc:
+        logger.error("cdm_playwright_failed", error=str(exc))
+        return []
 
 
 class CDMScraper(BaseRegistryScraper):
     source = "cdm"
 
     def __init__(self):
-        self.client: Optional[httpx.Client] = None
         self.live_mode = settings.LEAD_SCRAPER_MODE == "live"
-        self.rate_limit_delay = 1.0 / settings.LEAD_SCRAPER_RATE_LIMIT_RPS
-
-    def _get_client(self) -> httpx.Client:
-        if self.client is None:
-            self.client = httpx.Client(
-                headers=DEFAULT_HEADERS,
-                timeout=settings.LEAD_SCRAPER_REQUEST_TIMEOUT,
-                follow_redirects=True,
-            )
-        return self.client
-
-    def _try_live_scrape(self, country: str, status_filter: str) -> List[Dict[str, Any]]:
-        logger.info("cdm_live_scrape_attempt", country=country)
-        # CDM uses ASP.NET web forms with __VIEWSTATE and __EVENTVALIDATION.
-        # A full implementation would:
-        #   1. GET the search page to extract the form tokens
-        #   2. POST with country filter and tokens
-        #   3. Parse the paginated results
-        #   4. Visit each project detail page
-        # This requires Playwright or careful form handling.
-        url = "https://cdm.unfccc.int/Projects/projsearch.html"
-        client = self._get_client()
-        try:
-            time.sleep(self.rate_limit_delay)
-            resp = client.get(url, timeout=10)
-            if resp.status_code == 200 and "Project Search" in resp.text:
-                logger.info("cdm_search_page_reachable")
-                # TODO: Implement form token extraction + submission + result parsing
-            else:
-                logger.warning("cdm_search_page_blocked", status=resp.status_code)
-        except Exception as exc:
-            logger.warning("cdm_fetch_error", error=str(exc))
-
-        logger.warning("cdm_live_scrape_not_yet_implemented", country=country)
-        return []
 
     def health_check(self) -> Dict[str, Any]:
         if not self.live_mode:
             return {"status": "demo", "message": "Demo mode active — set LEAD_SCRAPER_MODE=live to enable real scraping"}
-        url = "https://cdm.unfccc.int/Projects/projsearch.html"
-        client = self._get_client()
+
         try:
-            resp = client.get(url, timeout=10)
-            if resp.status_code == 200 and "Project Search" in resp.text:
-                return {"status": "healthy", "message": "CDM registry reachable"}
-            return {"status": "blocked", "message": f"HTTP {resp.status_code}"}
+            from playwright_stealth import Stealth
+            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
+
+            browser = _get_or_launch_browser(headless=False)
+            context = browser.new_context(viewport={"width": 1920, "height": 1080})
+            page = context.new_page()
+            Stealth().apply_stealth_sync(page)
+            page.goto(
+                "https://cdm.unfccc.int/Projects/projsearch.html",
+                timeout=30000,
+                wait_until="domcontentloaded",
+            )
+            page.wait_for_timeout(3000)
+            has_form = page.query_selector('form[name=searchform]') is not None
+            context.close()
+
+            if has_form:
+                return {"status": "healthy", "message": "CDM registry reachable via Playwright"}
+            return {"status": "blocked", "message": "CDM form not found"}
         except Exception as exc:
-            return {"status": "error", "message": str(exc)}
+            return {"status": "error", "message": f"Playwright error: {str(exc)}"}
 
     def scrape(self, country: str = "Kenya", status_filter: str = "all") -> List[Dict[str, Any]]:
         logger.info("cdm_scrape_started", country=country, filter=status_filter, live_mode=self.live_mode)
@@ -154,7 +240,7 @@ class CDMScraper(BaseRegistryScraper):
         data_source = "demo"
 
         if self.live_mode:
-            live_leads = self._try_live_scrape(country, status_filter)
+            live_leads = _scrape_cdm_with_playwright(country)
             if live_leads:
                 leads.extend(live_leads)
                 data_source = "live"
@@ -179,6 +265,4 @@ class CDMScraper(BaseRegistryScraper):
         return leads
 
     def close(self) -> None:
-        if self.client:
-            self.client.close()
-            self.client = None
+        pass
