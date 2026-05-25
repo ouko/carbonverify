@@ -9,6 +9,7 @@ This document provides a deep dive into the architecture and design decisions of
 - [Data Flow](#data-flow)
 - [Database Schema](#database-schema)
 - [Calculation Pipeline](#calculation-pipeline)
+- [Lead Intelligence Engine](#lead-intelligence-engine)
 - [Async Task System](#async-task-system)
 - [Security Model](#security-model)
 - [Error Handling](#error-handling)
@@ -55,6 +56,13 @@ This document provides a deep dive into the architecture and design decisions of
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐   │
 │  │Provenance│ │  S3      │ │ VVB Liaison│ │ Review Queue│   │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────┘   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │         Lead Intelligence (Scrapers + Scorer)       │   │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐  │   │
+│  │  │  CDM    │ │ Verra   │ │Gold Std │ │  Scorer  │  │   │
+│  │  │Scraper  │ │Scraper  │ │Scraper  │ │  Engine  │  │   │
+│  │  └─────────┘ └─────────┘ └─────────┘ └──────────┘  │   │
+│  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
        │
        ▼
@@ -215,6 +223,39 @@ RegistryPoller (daily Celery beat)
        └───► auto-follow-up if SLA exceeded (14 days)
 ```
 
+### 5. Lead Intelligence Flow
+
+```
+Celery Beat (daily) or Manual trigger
+       │
+       ▼
+scrape_registries task
+       │
+       ├───► CDM Scraper (Playwright + BeautifulSoup)
+       │     ├───► Live: Navigate search form, parse table
+       │     └───► Fallback: Demo Kenya projects (9)
+       │
+       ├───► Verra Scraper (Playwright)
+       │     ├───► Live: Angular grid (blocked → empty)
+       │     └───► Fallback: Demo Kenya projects (5)
+       │
+       └───► Gold Standard Scraper (Playwright)
+             ├───► Live: Public listing (blocked → empty)
+             └───► Fallback: Demo Kenya projects (4)
+       │
+       ▼
+Deduplication by external_id + registry_source
+       │
+       ▼
+Upsert into Lead table
+       │
+       ▼
+ScraperRun record per source (timestamp, count, status)
+       │
+       ▼
+Frontend: "Last scraped" timestamps + per-source badges
+```
+
 ---
 
 ## Database Schema
@@ -242,7 +283,20 @@ User ──► Project ──► DataSource
   │                 ├───► severity: warning | error | critical
   │                 └───► status: open | in_review | approved | rejected
   │
-  └───► Role (admin | operator | developer | viewer)
+  ├───► Role (admin | operator | developer | viewer)
+  │
+  └───► Lead ──► ScraperRun
+        │            ├───► source: verra | gold_standard | cdm
+        │            ├───► scraped_at
+        │            ├───► count, created, updated
+        │            └───► status: live | demo | error
+        │
+        ├───► registry_source
+        ├───► stuck_score (0–100)
+        ├───► priority (low | medium | high | critical)
+        ├───► lead_status (new | contacted | qualified | proposal_sent | converted)
+        ├───► crediting_period_end (deadline tracking)
+        └───► days_in_status
 ```
 
 Full schema definition: [`backend/app/models.py`](backend/app/models.py)
@@ -303,6 +357,57 @@ Full schema definition: [`backend/app/models.py`](backend/app/models.py)
 
 ---
 
+## Lead Intelligence Engine
+
+### Persistent Browser Architecture
+
+The scraper system uses a **singleton Playwright browser** that launches once and reuses across calls:
+
+```
+Launch Chromium (non-headless)
+       │
+       ▼
+Apply stealth patches (playwright-stealth)
+       │
+       ▼
+New context per scrape (user agent, viewport, locale)
+       │
+       ▼
+Navigate → interact → parse → close context
+       │
+       ▼
+Browser stays alive for next scrape (~18s vs ~36s first run)
+```
+
+- First scrape: ~36s (browser launch + page load)
+- Subsequent scrapes: ~18s (browser reuse)
+- Cleanup: `close_persistent_browser()` available for shutdown
+
+### Stuck Score Algorithm
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| Time in Stage | 40 pts max | `days_in_status / 365 × 40` |
+| Deadline Proximity | 25 pts max | Days until `crediting_period_end` |
+| Verification Gap | 20 pts max | Days since `last_verification_date` |
+| Methodology Complexity | 15 pts max | Based on methodology family |
+
+**Priority Classification:**
+- Critical: stuck_score ≥ 70
+- High: stuck_score ≥ 50
+- Medium: stuck_score ≥ 30
+- Low: stuck_score < 30
+
+### Scraper Sources
+
+| Source | Live Status | Blocking Mechanism | Fallback |
+|--------|-------------|-------------------|----------|
+| CDM (UNFCCC) | ✅ Working | Incapsila (bypassed via non-headless + stealth) | 9 demo Kenya projects |
+| Verra | ❌ Blocked | Cloudflare + Angular grid | 5 demo Kenya projects |
+| Gold Standard | ❌ Blocked | API requires authentication | 4 demo Kenya projects |
+
+---
+
 ## Async Task System
 
 Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/celery_app.py)
@@ -315,6 +420,10 @@ Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/cele
 | `check_flagged_data_sources` | Every 5 min | Alert on low-confidence data |
 | `generate_overdue_reports` | Every 1 hr | Auto-generate pending reports |
 | `poll_registry_statuses` | Daily | Sync registry approval status |
+| `send_registry_follow_ups` | Daily | Auto-follow-up after SLA |
+| `scrape_registries` | Daily | Scrape carbon registries for leads |
+| `score_leads` | Weekly | Re-calculate stuck scores |
+| `check_lead_deadlines` | Daily | Alert on approaching crediting period ends |
 
 ---
 
@@ -349,6 +458,7 @@ Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/cele
 | Celery | Dead letter queue for failed jobs; retry with exponential backoff |
 | Registry Clients | 3 attempts with backoff on 5xx/timeout; structured logging |
 | Validation | Confidence score + flagging instead of hard rejection |
+| Scrapers | Live attempt → empty/error → demo fallback; `ScraperRun.status` tracks outcome |
 
 ---
 
@@ -356,11 +466,13 @@ Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/cele
 
 - **Structured Logging**: JSON format via `app/core/logging.py`
 - **Health Checks**: `/health` and `/health/db` endpoints
+- **Scraper Health**: `/api/v1/leads/health/scrapers` — per-source status
 - **Key Metrics Logged**:
   - `calculation_complete` with all result fields
   - `quality_gates_complete` with pass/fail status
   - `registry_submission` with retry count
   - `file_processed` with detected type and confidence
+  - `scraper_run_complete` with source, count, data_source, duration
 
 ---
 
@@ -375,3 +487,5 @@ Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/cele
 | **WeasyPrint** | HTML+CSS → PDF; easier to template than LaTeX |
 | **Celery + Redis** | Mature async task queue; supports scheduling |
 | **Alembic** | Database migration versioning; required for production |
+| **Playwright** | Headful Chromium bypasses bot detection (Incapsula); persistent browser singleton |
+| **playwright-stealth** | Patches Playwright fingerprints to avoid detection |
