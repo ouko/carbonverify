@@ -493,12 +493,8 @@ export function useScraperHistory() {
   return useQuery<Record<string, ScraperHistoryEntry | null>>({
     queryKey: ['scraper-history'],
     queryFn: async () => {
-      try {
-        const res = await api.get('/leads/scraper-history')
-        return res.data
-      } catch {
-        return {}
-      }
+      const res = await api.get('/leads/scraper-history')
+      return res.data
     },
     staleTime: 30000,
   })

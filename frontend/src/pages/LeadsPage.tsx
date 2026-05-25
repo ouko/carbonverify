@@ -275,23 +275,6 @@ export default function LeadsPage() {
               )}
             </div>
           )}
-          {/* Last scraped info */}
-          {history && (
-            <div className="flex items-center gap-3 flex-wrap text-[11px] text-surface-400 dark:text-surface-500">
-              {(['verra', 'gold_standard', 'cdm'] as const).map((source) => {
-                const entry = history[source]
-                if (!entry) return null
-                const label = source === 'gold_standard' ? 'Gold Standard' : source.charAt(0).toUpperCase() + source.slice(1)
-                const time = entry.scraped_at ? new Date(entry.scraped_at).toLocaleString() : 'Never'
-                return (
-                  <span key={source} className="flex items-center gap-1" title={`${entry.count} leads (${entry.created} new, ${entry.updated} updated)`}>
-                    <Clock className="h-3 w-3" />
-                    {label}: {time} · {entry.count} results
-                  </span>
-                )
-              })}
-            </div>
-          )}
           <div className="flex gap-2">
             <button
               onClick={() => scrapeMutation.mutate({ country: 'Kenya' })}
@@ -309,6 +292,35 @@ export default function LeadsPage() {
               {view === 'table' ? 'Kanban View' : 'Table View'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Last Scraped Info */}
+      <div className="card p-3">
+        <div className="flex items-center gap-4 flex-wrap text-xs text-surface-600 dark:text-surface-400">
+          <span className="font-semibold text-surface-700 dark:text-surface-300">Last scraped:</span>
+          {(['verra', 'gold_standard', 'cdm'] as const).map((source) => {
+            const entry = history?.[source]
+            const label = source === 'gold_standard' ? 'Gold Standard' : source.charAt(0).toUpperCase() + source.slice(1)
+            if (!entry) {
+              return (
+                <span key={source} className="flex items-center gap-1 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded">
+                  <Clock className="h-3 w-3" />
+                  {label}: <span className="text-surface-400">Never</span>
+                </span>
+              )
+            }
+            const time = entry.scraped_at ? new Date(entry.scraped_at).toLocaleString() : 'Never'
+            const isLive = entry.status === 'live'
+            return (
+              <span key={source} className={`flex items-center gap-1 px-2 py-1 rounded ${isLive ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300' : 'bg-surface-100 dark:bg-surface-800'}`} title={`${entry.count} leads (${entry.created} new, ${entry.updated} updated)`}>
+                <Clock className="h-3 w-3" />
+                {label}: {time}
+                <span className="font-medium">· {entry.count}</span>
+                {isLive && <span className="text-[10px] uppercase">live</span>}
+              </span>
+            )
+          })}
         </div>
       </div>
 
