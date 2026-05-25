@@ -18,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
 )
+from app.core.encrypted_types import EncryptedString
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
@@ -209,7 +210,7 @@ class User(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(EncryptedString(255), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRoleEnum] = mapped_column(Enum(UserRoleEnum, name="user_role"), nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -230,7 +231,7 @@ class Developer(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    contact_phone: Mapped[Optional[str]] = mapped_column(EncryptedString(50), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="developer_profile")
@@ -500,7 +501,7 @@ class Enumerator(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(EncryptedString(50), nullable=False)
     language_preference: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     data_quality_score: Mapped[Optional[float]] = mapped_column(Float, default=1.0)
@@ -515,7 +516,7 @@ class WhatsAppConversation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
-    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(EncryptedString(50), nullable=False)
     flow_type: Mapped[ConversationFlowEnum] = mapped_column(
         Enum(ConversationFlowEnum, name="conversation_flow"), default=ConversationFlowEnum.idle, nullable=False
     )
@@ -539,7 +540,7 @@ class SurveyResponse(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
     enumerator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("enumerators.id"), nullable=True)
-    household_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    household_id: Mapped[Optional[str]] = mapped_column(EncryptedString(100), nullable=True)
     stove_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     village_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     responses: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -561,7 +562,7 @@ class SupportTicket(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
-    phone_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(EncryptedString(50), nullable=False)
     issue_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     context_json: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -1106,8 +1107,8 @@ class Lead(Base):
     external_id: Mapped[str] = mapped_column(String(255), nullable=False)
     project_name: Mapped[str] = mapped_column(String(500), nullable=False)
     project_developer: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    developer_contact: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    developer_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    developer_contact: Mapped[Optional[str]] = mapped_column(EncryptedString(500), nullable=True)
+    developer_email: Mapped[Optional[str]] = mapped_column(EncryptedString(255), nullable=True)
     country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     region: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     location_coords: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

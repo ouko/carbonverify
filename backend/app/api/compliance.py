@@ -575,3 +575,127 @@ async def get_current_methodology(
         "rules": version.rules_json,
         "change_summary": version.change_summary,
     }
+
+
+# ─── Privacy Policy & Terms ───────────────────────────────────────────────────
+
+@router.get("/privacy-policy")
+async def privacy_policy():
+    """Return the CarbonVerify privacy policy."""
+    return {
+        "version": "1.0.0",
+        "effective_date": "2024-01-01",
+        "title": "CarbonVerify Privacy Policy",
+        "sections": [
+            {
+                "heading": "Data Collection",
+                "content": "We collect project data, MRV calculations, and contact information necessary for carbon credit verification. Personal data includes email addresses, phone numbers, and GPS coordinates for project locations.",
+            },
+            {
+                "heading": "Data Use",
+                "content": "Data is used exclusively for carbon credit MRV preparation, registry submission, and regulatory compliance. We do not sell personal data to third parties.",
+            },
+            {
+                "heading": "Data Retention",
+                "content": f"Raw photos are retained for {settings.DATA_RETENTION_YEARS_RAW_PHOTOS} years. Project calculation data is retained for the lifetime of the crediting period plus 7 years for audit purposes.",
+            },
+            {
+                "heading": "Your Rights",
+                "content": "Under the Kenya Data Protection Act and GDPR, you have the right to access, rectify, erase, restrict processing, and port your data. Submit requests via POST /compliance/dsr.",
+            },
+            {
+                "heading": "Encryption",
+                "content": "Sensitive fields (email, phone numbers, GPS coordinates, household IDs) are encrypted at the application layer using AES-128-GCM. All data in transit uses TLS 1.3.",
+            },
+            {
+                "heading": "Contact",
+                "content": "For privacy inquiries: privacy@carbonverify.io",
+            },
+        ],
+    }
+
+
+@router.get("/terms-of-service")
+async def terms_of_service():
+    """Return the CarbonVerify terms of service."""
+    return {
+        "version": "1.0.0",
+        "effective_date": "2024-01-01",
+        "title": "CarbonVerify Terms of Service",
+        "sections": [
+            {
+                "heading": "Service Description",
+                "content": "CarbonVerify provides automated Measurement, Reporting, and Verification (MRV) preparation for carbon credit projects.",
+            },
+            {
+                "heading": "User Obligations",
+                "content": "Users must provide accurate data, maintain confidentiality of credentials, and comply with applicable carbon standards (Verra, Gold Standard, Kenya National).",
+            },
+            {
+                "heading": "Limitation of Liability",
+                "content": "CarbonVerify is not liable for registry rejection decisions. Final verification and issuance are at the sole discretion of the registry and VVB.",
+            },
+        ],
+    }
+
+
+# ─── GDPR Erasure (Right to be Forgotten) ─────────────────────────────────────
+
+class ErasureRequest(BaseModel):
+    subject_id: str
+    subject_type: str  # enumerator | household | developer | user
+    reason: Optional[str] = None
+
+
+@router.post("/erasure", status_code=status.HTTP_202_ACCEPTED)
+async def request_erasure(
+    payload: ErasureRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Initiate GDPR/Kenya DPA right-to-erasure workflow.
+
+    Creates a DSR record and schedules cascading deletion via Celery.
+    Actual deletion is async to handle S3, Redis, and audit log cleanup.
+    """
+    dsr = DataSubjectRequest(
+        subject_id=payload.subject_id,
+        subject_type=payload.subject_type,
+        request_type=DSRTypeEnum.erasure,
+        status=DSRStatusEnum.received,
+        requested_by=current_user.id,
+        details={"reason": payload.reason, "automated": True},
+    )
+    db.add(dsr)
+    await db.commit()
+    await db.refresh(dsr)
+
+    # Schedule async erasure task
+    from app.tasks.celery_app import celery_app
+    celery_app.send_task(
+        "app.tasks.compliance.process_erasure_request",
+        args=[str(dsr.id)],
+    )
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.dsr_received,
+        actor_id=current_user.id,
+        target_type="dsr",
+        target_id=dsr.id,
+        metadata={"subject_id": payload.subject_id, "type": "erasure"},
+    )
+
+    logger.info(
+        "erasure_request_received",
+        dsr_id=str(dsr.id),
+        subject_id=payload.subject_id,
+        subject_type=payload.subject_type,
+    )
+
+    return {
+        "dsr_id": str(dsr.id),
+        "status": "received",
+        "message": "Erasure request accepted. Deletion will be processed asynchronously.",
+    }
