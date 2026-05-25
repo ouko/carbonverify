@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,5 +7,137 @@
 @layer base {
   html {
     @apply antialiased;
+  }
+  
+  body {
+    @apply font-sans text-surface-700 bg-surface-50 dark:bg-surface-950 dark:text-surface-300;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  ::selection {
+    @apply bg-primary-500/20 text-primary-700 dark:text-primary-300;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 dark:bg-surface-900/80 dark:border-surface-700/30;
+  }
+  
+  .glass-strong {
+    @apply bg-white/95 backdrop-blur-2xl border border-surface-200/50 dark:bg-surface-900/95 dark:border-surface-700/40;
+  }
+  
+  .card {
+    @apply bg-white rounded-2xl border border-surface-200/60 shadow-soft 
+           dark:bg-surface-900 dark:border-surface-800/60 dark:shadow-none
+           transition-all duration-300 ease-out;
+  }
+  
+  .card-hover {
+    @apply card hover:shadow-soft-lg hover:border-primary-200/50 dark:hover:border-primary-800/30;
+  }
+  
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+           bg-primary-600 text-white font-medium rounded-xl
+           hover:bg-primary-500 active:scale-[0.98]
+           transition-all duration-200 ease-spring
+           shadow-glow hover:shadow-glow-lg
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+           bg-surface-100 text-surface-700 font-medium rounded-xl
+           hover:bg-surface-200 active:scale-[0.98]
+           dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700
+           transition-all duration-200 ease-spring;
+  }
+  
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 
+           text-surface-600 font-medium rounded-xl
+           hover:bg-surface-100 active:scale-[0.98]
+           dark:text-surface-400 dark:hover:bg-surface-800
+           transition-all duration-200;
+  }
+  
+  .input-modern {
+    @apply w-full px-4 py-3 bg-surface-50 border border-surface-200 rounded-xl
+           text-surface-900 placeholder:text-surface-400
+           focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400
+           dark:bg-surface-900 dark:border-surface-700 dark:text-surface-100
+           dark:placeholder:text-surface-500 dark:focus:border-primary-600
+           transition-all duration-200;
+  }
+  
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-surface-500 hover:text-surface-900 hover:bg-surface-100/80
+           dark:text-surface-400 dark:hover:text-surface-100 dark:hover:bg-surface-800/60
+           transition-all duration-200;
+  }
+  
+  .nav-item-active {
+    @apply nav-item text-primary-700 bg-primary-50/80 dark:text-primary-300 dark:bg-primary-950/40;
+  }
+  
+  .stat-card {
+    @apply card-hover p-6;
+  }
+  
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-100;
+  }
+  
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500;
+  }
+  
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-green {
+    @apply badge bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300;
+  }
+  
+  .badge-blue {
+    @apply badge bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300;
+  }
+  
+  .badge-amber {
+    @apply badge bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300;
+  }
+  
+  .badge-red {
+    @apply badge bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300;
+  }
+  
+  .badge-slate {
+    @apply badge bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400;
+  }
+  
+  .divider {
+    @apply h-px bg-gradient-to-r from-transparent via-surface-200 to-transparent dark:via-surface-800;
+  }
+  
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100,116,139,0.3) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(100,116,139,0.3);
+    border-radius: 20px;
   }
 }

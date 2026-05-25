@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { ArrowUpDown, Search } from 'lucide-react'
+import { ArrowUpDown, Search, FolderOpen } from 'lucide-react'
 import { useProjectsHealth } from '../../hooks/useCommandData'
 import { useNavigate } from 'react-router-dom'
 
@@ -35,23 +35,23 @@ export function ProjectsGridPage() {
   }
 
   const getAlertBadge = (level: string, overdue: boolean) => {
-    if (overdue) return <span className="inline-flex animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">OVERDUE</span>
-    if (level === 'green') return <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">Ready</span>
-    if (level === 'yellow') return <span className="inline-flex rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">At Risk</span>
-    return <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-800 dark:bg-red-900/30 dark:text-red-300">Blocked</span>
+    if (overdue) return <span className="badge badge-red animate-pulse text-[10px]">OVERDUE</span>
+    if (level === 'green') return <span className="badge badge-green text-[10px]">Ready</span>
+    if (level === 'yellow') return <span className="badge badge-amber text-[10px]">At Risk</span>
+    return <span className="badge badge-red text-[10px]">Blocked</span>
   }
 
   const getStatusDot = (status: string) => {
     const colors: Record<string, string> = {
-      onboarding: 'bg-gray-400',
+      onboarding: 'bg-surface-400',
       data_collection: 'bg-blue-400',
-      calculation: 'bg-indigo-400',
-      review: 'bg-yellow-400',
+      calculation: 'bg-violet-400',
+      review: 'bg-amber-400',
       submitted: 'bg-purple-400',
-      verified: 'bg-green-400',
-      monitoring: 'bg-teal-400',
+      verified: 'bg-primary-400',
+      monitoring: 'bg-cyan-400',
     }
-    return <span className={`inline-block h-2 w-2 rounded-full ${colors[status] || 'bg-gray-400'}`} />
+    return <span className={`inline-block h-2 w-2 rounded-full ${colors[status] || 'bg-surface-400'}`} />
   }
 
   const stats = {
@@ -62,38 +62,38 @@ export function ProjectsGridPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Total Projects</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="card p-5">
+          <p className="text-xs text-surface-400 dark:text-surface-500">Total Projects</p>
+          <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">{stats.total}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-xs text-green-600 dark:text-green-400">Ready</p>
-          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.green}</p>
+        <div className="card p-5">
+          <p className="text-xs text-primary-600 dark:text-primary-400">Ready</p>
+          <p className="text-2xl font-bold text-primary-700 dark:text-primary-300">{stats.green}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-xs text-yellow-600 dark:text-yellow-400">At Risk</p>
-          <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{stats.yellow}</p>
+        <div className="card p-5">
+          <p className="text-xs text-amber-600 dark:text-amber-400">At Risk</p>
+          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{stats.yellow}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+        <div className="card p-5">
           <p className="text-xs text-red-600 dark:text-red-400">Blocked / Overdue</p>
           <p className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.red}</p>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex items-center rounded-md bg-gray-100 px-2 py-1 dark:bg-gray-700">
-          <Search className="h-3.5 w-3.5 text-gray-400" />
+      <div className="flex flex-wrap items-center gap-2 card p-3">
+        <div className="flex items-center rounded-xl bg-surface-100/80 dark:bg-surface-800/50 px-3 py-2">
+          <Search className="h-3.5 w-3.5 text-surface-400" />
           <input
             type="text"
             placeholder="Search projects..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="ml-2 w-40 bg-transparent text-xs text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200"
+            className="ml-2 w-40 bg-transparent text-xs text-surface-700 outline-none placeholder:text-surface-400 dark:text-surface-200"
           />
         </div>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input-modern py-1.5 px-2 text-xs appearance-none cursor-pointer">
           <option value="all">All Statuses</option>
           <option value="onboarding">Onboarding</option>
           <option value="data_collection">Data Collection</option>
@@ -103,14 +103,14 @@ export function ProjectsGridPage() {
           <option value="verified">Verified</option>
           <option value="monitoring">Monitoring</option>
         </select>
-        <select value={methodologyFilter} onChange={(e) => setMethodologyFilter(e.target.value)} className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+        <select value={methodologyFilter} onChange={(e) => setMethodologyFilter(e.target.value)} className="input-modern py-1.5 px-2 text-xs appearance-none cursor-pointer">
           <option value="all">All Methodologies</option>
           <option value="TPDDTEC_v4">TPDDTEC v4</option>
           <option value="VM0050">VM0050</option>
           <option value="VMR0006">VMR0006</option>
           <option value="AMS-II.G">AMS-II.G</option>
         </select>
-        <select value={alertFilter} onChange={(e) => setAlertFilter(e.target.value)} className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+        <select value={alertFilter} onChange={(e) => setAlertFilter(e.target.value)} className="input-modern py-1.5 px-2 text-xs appearance-none cursor-pointer">
           <option value="all">All Alerts</option>
           <option value="green">Ready</option>
           <option value="yellow">At Risk</option>
@@ -118,58 +118,67 @@ export function ProjectsGridPage() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900">
-            <tr>
-              {[
-                { key: 'name', label: 'Project' },
-                { key: 'status', label: 'Status' },
-                { key: 'readiness', label: 'Readiness %' },
-                { key: 'creditsForecast', label: 'Credits Forecast' },
-                { key: 'lastActivityDays', label: 'Last Activity' },
-                { key: 'alertLevel', label: 'Alert' },
-              ].map((col) => (
-                <th key={col.key} onClick={() => toggleSort(col.key)} className="cursor-pointer px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">
-                  <div className="flex items-center gap-1">{col.label}<ArrowUpDown className="h-3 w-3" /></div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {isLoading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No projects match filters</td></tr>
-            ) : (
-              filtered.map((p: any) => (
-                <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-3 py-2.5">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div>
-                    <div className="text-xs text-gray-500">{p.methodology} • {p.developer}</div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
-                      {getStatusDot(p.status)}
-                      <span className="capitalize">{p.status.replace('_', ' ')}</span>
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-surface-50 dark:bg-surface-900">
+              <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
+                {[
+                  { key: 'name', label: 'Project' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'readiness', label: 'Readiness %' },
+                  { key: 'creditsForecast', label: 'Credits Forecast' },
+                  { key: 'lastActivityDays', label: 'Last Activity' },
+                  { key: 'alertLevel', label: 'Alert' },
+                ].map((col) => (
+                  <th key={col.key} onClick={() => toggleSort(col.key)} className="cursor-pointer px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                    <div className="flex items-center gap-1">{col.label}<ArrowUpDown className="h-3 w-3" /></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
+              {isLoading ? (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-surface-400">Loading...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-12 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                      <FolderOpen className="w-6 h-6 text-surface-400 dark:text-surface-500" />
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 rounded-full bg-gray-200 dark:bg-gray-700">
-                        <div className={`h-1.5 rounded-full ${p.readiness > 90 ? 'bg-green-500' : p.readiness > 70 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${p.readiness}%` }} />
+                    <p className="text-sm text-surface-400">No projects match filters</p>
+                  </div>
+                </td></tr>
+              ) : (
+                filtered.map((p: any) => (
+                  <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} className="cursor-pointer transition-colors hover:bg-surface-50/50 dark:hover:bg-surface-800/30">
+                    <td className="px-3 py-2.5">
+                      <div className="text-sm font-semibold text-surface-900 dark:text-surface-100">{p.name}</div>
+                      <div className="text-xs text-surface-400">{p.methodology} • {p.developer}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <div className="flex items-center gap-1.5 text-xs text-surface-600 dark:text-surface-300">
+                        {getStatusDot(p.status)}
+                        <span className="capitalize">{p.status.replace('_', ' ')}</span>
                       </div>
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{p.readiness}%</span>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-sm text-gray-900 dark:text-white">{p.creditsForecast.toLocaleString()} tCO₂e</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-xs text-gray-500 dark:text-gray-400">{p.lastActivityDays === 0 ? 'Today' : `${p.lastActivityDays}d ago`}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5">{getAlertBadge(p.alertLevel, p.overdue)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-16 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+                          <div className={`h-1.5 rounded-full ${p.readiness > 90 ? 'bg-primary-500' : p.readiness > 70 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${p.readiness}%` }} />
+                        </div>
+                        <span className="text-xs font-medium text-surface-700 dark:text-surface-300">{p.readiness}%</span>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-sm text-surface-900 dark:text-surface-100">{p.creditsForecast.toLocaleString()} tCO₂e</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-xs text-surface-400 dark:text-surface-500">{p.lastActivityDays === 0 ? 'Today' : `${p.lastActivityDays}d ago`}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5">{getAlertBadge(p.alertLevel, p.overdue)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

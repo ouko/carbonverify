@@ -59,6 +59,13 @@ class Settings(BaseSettings):
     BREACH_NOTIFICATION_SLA_HOURS: int = 72
     DSR_RESPONSE_SLA_DAYS: int = 30
 
+    # Lead Intelligence Engine
+    LEAD_SCRAPER_MODE: str = "demo"  # "demo" or "live"
+    LEAD_SCRAPER_RATE_LIMIT_RPS: float = 0.5  # requests per second
+    LEAD_SCRAPER_REQUEST_TIMEOUT: int = 30
+    LEAD_SCRAPER_MAX_RETRIES: int = 3
+    LEAD_SCRAPER_RETRY_DELAY: int = 5
+
 
 @lru_cache()
 def get_settings() -> Settings:

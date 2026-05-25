@@ -12,17 +12,53 @@ import {
   Sun,
   Moon,
   LogOut,
+  Shield,
+  Landmark,
+  BarChart3,
+  Leaf,
+  Coins,
+  Building2,
+  Command,
+  Target,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/projects', icon: FolderOpen, label: 'Projects' },
-  { to: '/data-sources', icon: Database, label: 'Data Sources' },
-  { to: '/calculations', icon: Calculator, label: 'Calculations' },
-  { to: '/reports', icon: FileText, label: 'Reports' },
-  { to: '/review-queue', icon: ClipboardList, label: 'Review Queue' },
+const navGroups = [
+  {
+    label: 'Core',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/projects', icon: FolderOpen, label: 'Projects' },
+      { to: '/data-sources', icon: Database, label: 'Data Sources' },
+      { to: '/calculations', icon: Calculator, label: 'Calculations' },
+      { to: '/reports', icon: FileText, label: 'Reports' },
+      { to: '/review-queue', icon: ClipboardList, label: 'Review Queue' },
+    ],
+  },
+  {
+    label: 'Marketplace',
+    items: [
+      { to: '/leads', icon: Target, label: 'Lead Intelligence' },
+      { to: '/brokerage', icon: BarChart3, label: 'Brokerage' },
+      { to: '/tokenization', icon: Coins, label: 'Tokenization' },
+      { to: '/corporate', icon: Building2, label: 'Corporate' },
+    ],
+  },
+  {
+    label: 'Security',
+    items: [
+      { to: '/security', icon: Shield, label: 'Security' },
+      { to: '/audit', icon: Landmark, label: 'Audit' },
+      { to: '/compliance', icon: Leaf, label: 'Compliance' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { to: '/command-center', icon: Command, label: 'Command Center' },
+    ],
+  },
 ]
 
 export default function Layout() {
@@ -33,85 +69,117 @@ export default function Layout() {
   const { isDark, toggle } = useThemeStore()
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-surface-50 dark:bg-surface-950">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-surface-950/20 backdrop-blur-sm lg:hidden animate-fade-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform dark:bg-gray-800 lg:static lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col 
+          bg-white/95 dark:bg-surface-900/95 backdrop-blur-xl
+          border-r border-surface-200/60 dark:border-surface-800/40
+          transition-transform duration-300 ease-spring lg:static lg:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex h-16 items-center justify-between px-4">
-          <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-5 h-16 border-b border-surface-100 dark:border-surface-800/50">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500 text-white">
+            <Leaf className="w-5 h-5" />
+          </div>
+          <span className="text-lg font-bold tracking-tight text-surface-900 dark:text-surface-100">
             CarbonVerify
           </span>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
-            <X className="h-6 w-6 text-gray-500" />
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="ml-auto p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <nav className="mt-4 space-y-1 px-2">
-          {navItems.map((item) => {
-            const active = location.pathname === item.to
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.label}
-              </Link>
-            )
-          })}
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <div className="section-title px-3 mb-2">{group.label}</div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const isActive = location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setSidebarOpen(false)}
+                      className={isActive ? 'nav-item-active' : 'nav-item'}
+                    >
+                      <item.icon className="w-[18px] h-[18px]" strokeWidth={isActive ? 2.5 : 2} />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="absolute bottom-0 w-full border-t border-gray-200 p-4 dark:border-gray-700">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {user?.name}
-            </span>
+        {/* Bottom actions */}
+        <div className="p-3 border-t border-surface-100 dark:border-surface-800/50">
+          <div className="flex items-center gap-2 mb-2 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-700 dark:text-primary-300 text-sm font-semibold">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-surface-900 dark:text-surface-200 truncate">
+                {user?.name || 'User'}
+              </div>
+              <div className="text-xs text-surface-400 dark:text-surface-500 truncate">
+                {user?.email || ''}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
             <button
               onClick={toggle}
-              className="rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="btn-ghost flex-1 justify-center text-xs py-2"
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={logout}
+              className="btn-ghost flex-1 justify-center text-xs py-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
-          <button
-            onClick={logout}
-            className="flex w-full items-center rounded-lg px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-          >
-            <LogOut className="mr-3 h-5 w-5" />
-            Logout
-          </button>
         </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center border-b border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-800 lg:px-8">
-          <button onClick={() => setSidebarOpen(true)} className="mr-4 lg:hidden">
-            <Menu className="h-6 w-6 text-gray-500" />
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <header className="flex items-center h-16 px-4 lg:px-8 border-b border-surface-200/60 dark:border-surface-800/40 bg-white/50 dark:bg-surface-950/50 backdrop-blur-sm">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden"
+          >
+            <Menu className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
-            {navItems.find((n) => n.to === location.pathname)?.label || 'CarbonVerify'}
+          <h1 className="page-title ml-2 lg:ml-0">
+            {navGroups.flatMap((g) => g.items).find((n) => n.to === location.pathname)?.label || 'CarbonVerify'}
           </h1>
         </header>
-        <main className="flex-1 overflow-auto p-4 lg:p-8">
-          <Outlet />
+
+        {/* Page content */}
+        <main className="flex-1 overflow-auto scrollbar-thin p-4 lg:p-8">
+          <div className="animate-slide-up">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

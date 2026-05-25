@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
+import ProjectCreatePage from './pages/ProjectCreatePage';
 import DataSourcesPage from './pages/DataSourcesPage';
 import CalculationsPage from './pages/CalculationsPage';
 import ReportsPage from './pages/ReportsPage';
@@ -18,6 +19,7 @@ import { ComplianceDashboardPage } from './pages/ComplianceDashboardPage';
 import { BrokeragePage } from './pages/BrokeragePage';
 import { TokenizationPage } from './pages/TokenizationPage';
 import { CorporateDashboardPage } from './pages/CorporateDashboardPage';
+import LeadsPage from './pages/LeadsPage';
 import CommandLayout from './components/CommandLayout';
 import { InboxPage } from './pages/command/InboxPage';
 import { ProjectsGridPage } from './pages/command/ProjectsGridPage';
@@ -38,6 +40,7 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/new" element={<ProjectCreatePage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/calculations" element={<CalculationsPage />} />
@@ -50,6 +53,7 @@ function App() {
               <Route path="/brokerage" element={<BrokeragePage />} />
               <Route path="/tokenization" element={<TokenizationPage />} />
               <Route path="/corporate" element={<CorporateDashboardPage />} />
+              <Route path="/leads" element={<LeadsPage />} />
             </Route>
             <Route element={<CommandLayout />}>
               <Route path="/command-center/inbox" element={<InboxPage />} />

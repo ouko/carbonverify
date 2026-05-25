@@ -11,6 +11,9 @@ import {
   X,
   Bell,
   Search,
+  Sun,
+  Moon,
+  LogOut,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -38,39 +41,46 @@ export default function CommandLayout() {
   const currentLabel = navItems.find((n) => location.pathname.startsWith(n.to))?.label || 'Command Center'
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-surface-50 dark:bg-surface-950">
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-surface-950/20 backdrop-blur-sm lg:hidden animate-fade-in" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-gray-200 bg-white transition-transform dark:border-gray-700 dark:bg-gray-800 lg:static lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col
+          bg-white/95 dark:bg-surface-900/95 backdrop-blur-xl
+          border-r border-surface-200/60 dark:border-surface-800/40
+          transition-transform duration-300 ease-spring lg:static lg:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex h-16 items-center justify-between px-4">
-          <div>
-            <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">Command</span>
-            <span className="text-lg font-bold text-gray-800 dark:text-gray-200">Center</span>
+        <div className="flex items-center justify-between px-5 h-16 border-b border-surface-100 dark:border-surface-800/50">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <span className="text-lg font-bold tracking-tight text-surface-900 dark:text-surface-100">Command</span>
+              <span className="text-lg font-bold tracking-tight text-primary-600 dark:text-primary-400">Center</span>
+            </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
-            <X className="h-5 w-5 text-gray-500" />
+          <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="px-3 py-2">
-          <div className="flex items-center rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-700">
-            <Search className="h-4 w-4 text-gray-400" />
+        <div className="px-3 py-3">
+          <div className="flex items-center rounded-xl bg-surface-100/80 dark:bg-surface-800/50 px-3.5 py-2.5">
+            <Search className="h-4 w-4 text-surface-400" />
             <input
               type="text"
               placeholder="Search projects..."
-              className="ml-2 w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200"
+              className="ml-2 w-full bg-transparent text-sm text-surface-700 outline-none placeholder:text-surface-400 dark:text-surface-200"
             />
           </div>
         </div>
 
-        <nav className="mt-2 space-y-0.5 px-2">
+        <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 space-y-0.5">
           {navItems.map((item) => {
             const active = location.pathname.startsWith(item.to)
             return (
@@ -78,16 +88,12 @@ export default function CommandLayout() {
                 key={item.to}
                 to={item.to}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300'
-                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                }`}
+                className={active ? 'nav-item-active' : 'nav-item'}
               >
-                <item.icon className="mr-3 h-5 w-5" />
+                <item.icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.5 : 2} />
                 {item.label}
                 {item.label === 'Inbox' && unreadCount > 0 && (
-                  <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                  <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
                     {unreadCount}
                   </span>
                 )}
@@ -96,42 +102,42 @@ export default function CommandLayout() {
           })}
         </nav>
 
-        <div className="absolute bottom-0 w-full border-t border-gray-200 p-3 dark:border-gray-700">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="p-3 border-t border-surface-100 dark:border-surface-800/50">
+          <div className="flex items-center justify-between mb-2">
             <div className="text-xs">
-              <p className="font-medium text-gray-700 dark:text-gray-200">{user?.name || 'Operator'}</p>
-              <p className="text-gray-500 dark:text-gray-400">{user?.role || 'operator'}</p>
+              <p className="font-semibold text-surface-700 dark:text-surface-200">{user?.name || 'Operator'}</p>
+              <p className="text-surface-400 dark:text-surface-500 capitalize">{user?.role || 'operator'}</p>
             </div>
             <button
               onClick={toggle}
-              className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               title="Toggle theme"
             >
-              {isDark ? <span className="text-sm">☀️</span> : <span className="text-sm">🌙</span>}
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
           </div>
           <button
             onClick={logout}
-            className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors"
           >
-            Logout
+            <LogOut className="h-4 w-4" /> Logout
           </button>
         </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        <header className="flex h-14 items-center justify-between border-b border-surface-200/60 dark:border-surface-800/40 bg-white/50 dark:bg-surface-950/50 backdrop-blur-sm px-4 lg:px-6">
           <div className="flex items-center">
-            <button onClick={() => setSidebarOpen(true)} className="mr-3 lg:hidden">
-              <Menu className="h-5 w-5 text-gray-500" />
+            <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
+              <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-base font-semibold text-gray-800 dark:text-gray-100">{currentLabel}</h1>
+            <h1 className="text-base font-semibold text-surface-900 dark:text-surface-100 ml-2 lg:ml-0">{currentLabel}</h1>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className="relative rounded-full p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="relative p-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
             >
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
@@ -149,8 +155,10 @@ export default function CommandLayout() {
           </div>
         )}
 
-        <main className="flex-1 overflow-auto p-4 lg:p-6">
-          <Outlet />
+        <main className="flex-1 overflow-auto scrollbar-thin p-4 lg:p-6">
+          <div className="animate-slide-up">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

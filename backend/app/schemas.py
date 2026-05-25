@@ -579,3 +579,84 @@ class ESGReportOut(BaseModel):
     sdg_impact_summary: Dict[str, Any]
     project_contributions: List[Dict[str, Any]]
     generated_at: datetime
+
+
+# ─── Lead Intelligence ──────────────────────────────────────────────────────────
+
+class LeadBase(BaseModel):
+    registry_source: str
+    external_id: str
+    project_name: str
+    project_developer: Optional[str] = None
+    developer_contact: Optional[str] = None
+    developer_email: Optional[str] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    location_coords: Optional[str] = None
+    methodology: Optional[str] = None
+    sector: Optional[str] = None
+    status: Optional[str] = "unknown"
+    crediting_period_start: Optional[date] = None
+    crediting_period_end: Optional[date] = None
+    last_verification_date: Optional[date] = None
+    last_monitoring_period_end: Optional[date] = None
+    estimated_credits_per_year: Optional[float] = None
+    registry_url: Optional[str] = None
+    days_in_status: Optional[int] = None
+    stuck_score: float = 0.0
+    priority: Optional[str] = "low"
+    lead_status: Optional[str] = "new"
+    notes: Optional[str] = None
+
+
+class LeadCreate(LeadBase):
+    pass
+
+
+class LeadUpdate(BaseModel):
+    project_name: Optional[str] = None
+    project_developer: Optional[str] = None
+    developer_contact: Optional[str] = None
+    developer_email: Optional[str] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    methodology: Optional[str] = None
+    sector: Optional[str] = None
+    status: Optional[str] = None
+    crediting_period_start: Optional[date] = None
+    crediting_period_end: Optional[date] = None
+    estimated_credits_per_year: Optional[float] = None
+    registry_url: Optional[str] = None
+    stuck_score: Optional[float] = None
+    priority: Optional[str] = None
+    lead_status: Optional[str] = None
+    notes: Optional[str] = None
+    assigned_to: Optional[uuid.UUID] = None
+
+
+class LeadOut(LeadBase, ORMBase):
+    id: uuid.UUID
+    scraped_at: datetime
+    updated_at: datetime
+    last_scored_at: Optional[datetime] = None
+    assigned_to: Optional[uuid.UUID] = None
+
+
+class LeadScoreRequest(BaseModel):
+    recompute_all: bool = False
+
+
+class LeadScrapeRequest(BaseModel):
+    registry_source: Optional[str] = None
+    country: Optional[str] = "Kenya"
+
+
+class LeadStats(BaseModel):
+    total_leads: int
+    by_registry: Dict[str, int]
+    by_priority: Dict[str, int]
+    by_country: Dict[str, int]
+    by_lead_status: Dict[str, int]
+    avg_stuck_score: float
+    high_priority_count: int
+    critical_count: int

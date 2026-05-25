@@ -162,6 +162,42 @@ class OrchestratorEventTypeEnum(str, PyEnum):
     error = "error"
 
 
+# ─── Lead Intelligence Enums ──────────────────────────────────────────────────
+
+class LeadRegistrySourceEnum(str, PyEnum):
+    verra = "verra"
+    gold_standard = "gold_standard"
+    cdm = "cdm"
+    kenya_national = "kenya_national"
+    manual = "manual"
+
+
+class LeadPriorityEnum(str, PyEnum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
+
+
+class LeadWorkflowStatusEnum(str, PyEnum):
+    new = "new"
+    contacted = "contacted"
+    qualified = "qualified"
+    proposal_sent = "proposal_sent"
+    converted = "converted"
+    dismissed = "dismissed"
+
+
+class LeadProjectStatusEnum(str, PyEnum):
+    under_validation = "under_validation"
+    under_verification = "under_verification"
+    registered = "registered"
+    certified = "certified"
+    rejected = "rejected"
+    completed = "completed"
+    unknown = "unknown"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -1041,3 +1077,64 @@ class PortfolioHolding(Base):
 
     portfolio: Mapped["CorporatePortfolio"] = relationship("CorporatePortfolio")
     token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")
+
+
+# ─── Lead Intelligence ──────────────────────────────────────────────────────────
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    __table_args__ = (
+        Index("ix_leads_registry_source", "registry_source"),
+        Index("ix_leads_status", "status"),
+        Index("ix_leads_priority", "priority"),
+        Index("ix_leads_stuck_score", "stuck_score"),
+        Index("ix_leads_lead_status", "lead_status"),
+        Index("ix_leads_country", "country"),
+        Index("ix_leads_assigned_to", "assigned_to"),
+        Index("ix_leads_external_id", "external_id"),
+        Index("ix_leads_scraped_at", "scraped_at"),
+        UniqueConstraint("registry_source", "external_id", name="uq_lead_registry_external"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    registry_source: Mapped[LeadRegistrySourceEnum] = mapped_column(
+        Enum(LeadRegistrySourceEnum, name="lead_registry_source"), nullable=False
+    )
+    external_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    project_name: Mapped[str] = mapped_column(String(500), nullable=False)
+    project_developer: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    developer_contact: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    developer_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    region: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    location_coords: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    methodology: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[LeadProjectStatusEnum] = mapped_column(
+        Enum(LeadProjectStatusEnum, name="lead_project_status"), default=LeadProjectStatusEnum.unknown, nullable=False
+    )
+    crediting_period_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    crediting_period_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    last_verification_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    last_monitoring_period_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    estimated_credits_per_year: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    registry_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    days_in_status: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    stuck_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    priority: Mapped[LeadPriorityEnum] = mapped_column(
+        Enum(LeadPriorityEnum, name="lead_priority"), default=LeadPriorityEnum.low, nullable=False
+    )
+    lead_status: Mapped[LeadWorkflowStatusEnum] = mapped_column(
+        Enum(LeadWorkflowStatusEnum, name="lead_workflow_status"), default=LeadWorkflowStatusEnum.new, nullable=False
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    last_scored_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    assignee: Mapped[Optional["User"]] = relationship("User")

@@ -107,3 +107,49 @@ export interface TokenResponse {
   refresh_token: string
   token_type: string
 }
+
+export type LeadRegistrySource = 'verra' | 'gold_standard' | 'cdm' | 'kenya_national' | 'manual'
+export type LeadPriority = 'low' | 'medium' | 'high' | 'critical'
+export type LeadWorkflowStatus = 'new' | 'contacted' | 'qualified' | 'proposal_sent' | 'converted' | 'dismissed'
+
+export interface Lead {
+  id: string
+  registry_source: LeadRegistrySource
+  external_id: string
+  project_name: string
+  project_developer: string | null
+  developer_contact: string | null
+  developer_email: string | null
+  country: string | null
+  region: string | null
+  location_coords?: string | null
+  methodology: string | null
+  sector: string | null
+  status: string
+  crediting_period_start: string | null
+  crediting_period_end: string | null
+  last_verification_date: string | null
+  last_monitoring_period_end: string | null
+  estimated_credits_per_year: number | null
+  registry_url: string | null
+  days_in_status: number | null
+  stuck_score: number
+  priority: LeadPriority
+  lead_status: LeadWorkflowStatus
+  notes: string | null
+  scraped_at: string
+  updated_at: string
+  last_scored_at: string | null
+  assigned_to: string | null
+}
+
+export interface LeadStats {
+  total_leads: number
+  by_registry: Record<string, number>
+  by_priority: Record<string, number>
+  by_country: Record<string, number>
+  by_lead_status: Record<string, number>
+  avg_stuck_score: number
+  high_priority_count: number
+  critical_count: number
+}

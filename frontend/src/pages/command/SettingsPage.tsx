@@ -21,99 +21,59 @@ export function SettingsPage() {
     setSettings((s) => ({ ...s, [key]: !s[key] }))
   }
 
+  const toggleRow = (label: string, desc: string, key: keyof typeof settings) => (
+    <div className="flex items-center justify-between py-3 border-b border-surface-100 dark:border-surface-800/50 last:border-0">
+      <div>
+        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">{label}</p>
+        <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">{desc}</p>
+      </div>
+      <button
+        onClick={() => toggle(key)}
+        className={`relative h-6 w-11 rounded-full transition-colors ${settings[key] ? 'bg-primary-600' : 'bg-surface-200 dark:bg-surface-700'}`}
+      >
+        <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings[key] ? 'translate-x-5' : ''}`} />
+      </button>
+    </div>
+  )
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Notification Preferences</h2>
+      <div>
+        <h2 className="page-title">Settings</h2>
+        <p className="text-sm text-surface-400 dark:text-surface-500 mt-1">Configure notification and automation preferences</p>
+      </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-700">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Human Review Required</p>
-              <p className="text-xs text-gray-500">When any agent queues an item for human review</p>
-            </div>
-            <button
-              onClick={() => toggle('notifyHumanReview')}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings.notifyHumanReview ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-            >
-              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings.notifyHumanReview ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-700">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">VVB Clarifications</p>
-              <p className="text-xs text-gray-500">When a registry requests clarification</p>
-            </div>
-            <button
-              onClick={() => toggle('notifyVVB')}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings.notifyVVB ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-            >
-              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings.notifyVVB ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-700">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Calculation Anomalies</p>
-              <p className="text-xs text-gray-500">Cross-project or statistical anomalies detected</p>
-            </div>
-            <button
-              onClick={() => toggle('notifyAnomaly')}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings.notifyAnomaly ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-            >
-              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings.notifyAnomaly ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-700">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Client Churn Risk</p>
-              <p className="text-xs text-gray-500">When client success agent flags retention risk</p>
-            </div>
-            <button
-              onClick={() => toggle('notifyChurn')}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings.notifyChurn ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-            >
-              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings.notifyChurn ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Deadline Warnings</p>
-              <p className="text-xs text-gray-500">Upcoming SLA deadlines and overdue items</p>
-            </div>
-            <button
-              onClick={() => toggle('notifyDeadline')}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings.notifyDeadline ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-            >
-              <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings.notifyDeadline ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
+      <div className="card p-6">
+        <h3 className="mb-4 font-semibold text-surface-900 dark:text-surface-100">Notification Preferences</h3>
+        <div className="space-y-0">
+          {toggleRow('Human Review Required', 'When any agent queues an item for human review', 'notifyHumanReview')}
+          {toggleRow('VVB Clarifications', 'When a registry requests clarification', 'notifyVVB')}
+          {toggleRow('Calculation Anomalies', 'Cross-project or statistical anomalies detected', 'notifyAnomaly')}
+          {toggleRow('Client Churn Risk', 'When client success agent flags retention risk', 'notifyChurn')}
+          {toggleRow('Deadline Warnings', 'Upcoming SLA deadlines and overdue items', 'notifyDeadline')}
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Notification Channels</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="card p-6">
+        <h3 className="mb-4 font-semibold text-surface-900 dark:text-surface-100">Notification Channels</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { key: 'channelEmail', icon: Mail, label: 'Email' },
-            { key: 'channelInApp', icon: Bell, label: 'In-App' },
-            { key: 'channelSMS', icon: Smartphone, label: 'SMS' },
-            { key: 'channelWhatsApp', icon: MessageSquare, label: 'WhatsApp' },
+            { key: 'channelEmail' as const, icon: Mail, label: 'Email' },
+            { key: 'channelInApp' as const, icon: Bell, label: 'In-App' },
+            { key: 'channelSMS' as const, icon: Smartphone, label: 'SMS' },
+            { key: 'channelWhatsApp' as const, icon: MessageSquare, label: 'WhatsApp' },
           ].map((ch) => (
             <button
               key={ch.key}
-              onClick={() => toggle(ch.key as any)}
-              className={`flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors ${
+              onClick={() => toggle(ch.key)}
+              className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-all ${
                 (settings as any)[ch.key]
-                  ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/20'
-                  : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/50'
+                  ? 'border-primary-400 bg-primary-50/50 dark:border-primary-500/50 dark:bg-primary-950/10'
+                  : 'border-surface-200 hover:bg-surface-50 dark:border-surface-700 dark:hover:bg-surface-800/50'
               }`}
             >
-              <ch.icon className={`h-6 w-6 ${(settings as any)[ch.key] ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400'}`} />
-              <span className={`text-xs font-medium ${(settings as any)[ch.key] ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}>
+              <ch.icon className={`h-6 w-6 ${(settings as any)[ch.key] ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400'}`} />
+              <span className={`text-xs font-medium ${(settings as any)[ch.key] ? 'text-primary-700 dark:text-primary-300' : 'text-surface-600 dark:text-surface-400'}`}>
                 {ch.label}
               </span>
             </button>
@@ -121,18 +81,18 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Automation Settings</h2>
+      <div className="card p-6">
+        <h3 className="mb-4 font-semibold text-surface-900 dark:text-surface-100">Automation Settings</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Digest Mode</p>
-              <p className="text-xs text-gray-500">Receive summaries instead of individual alerts</p>
+              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Digest Mode</p>
+              <p className="text-xs text-surface-400 dark:text-surface-500">Receive summaries instead of individual alerts</p>
             </div>
             <select
               value={settings.digestMode}
               onChange={(e) => setSettings((s) => ({ ...s, digestMode: e.target.value }))}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="input-modern py-1.5 px-3 text-sm appearance-none cursor-pointer"
             >
               <option value="realtime">Real-time</option>
               <option value="hourly">Hourly digest</option>
@@ -142,12 +102,12 @@ export function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Auto-Assign Queue Items</p>
-              <p className="text-xs text-gray-500">Automatically assign items based on workload</p>
+              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Auto-Assign Queue Items</p>
+              <p className="text-xs text-surface-400 dark:text-surface-500">Automatically assign items based on workload</p>
             </div>
             <button
               onClick={() => toggle('autoAssign')}
-              className={`relative h-6 w-11 rounded-full transition-colors ${settings.autoAssign ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+              className={`relative h-6 w-11 rounded-full transition-colors ${settings.autoAssign ? 'bg-primary-600' : 'bg-surface-200 dark:bg-surface-700'}`}
             >
               <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${settings.autoAssign ? 'translate-x-5' : ''}`} />
             </button>
@@ -155,8 +115,8 @@ export function SettingsPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-white">Auto-Advance Threshold</p>
-              <p className="text-xs text-gray-500">Minimum confidence for automatic state advancement</p>
+              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Auto-Advance Threshold</p>
+              <p className="text-xs text-surface-400 dark:text-surface-500">Minimum confidence for automatic state advancement</p>
             </div>
             <input
               type="number"
@@ -165,14 +125,14 @@ export function SettingsPage() {
               step={0.01}
               value={settings.autoAdvanceThreshold}
               onChange={(e) => setSettings((s) => ({ ...s, autoAdvanceThreshold: parseFloat(e.target.value) }))}
-              className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-24 input-modern py-1.5 px-2 text-sm text-center"
             />
           </div>
         </div>
       </div>
 
       <div className="flex justify-end">
-        <button className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">
+        <button className="btn-primary">
           <Save className="h-4 w-4" /> Save Settings
         </button>
       </div>

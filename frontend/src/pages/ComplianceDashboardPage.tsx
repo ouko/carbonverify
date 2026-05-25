@@ -21,81 +21,70 @@ const MOCK_CONFLICTS = [
 ]
 
 const STATUS_COLORS: Record<string, string> = {
-  received: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  under_review: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  fulfilled: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  contained: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  notified_regulator: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  pending_review: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  received: 'badge-blue',
+  under_review: 'badge-amber',
+  fulfilled: 'badge-green',
+  rejected: 'badge-red',
+  contained: 'badge-green',
+  notified_regulator: 'bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300',
+  pending_review: 'bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300',
+  approved: 'badge-green',
 }
 
 export function ComplianceDashboardPage() {
   const [activeTab, setActiveTab] = useState<'dsr' | 'breaches' | 'conflicts' | 'methodology'>('dsr')
 
+  const tabs = [
+    { key: 'dsr' as const, label: 'Data Subject Requests', icon: FileText },
+    { key: 'breaches' as const, label: 'Breach Notifications', icon: AlertTriangle },
+    { key: 'conflicts' as const, label: 'Conflict of Interest', icon: Gavel },
+    { key: 'methodology' as const, label: 'Methodology Versions', icon: BookOpen },
+  ]
+
   return (
-    <div className="space-y-6 p-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Shield className="h-6 w-6 text-indigo-600" /> Compliance Center
-        </h1>
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          Kenya Data Protection Act · VVB Independence
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+            <Shield className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div>
+            <h2 className="page-title">Compliance Center</h2>
+            <p className="text-xs text-surface-400 dark:text-surface-500">Kenya Data Protection Act · VVB Independence</p>
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-500" />
-            <span className="text-xs text-gray-500 dark:text-gray-400">Open DSRs</span>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {[
+          { label: 'Open DSRs', value: '2', sub: '1 urgent (≤15 days)', icon: FileText, color: 'text-blue-500' },
+          { label: 'Active Breaches', value: '1', sub: 'Within 72h SLA', icon: AlertTriangle, color: 'text-red-500' },
+          { label: 'Pending COI', value: '1', sub: 'Awaiting review', icon: Users, color: 'text-violet-500' },
+          { label: 'Methodologies', value: '4', sub: 'All current', icon: BookOpen, color: 'text-primary-500' },
+        ].map((stat) => (
+          <div key={stat.label} className="card p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <stat.icon className={`h-4 w-4 ${stat.color}`} />
+              <span className="text-xs text-surface-400 dark:text-surface-500">{stat.label}</span>
+            </div>
+            <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">{stat.value}</p>
+            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">{stat.sub}</p>
           </div>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">2</p>
-          <p className="text-xs text-yellow-600">1 urgent (≤15 days)</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
-            <span className="text-xs text-gray-500 dark:text-gray-400">Active Breaches</span>
-          </div>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">1</p>
-          <p className="text-xs text-green-600">Within 72h SLA</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-purple-500" />
-            <span className="text-xs text-gray-500 dark:text-gray-400">Pending COI</span>
-          </div>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">1</p>
-          <p className="text-xs text-gray-500">Awaiting review</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-green-500" />
-            <span className="text-xs text-gray-500 dark:text-gray-400">Methodologies</span>
-          </div>
-          <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">4</p>
-          <p className="text-xs text-green-600">All current</p>
-        </div>
+        ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-        {[
-          { key: 'dsr', label: 'Data Subject Requests', icon: FileText },
-          { key: 'breaches', label: 'Breach Notifications', icon: AlertTriangle },
-          { key: 'conflicts', label: 'Conflict of Interest', icon: Gavel },
-          { key: 'methodology', label: 'Methodology Versions', icon: BookOpen },
-        ].map((tab) => (
+      <div className="flex gap-1 rounded-xl bg-surface-100/80 dark:bg-surface-800/50 p-1">
+        {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
               activeTab === tab.key
-                ? 'bg-white text-indigo-700 shadow-sm dark:bg-gray-700 dark:text-indigo-300'
-                : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700'
+                ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
+                : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'
             }`}
           >
             <tab.icon className="h-4 w-4" />
@@ -106,31 +95,31 @@ export function ComplianceDashboardPage() {
 
       {/* DSR Tab */}
       {activeTab === 'dsr' && (
-        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Data Subject Requests</h3>
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-surface-200/60 dark:border-surface-800/40">
+            <h3 className="font-semibold text-surface-900 dark:text-surface-100">Data Subject Requests</h3>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
             {MOCK_DSRS.map((dsr) => (
-              <div key={dsr.id} className="flex items-center justify-between px-4 py-3">
+              <div key={dsr.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{dsr.id}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[dsr.status]}`}>
-                      {dsr.status}
+                    <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{dsr.id}</span>
+                    <span className={`badge text-[10px] ${STATUS_COLORS[dsr.status]}`}>
+                      {dsr.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                     {dsr.type} · Subject: {dsr.subject} · Assigned: {dsr.assigned_to || 'Unassigned'}
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className={`text-xs font-medium ${dsr.days_remaining <= 7 ? 'text-red-600' : 'text-gray-600 dark:text-gray-400'}`}>
+                  <div className={`text-xs font-semibold ${dsr.days_remaining <= 7 ? 'text-red-600 dark:text-red-400' : 'text-surface-600 dark:text-surface-400'}`}>
                     {dsr.days_remaining} days left
                   </div>
-                  <div className="mt-1 h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                  <div className="mt-1.5 h-1.5 w-20 overflow-hidden rounded-full bg-surface-200 dark:bg-surface-700">
                     <div
-                      className={`h-full rounded-full ${dsr.days_remaining <= 7 ? 'bg-red-500' : dsr.days_remaining <= 15 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                      className={`h-full rounded-full ${dsr.days_remaining <= 7 ? 'bg-red-500' : dsr.days_remaining <= 15 ? 'bg-amber-500' : 'bg-primary-500'}`}
                       style={{ width: `${Math.min(100, (dsr.days_remaining / 30) * 100)}%` }}
                     />
                   </div>
@@ -143,29 +132,27 @@ export function ComplianceDashboardPage() {
 
       {/* Breaches Tab */}
       {activeTab === 'breaches' && (
-        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Breach Notifications</h3>
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-surface-200/60 dark:border-surface-800/40">
+            <h3 className="font-semibold text-surface-900 dark:text-surface-100">Breach Notifications</h3>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
             {MOCK_BREACHES.map((b) => (
-              <div key={b.id} className="px-4 py-3">
+              <div key={b.id} className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{b.title}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      b.severity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30'
-                    }`}>
+                    <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{b.title}</span>
+                    <span className={`badge text-[10px] ${b.severity === 'high' ? 'badge-red' : 'badge-amber'}`}>
                       {b.severity}
                     </span>
                   </div>
-                  <span className={`text-xs ${b.sla_ok ? 'text-green-600' : 'text-red-600'}`}>
-                    {b.sla_ok ? <CheckCircle className="inline h-3.5 w-3.5 mr-1" /> : <Clock className="inline h-3.5 w-3.5 mr-1" />}
+                  <span className={`text-xs flex items-center gap-1 ${b.sla_ok ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {b.sla_ok ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                     {b.hours_elapsed}h / 72h SLA
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Status: {b.status} · ID: {b.id}
+                <p className="mt-1 text-xs text-surface-400 dark:text-surface-500">
+                  Status: {b.status.replace('_', ' ')} · ID: {b.id}
                 </p>
               </div>
             ))}
@@ -175,26 +162,26 @@ export function ComplianceDashboardPage() {
 
       {/* Conflicts Tab */}
       {activeTab === 'conflicts' && (
-        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Conflict of Interest Disclosures</h3>
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-surface-200/60 dark:border-surface-800/40">
+            <h3 className="font-semibold text-surface-900 dark:text-surface-100">Conflict of Interest Disclosures</h3>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
             {MOCK_CONFLICTS.map((coi) => (
-              <div key={coi.id} className="flex items-center justify-between px-4 py-3">
+              <div key={coi.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{coi.user}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[coi.status]}`}>
-                      {coi.status}
+                    <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{coi.user}</span>
+                    <span className={`badge text-[10px] ${STATUS_COLORS[coi.status]}`}>
+                      {coi.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                     {coi.type} · {coi.project} · Disclosed {coi.disclosed}
                   </p>
                 </div>
                 {coi.status === 'pending_review' && (
-                  <button className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">
+                  <button className="btn-primary text-xs">
                     Review
                   </button>
                 )}
@@ -206,30 +193,30 @@ export function ComplianceDashboardPage() {
 
       {/* Methodology Tab */}
       {activeTab === 'methodology' && (
-        <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Methodology Versions</h3>
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-surface-200/60 dark:border-surface-800/40">
+            <h3 className="font-semibold text-surface-900 dark:text-surface-100">Methodology Versions</h3>
           </div>
-          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
             {[
               { name: 'TPDDTEC v4', version: '4.2.1', effective: '2024-01-01', current: true, changes: 'Updated sample size requirement' },
               { name: 'VM0050', version: '2.0', effective: '2023-06-01', current: true, changes: 'Revised leakage factors' },
               { name: 'VMR0006', version: '1.1', effective: '2023-03-15', current: true, changes: 'Clarified monitoring boundaries' },
               { name: 'AMS-II.G', version: '3.0', effective: '2022-09-01', current: true, changes: 'Baseline recalculation protocol' },
             ].map((m, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3">
+              <div key={i} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{m.name}</span>
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                    <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{m.name}</span>
+                    <span className="badge badge-green text-[10px]">
                       {m.current ? 'Current' : 'Superseded'}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                     v{m.version} · Effective {m.effective} · {m.changes}
                   </p>
                 </div>
-                <button className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                <button className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors">
                   View Rules
                 </button>
               </div>
@@ -239,12 +226,12 @@ export function ComplianceDashboardPage() {
       )}
 
       {/* Independence Block */}
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-800 dark:bg-indigo-900/20">
+      <div className="rounded-2xl border border-primary-200 bg-primary-50 p-5 dark:border-primary-900/20 dark:bg-primary-950/10">
         <div className="flex items-start gap-3">
-          <TrendingUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          <TrendingUp className="h-5 w-5 text-primary-600 dark:text-primary-400 shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-medium text-indigo-900 dark:text-indigo-300">Independence Enforcement</h3>
-            <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-400">
+            <h3 className="font-semibold text-primary-900 dark:text-primary-300">Independence Enforcement</h3>
+            <p className="mt-1 text-sm text-primary-700 dark:text-primary-400">
               PDD drafting is technically blocked for all users to maintain VVB independence.
               Conflict-of-interest detection is active. All methodology changes require admin approval
               and are versioned with rollback capability.
