@@ -151,15 +151,18 @@ class CDMScraper(BaseRegistryScraper):
         logger.info("cdm_scrape_started", country=country, filter=status_filter, live_mode=self.live_mode)
 
         leads: List[Dict[str, Any]] = []
+        data_source = "demo"
 
         if self.live_mode:
             live_leads = self._try_live_scrape(country, status_filter)
             if live_leads:
                 leads.extend(live_leads)
+                data_source = "live"
             else:
                 logger.warning("cdm_live_scrape_empty", country=country, falling_back="demo")
 
         if not leads:
+            data_source = "demo"
             for raw in DEMO_CDM_LEADS:
                 if country and raw.get("country") != country:
                     continue
@@ -170,7 +173,9 @@ class CDMScraper(BaseRegistryScraper):
                 raw_copy["scraped_at"] = datetime.now(timezone.utc).isoformat()
                 leads.append(raw_copy)
 
-        logger.info("cdm_scrape_completed", count=len(leads), live_mode=self.live_mode)
+        logger.info("cdm_scrape_completed", count=len(leads), live_mode=self.live_mode, data_source=data_source)
+        for lead in leads:
+            lead["_scrape_meta"] = {"source": self.source, "data_source": data_source}
         return leads
 
     def close(self) -> None:

@@ -294,6 +294,54 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* Scrape Report */}
+      {scrapeMutation.data && (
+        <div className="card p-4 border-l-4 border-primary-500">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-100">
+              Scrape Report — {scrapeMutation.data.created} created, {scrapeMutation.data.updated} updated
+            </h3>
+            <button
+              onClick={() => scrapeMutation.reset()}
+              className="text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="space-y-2">
+            {scrapeMutation.data.per_source.map((s) => (
+              <div key={s.source} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="capitalize font-medium text-surface-700 dark:text-surface-300">
+                    {s.source.replace('_', ' ')}
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    s.status === 'live'
+                      ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300'
+                      : s.status === 'error'
+                      ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
+                      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
+                  }`}>
+                    {s.status}
+                  </span>
+                </div>
+                <div className="text-surface-500 dark:text-surface-400 text-xs">
+                  {s.count} leads
+                  {s.created > 0 && <span className="text-green-600 dark:text-green-400 ml-1">({s.created} new)</span>}
+                  {s.updated > 0 && <span className="text-blue-600 dark:text-blue-400 ml-1">({s.updated} updated)</span>}
+                  {s.error && <span className="text-red-500 ml-1" title={s.error}>— error</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {scrapeMutation.data.per_source.some((s) => s.status === 'demo') && (
+            <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-2">
+              Some sources returned demo data because live scraping is blocked. Set LEAD_SCRAPER_MODE=live and install Playwright for real registry data.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card p-5">

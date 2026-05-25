@@ -1,5 +1,6 @@
 """Lead Intelligence API routes."""
 
+import asyncio
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
@@ -154,18 +155,30 @@ async def trigger_scrape(
     sources = [payload.registry_source] if payload.registry_source else list_scrapers()
     total_created = 0
     total_updated = 0
+    per_source: list[dict] = []
 
     for source in sources:
         scraper = get_scraper(source)
+        raw_leads: list[dict] = []
+        error_msg: str | None = None
+        data_source = "demo"
+
         try:
-            raw_leads = scraper.scrape(country=payload.country or "Kenya")
+            raw_leads = await asyncio.to_thread(scraper.scrape, country=payload.country or "Kenya")
         except Exception as exc:
-            logger.error("scrape_failed", source=source, error=str(exc))
-            continue
+            error_msg = str(exc)
+            logger.error("scrape_failed", source=source, error=error_msg)
         finally:
             scraper.close()
 
+        source_created = 0
+        source_updated = 0
+
         for raw in raw_leads:
+            # Track whether this came from live or demo
+            meta = raw.pop("_scrape_meta", {})
+            data_source = meta.get("data_source", "demo")
+
             # Upsert by (registry_source, external_id)
             existing = await db.execute(
                 select(Lead).where(
@@ -204,6 +217,7 @@ async def trigger_scrape(
                 lead.last_scored_at = datetime.now(timezone.utc)
                 lead.updated_at = datetime.now(timezone.utc)
                 total_updated += 1
+                source_updated += 1
             else:
                 lead_data = {
                     "registry_source": source,
@@ -234,10 +248,26 @@ async def trigger_scrape(
 
                 db.add(Lead(**lead_data))
                 total_created += 1
+                source_created += 1
+
+        per_source.append({
+            "source": source,
+            "status": "error" if error_msg else ("live" if data_source == "live" else "demo"),
+            "count": len(raw_leads),
+            "created": source_created,
+            "updated": source_updated,
+            "error": error_msg,
+            "data_source": data_source,
+        })
 
     await db.commit()
-    logger.info("scrape_completed", created=total_created, updated=total_updated, sources=sources)
-    return {"created": total_created, "updated": total_updated, "sources": sources}
+    logger.info("scrape_completed", created=total_created, updated=total_updated, sources=sources, per_source=per_source)
+    return {
+        "created": total_created,
+        "updated": total_updated,
+        "sources": sources,
+        "per_source": per_source,
+    }
 
 
 @router.get("/stats/dashboard", response_model=LeadStats)

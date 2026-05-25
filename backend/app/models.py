@@ -191,6 +191,8 @@ class LeadWorkflowStatusEnum(str, PyEnum):
 class LeadProjectStatusEnum(str, PyEnum):
     under_validation = "under_validation"
     under_verification = "under_verification"
+    under_certification = "under_certification"
+    request_for_issuance = "request_for_issuance"
     registered = "registered"
     certified = "certified"
     rejected = "rejected"
