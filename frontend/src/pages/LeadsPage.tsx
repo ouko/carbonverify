@@ -3,7 +3,7 @@ import {
   Target, Search, Filter, ExternalLink, X, ArrowRight, Phone, Mail, MapPin,
   Activity, Gauge, Clock, CheckCircle, BarChart3, RefreshCw, AlertTriangle, Wifi, WifiOff,
 } from 'lucide-react'
-import { useLeads, useUpdateLead, useLeadsStats, useScrapeLeads, useScraperHealth } from '../hooks/useLeads'
+import { useLeads, useUpdateLead, useLeadsStats, useScrapeLeads, useScraperHealth, useScraperHistory } from '../hooks/useLeads'
 import type { Lead, LeadWorkflowStatus, LeadPriority } from '../types'
 
 const REGISTRY_LABELS: Record<string, string> = {
@@ -247,6 +247,7 @@ export default function LeadsPage() {
   const { data: leads, isLoading } = useLeads(filters)
   const { data: stats } = useLeadsStats()
   const { data: health } = useScraperHealth()
+  const { data: history } = useScraperHistory()
   const scrapeMutation = useScrapeLeads()
 
   const kanbanLeads = (status: LeadWorkflowStatus) => leads?.filter((l) => l.lead_status === status) || []
@@ -272,6 +273,23 @@ export default function LeadsPage() {
               {health.mode === 'demo' && (
                 <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-2 py-0.5 rounded">Demo mode</span>
               )}
+            </div>
+          )}
+          {/* Last scraped info */}
+          {history && (
+            <div className="flex items-center gap-3 flex-wrap text-[11px] text-surface-400 dark:text-surface-500">
+              {(['verra', 'gold_standard', 'cdm'] as const).map((source) => {
+                const entry = history[source]
+                if (!entry) return null
+                const label = source === 'gold_standard' ? 'Gold Standard' : source.charAt(0).toUpperCase() + source.slice(1)
+                const time = entry.scraped_at ? new Date(entry.scraped_at).toLocaleString() : 'Never'
+                return (
+                  <span key={source} className="flex items-center gap-1" title={`${entry.count} leads (${entry.created} new, ${entry.updated} updated)`}>
+                    <Clock className="h-3 w-3" />
+                    {label}: {time} · {entry.count} results
+                  </span>
+                )
+              })}
             </div>
           )}
           <div className="flex gap-2">

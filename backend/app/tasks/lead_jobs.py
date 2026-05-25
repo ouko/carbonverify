@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.tasks.celery_app import celery_app
 from app.database import AsyncSessionLocal
-from app.models import Lead, LeadWorkflowStatusEnum
+from app.models import Lead, LeadWorkflowStatusEnum, ScraperRun
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 from app.services.lead_intelligence.factory import get_scraper, list_scrapers
 from app.core.logging import get_logger
@@ -41,15 +41,24 @@ def scrape_registries(self, country: str = "Kenya"):
 
             for source in list_scrapers():
                 scraper = get_scraper(source)
+                raw_leads: list[dict] = []
+                error_msg: str | None = None
+                data_source = "demo"
+                source_created = 0
+                source_updated = 0
+
                 try:
                     raw_leads = scraper.scrape(country=country)
                 except Exception as exc:
-                    logger.error("scrape_failed", source=source, error=str(exc))
-                    continue
+                    error_msg = str(exc)
+                    logger.error("scrape_failed", source=source, error=error_msg)
                 finally:
                     scraper.close()
 
                 for raw in raw_leads:
+                    meta = raw.pop("_scrape_meta", {})
+                    data_source = meta.get("data_source", "demo")
+
                     existing = await db.execute(
                         select(Lead).where(
                             Lead.registry_source == source,
@@ -85,6 +94,7 @@ def scrape_registries(self, country: str = "Kenya"):
                         lead.last_scored_at = datetime.now(timezone.utc)
                         lead.updated_at = datetime.now(timezone.utc)
                         total_updated += 1
+                        source_updated += 1
                     else:
                         lead_data = {
                             "registry_source": source,
@@ -115,6 +125,20 @@ def scrape_registries(self, country: str = "Kenya"):
 
                         db.add(Lead(**lead_data))
                         total_created += 1
+                        source_created += 1
+
+                # Log this scrape run
+                db.add(ScraperRun(
+                    source=source,
+                    scraped_at=datetime.now(timezone.utc),
+                    count=len(raw_leads),
+                    created=source_created,
+                    updated=source_updated,
+                    status="error" if error_msg else ("live" if data_source == "live" else "demo"),
+                    data_source=data_source,
+                    error_message=error_msg,
+                    mode=scraper.live_mode and "live" or "demo",
+                ))
 
             await db.commit()
             logger.info("task_scrape_registries_completed", created=total_created, updated=total_updated)

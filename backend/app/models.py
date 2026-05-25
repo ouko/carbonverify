@@ -1140,3 +1140,20 @@ class Lead(Base):
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     assignee: Mapped[Optional["User"]] = relationship("User")
+
+
+class ScraperRun(Base):
+    __tablename__ = "scraper_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    scraped_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
+    count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="demo", nullable=False)  # live, demo, error
+    data_source: Mapped[str] = mapped_column(String(20), default="demo", nullable=False)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mode: Mapped[str] = mapped_column(String(20), default="demo", nullable=False)

@@ -453,6 +453,17 @@ export function useScrapeLeads() {
   })
 }
 
+export interface ScraperHistoryEntry {
+  scraped_at: string | null
+  count: number
+  created: number
+  updated: number
+  status: string
+  data_source: string
+  error_message: string | null
+  mode: string
+}
+
 export function useScraperHealth() {
   return useQuery({
     queryKey: ['scraper-health'],
@@ -472,6 +483,21 @@ export function useScraperHealth() {
           cdm: { status: 'demo', message: 'Backend unreachable — using mock data' },
           mode: 'demo',
         }
+      }
+    },
+    staleTime: 30000,
+  })
+}
+
+export function useScraperHistory() {
+  return useQuery<Record<string, ScraperHistoryEntry | null>>({
+    queryKey: ['scraper-history'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/leads/scraper-history')
+        return res.data
+      } catch {
+        return {}
       }
     },
     staleTime: 30000,

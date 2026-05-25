@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.database import get_db
-from app.models import Lead, User, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum
+from app.models import Lead, User, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun
 from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadStats, LeadScrapeRequest
 from app.auth.dependencies import require_operator, require_viewer, require_admin
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
@@ -69,6 +69,40 @@ async def create_lead(
     await db.commit()
     await db.refresh(lead)
     return lead
+
+
+@router.get("/scraper-history")
+async def get_scraper_history(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """Return the most recent scrape run for each registry source."""
+    from sqlalchemy import desc
+
+    results = {}
+    for source in list_scrapers():
+        run_result = await db.execute(
+            select(ScraperRun)
+            .where(ScraperRun.source == source)
+            .order_by(desc(ScraperRun.scraped_at))
+            .limit(1)
+        )
+        run = run_result.scalar_one_or_none()
+        if run:
+            results[source] = {
+                "scraped_at": run.scraped_at.isoformat() if run.scraped_at else None,
+                "count": run.count,
+                "created": run.created,
+                "updated": run.updated,
+                "status": run.status,
+                "data_source": run.data_source,
+                "error_message": run.error_message,
+                "mode": run.mode,
+            }
+        else:
+            results[source] = None
+
+    return results
 
 
 @router.get("/{lead_id}", response_model=LeadOut)
@@ -272,6 +306,19 @@ async def trigger_scrape(
             "data_source": data_source,
         })
 
+        # Log this manual scrape run
+        db.add(ScraperRun(
+            source=source,
+            scraped_at=datetime.now(timezone.utc),
+            count=len(raw_leads),
+            created=source_created,
+            updated=source_updated,
+            status="error" if error_msg else ("live" if data_source == "live" else "demo"),
+            data_source=data_source,
+            error_message=error_msg,
+            mode="live" if any(s == "live" for s in [data_source]) else "demo",
+        ))
+
     await db.commit()
     logger.info("scrape_completed", created=total_created, updated=total_updated, sources=sources, per_source=per_source)
     return {
@@ -357,3 +404,5 @@ async def get_scraper_health(
 ):
     """Return health status for all registry scrapers."""
     return health_check_all()
+
+
