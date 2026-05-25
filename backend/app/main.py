@@ -10,6 +10,7 @@ import prometheus_client
 
 from app.config import get_settings
 from app.core.logging import get_logger
+from app.core.request_id import RequestIDMiddleware
 from app.database import engine
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
@@ -55,6 +56,7 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(RequestIDMiddleware)
 
 
 @app.middleware("http")
