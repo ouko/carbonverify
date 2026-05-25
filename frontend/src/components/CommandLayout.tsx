@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   LogOut,
+  ArrowLeft,
+  Leaf,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -67,6 +69,17 @@ export default function CommandLayout() {
           <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
             <X className="h-5 w-5" />
           </button>
+        </div>
+
+        <div className="px-3 pb-2">
+          <Link
+            to="/"
+            className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:text-surface-400 dark:hover:text-surface-200 dark:hover:bg-surface-800 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <Leaf className="h-3.5 w-3.5 text-primary-500" />
+            CarbonVerify
+          </Link>
         </div>
 
         <div className="px-3 py-3">

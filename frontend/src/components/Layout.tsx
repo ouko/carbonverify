@@ -20,6 +20,7 @@ import {
   Building2,
   Command,
   Target,
+  MapPin,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -34,6 +35,7 @@ const navGroups = [
       { to: '/calculations', icon: Calculator, label: 'Calculations' },
       { to: '/reports', icon: FileText, label: 'Reports' },
       { to: '/review-queue', icon: ClipboardList, label: 'Review Queue' },
+      { to: '/field', icon: MapPin, label: 'Field' },
     ],
   },
   {
