@@ -16,6 +16,23 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    # Task execution settings
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    worker_prefetch_multiplier=1,
+    # Dead Letter Queue for failed tasks
+    task_routes={
+        "app.tasks.jobs.*": {"queue": "default"},
+        "app.tasks.report_jobs.*": {"queue": "default"},
+        "app.tasks.lead_jobs.*": {"queue": "default"},
+    },
+    task_default_exchange="default",
+    task_default_queue="default",
+    task_default_routing_key="default",
+    # Retry settings
+    task_default_retry_delay=60,
+    task_max_retries=3,
+    # Beat schedule
     beat_schedule={
         "check-flagged-data-sources": {
             "task": "app.tasks.jobs.check_flagged_data_sources",
@@ -47,3 +64,11 @@ celery_app.conf.update(
         },
     },
 )
+
+# Dead Letter Queue configuration: failed tasks after max retries go to DLQ
+celery_app.conf.task_queue_max_priority = 10
+celery_app.conf.broker_transport_options = {
+    "priority_steps": list(range(10)),
+    "sep": ":",
+    "queue_order_strategy": "priority",
+}

@@ -1,10 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from contextlib import asynccontextmanager
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, REGISTRY
+import prometheus_client
 
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -63,6 +65,19 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Content Security Policy
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    response.headers["Content-Security-Policy"] = csp
     return response
 
 
@@ -78,6 +93,7 @@ async def request_size_limit(request: Request, call_next):
             )
     return await call_next(request)
 
+
 # Production CORS: tighten in production, allow local dev
 allow_origins = [settings.FRONTEND_URL]
 if settings.ENVIRONMENT == "development":
@@ -88,7 +104,7 @@ app.add_middleware(
     allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-API-Key"],
     max_age=600,
 )
 
@@ -115,6 +131,16 @@ app.include_router(corporate_router)
 app.include_router(leads_router)
 
 
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return PlainTextResponse(
+        content=generate_latest(REGISTRY),
+        media_type=CONTENT_TYPE_LATEST,
+    )
+
+
 @app.get("/")
-async def root():
+@limiter.limit("60/minute")
+async def root(request: Request):
     return {"message": "CarbonVerify API", "version": "1.2.0"}

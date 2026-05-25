@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
 import uuid
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.models import (
@@ -24,6 +26,7 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["whatsapp"])
+limiter = Limiter(key_func=get_remote_address)
 
 VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN")
 if not VERIFY_TOKEN:
@@ -32,8 +35,10 @@ if not VERIFY_TOKEN:
 
 # ─── Meta Webhook Endpoints ───────────────────────────────────────────────────
 
+@limiter.limit("60/minute")
 @router.get("/whatsapp")
 async def whatsapp_webhook_verify(
+    request: Request,
     hub_mode: str = Query(None, alias="hub.mode"),
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
     hub_challenge: str = Query(None, alias="hub.challenge"),
@@ -47,6 +52,7 @@ async def whatsapp_webhook_verify(
     raise HTTPException(status_code=403, detail="Webhook verification failed")
 
 
+@limiter.limit("60/minute")
 @router.post("/whatsapp")
 async def whatsapp_webhook_receive(request: Request):
     """Receive incoming messages from Meta WhatsApp webhook."""
