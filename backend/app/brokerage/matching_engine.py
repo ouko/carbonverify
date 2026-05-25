@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models import BrokerageListing, BuyerProfile, TradeMatch, User
+from app.models import BrokerageListing, BuyerProfile, TradeMatch
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -131,7 +131,7 @@ class MatchingEngine:
             return []
 
         buyers_result = await self.db.execute(
-            select(BuyerProfile).where(BuyerProfile.auto_match_enabled == True)
+            select(BuyerProfile).where(BuyerProfile.auto_match_enabled.is_(True))
         )
         buyers = buyers_result.scalars().all()
 
@@ -197,7 +197,7 @@ class MatchingEngine:
         listings = listings_result.scalars().all()
 
         buyers_result = await self.db.execute(
-            select(BuyerProfile).where(BuyerProfile.auto_match_enabled == True)
+            select(BuyerProfile).where(BuyerProfile.auto_match_enabled.is_(True))
         )
         buyers = buyers_result.scalars().all()
 

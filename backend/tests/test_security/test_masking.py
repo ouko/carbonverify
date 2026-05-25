@@ -6,7 +6,6 @@ from app.security.masking import (
     mask_field,
     mask_data,
     mask_survey_response,
-    SensitivityLevel,
 )
 from app.models import UserRoleEnum
 

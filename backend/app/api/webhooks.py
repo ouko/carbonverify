@@ -1,14 +1,13 @@
 import uuid
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import Project, DataSource, SourceTypeEnum, ValidationStatusEnum, User
-from app.schemas import IoTWebhookPayload, IoTWebhookResponse
-from app.auth.dependencies import get_current_user, require_operator
+from app.models import Project, DataSource, SourceTypeEnum, ValidationStatusEnum
+from app.schemas import IoTWebhookResponse
 from app.services.pipelines.iot import process_iot_webhook
 from app.services.validation_engine import run_full_validation
 from app.services.provenance import build_full_provenance

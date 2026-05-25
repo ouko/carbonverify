@@ -1,22 +1,22 @@
 """WhatsApp Business API webhook and bot endpoints."""
 
+import os
+
 from fastapi import APIRouter, Request, HTTPException, status, Depends, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import Optional
 import uuid
 
 from app.database import get_db
 from app.models import (
     Enumerator,
-    Project,
     SurveyResponse,
     SupportTicket,
-    WhatsAppConversation,
     ValidationStatusEnum,
 )
-from app.auth.dependencies import get_current_user, require_operator, require_admin, require_viewer
+from app.auth.dependencies import require_operator, require_admin, require_viewer
 from app.services.whatsapp.bot import get_whatsapp_bot
 from app.services.whatsapp.meta_api import get_whatsapp_api
 from app.services.whatsapp.state_machine import conversation_state
@@ -25,7 +25,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["whatsapp"])
 
-VERIFY_TOKEN = "carbonverify_whatsapp_webhook_2025"
+VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "change-me-in-production")
 
 
 # ─── Meta Webhook Endpoints ───────────────────────────────────────────────────
@@ -74,7 +74,7 @@ async def list_enumerators(
     if project_id:
         stmt = stmt.where(Enumerator.project_id == project_id)
     if active_only:
-        stmt = stmt.where(Enumerator.active == True)
+        stmt = stmt.where(Enumerator.active.is_(True))
     stmt = stmt.order_by(Enumerator.data_quality_score.desc().nullslast())
 
     result = await db.execute(stmt)

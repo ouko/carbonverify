@@ -10,11 +10,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select
 
 from app.database import get_db
 from app.models import AuditLog, AuditActionEnum, User
-from app.auth.dependencies import require_admin, require_operator, get_current_user
+from app.auth.dependencies import require_admin, require_operator
 from app.security.audit_logging import AuditLogger
 from app.core.logging import get_logger
 

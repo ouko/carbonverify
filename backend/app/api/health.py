@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from datetime import datetime
+from datetime import datetime, timezone
 import redis.asyncio as redis
 
-from app.database import get_db, engine
+from app.database import get_db
 from app.config import get_settings
 from app.schemas import HealthCheck
 from app.core.logging import get_logger
@@ -39,5 +39,5 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         status=overall,
         database=db_status,
         redis=redis_status,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
     )

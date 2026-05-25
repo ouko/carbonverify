@@ -7,7 +7,7 @@ import uuid
 from app.database import get_db
 from app.models import HumanReviewQueue, User
 from app.schemas import HumanReviewQueueCreate, HumanReviewQueueUpdate, HumanReviewQueueOut
-from app.auth.dependencies import get_current_user, require_operator, require_viewer
+from app.auth.dependencies import require_operator, require_viewer
 
 router = APIRouter(prefix="/review-queue", tags=["review-queue"])
 

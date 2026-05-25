@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

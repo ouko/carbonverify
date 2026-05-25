@@ -10,7 +10,7 @@ from datetime import datetime, timezone, date
 from typing import Optional, Dict, Any, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.models import (
     CorporatePortfolio, PortfolioHolding, CarbonCreditToken,

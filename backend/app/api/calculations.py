@@ -5,9 +5,9 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import CalculationRun, Project, User, HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum
+from app.models import CalculationRun, Project, User
 from app.schemas import CalculationRunCreate, CalculationRunUpdate, CalculationRunOut
-from app.auth.dependencies import get_current_user, require_operator, require_viewer
+from app.auth.dependencies import require_operator, require_viewer
 from app.calculations.fnrb_calculator import calculate_fnrb
 from app.calculations.emissions_quantifier import quantify_emissions
 from app.calculations.leakage_detector import assess_leakage

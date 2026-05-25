@@ -1,7 +1,7 @@
 """Cross-reference validation for reports: table/figure/appendix numbering consistency."""
 
 import re
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 
 
 class CrossReferenceValidator:

@@ -14,17 +14,15 @@ from sqlalchemy import select, desc
 
 from app.database import get_db
 from app.models import (
-    User, Project, BrokerageListing, BuyerProfile, TradeMatch,
-    BrokerageTransaction, Escrow, Commission, ListingStatusEnum,
-    TradeTypeEnum, TransactionStatusEnum,
+    User, Project, BrokerageListing, BuyerProfile, Commission, ListingStatusEnum,
+    TradeTypeEnum,
 )
-from app.auth.dependencies import get_current_user, require_admin, require_operator
+from app.auth.dependencies import get_current_user, require_operator
 from app.brokerage.matching_engine import MatchingEngine
 from app.brokerage.transaction_engine import TransactionEngine
 from app.schemas import (
     BrokerageListingCreate, BrokerageListingOut, BuyerProfileCreate,
-    BuyerProfileOut, TradeMatchOut, TransactionCreate, TransactionOut,
-    EscrowOut, CommissionOut,
+    BuyerProfileOut, TransactionCreate, TransactionOut,
 )
 from app.core.logging import get_logger
 

@@ -1,6 +1,5 @@
 """Uncertainty Engine - Monte Carlo simulation and sensitivity analysis."""
 
-import numpy as np
 from typing import Dict, Any, List, Optional, Callable
 
 from app.calculations.emissions_quantifier import run_monte_carlo

@@ -1,7 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
+from typing import Optional
 
 from passlib.context import CryptContext
 from jose import JWTError, jwt

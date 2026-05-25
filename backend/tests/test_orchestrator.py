@@ -2,8 +2,6 @@
 
 import uuid
 import asyncio
-import pytest
-from datetime import datetime, timedelta
 
 from app.models import ProjectStatusEnum
 from app.agents.base import AgentResult

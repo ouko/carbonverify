@@ -1,8 +1,6 @@
 """Celery tasks for report generation and VVB liaison."""
 
-from datetime import datetime, timedelta
-from celery import shared_task
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.tasks.celery_app import celery_app
@@ -10,8 +8,6 @@ from app.database import AsyncSessionLocal
 from app.models import Report, Project, CalculationRun, DataSource, HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum
 from app.reports.generator import generate_report
 from app.vvb_liaison.polling import RegistryPoller, generate_follow_up_email
-from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
-from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -213,7 +209,7 @@ def send_registry_follow_ups():
                     continue
 
                 submitted_date = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
-                days_pending = (datetime.utcnow() - submitted_date).days
+                days_pending = (datetime.now(timezone.utc) - submitted_date).days
 
                 if days_pending >= 14:
                     proj_result = await db.execute(select(Project).where(Project.id == report.project_id))

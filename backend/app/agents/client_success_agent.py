@@ -1,7 +1,6 @@
 """ClientSuccessAgent: onboarding, progress updates, retention, upsell."""
 
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from sqlalchemy import select, func
@@ -83,7 +82,7 @@ class ClientSuccessAgent(BaseAgent):
     async def _check_onboarding(self, project: Project) -> List[Dict[str, Any]]:
         """Check if onboarding tasks are complete."""
         actions = []
-        days_since_creation = (datetime.utcnow() - project.created_at).days
+        days_since_creation = (datetime.now(timezone.utc) - project.created_at).days
 
         if days_since_creation <= 1:
             actions.append({
@@ -157,7 +156,7 @@ class ClientSuccessAgent(BaseAgent):
         )
         latest_calc = result.scalar_one_or_none()
         if latest_calc:
-            days_in_current_state = (datetime.utcnow() - latest_calc.created_at).days
+            days_in_current_state = (datetime.now(timezone.utc) - latest_calc.created_at).days
 
         if days_in_current_state > 14:
             actions.append({

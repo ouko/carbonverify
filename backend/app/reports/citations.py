@@ -1,7 +1,6 @@
 """Citation management system for auto-linking numbers to sources."""
 
 from typing import Dict, Any, List
-from datetime import datetime
 
 CITATION_LIBRARY = {
     "ipcc_2006_vol2_ch2": {

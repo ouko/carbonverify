@@ -5,10 +5,9 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import Report, Project, CalculationRun, User, HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum
+from app.models import Report, Project, CalculationRun, User
 from app.schemas import ReportCreate, ReportUpdate, ReportOut
-from app.auth.dependencies import get_current_user, require_operator, require_viewer
-from app.reports.generator import generate_report
+from app.auth.dependencies import require_operator, require_viewer
 from app.reports.quality_gates import run_quality_gates
 from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
 from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient

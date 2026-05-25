@@ -8,7 +8,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
-from sqlalchemy import JSON, String, Text, TypeDecorator
+from sqlalchemy import JSON, String, TypeDecorator
 
 # Set test database URL BEFORE any app imports
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
@@ -36,7 +36,7 @@ class UUIDAsString(TypeDecorator):
 
 
 # Patch PostgreSQL-specific types for SQLite compatibility
-import app.models as models_module
+import app.models as models_module  # noqa: E402
 for attr_name in dir(models_module):
     obj = getattr(models_module, attr_name)
     if isinstance(obj, type) and hasattr(obj, '__tablename__'):
@@ -48,13 +48,13 @@ for attr_name in dir(models_module):
             if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'UUID':
                 col.type = UUIDAsString()
 
-from app.main import app
-from app.database import Base, get_db
-from app.auth.dependencies import get_current_user
-from app.models import User, UserRoleEnum
+from app.main import app  # noqa: E402
+from app.database import Base, get_db  # noqa: E402
+from app.auth.dependencies import get_current_user  # noqa: E402
+from app.models import User, UserRoleEnum  # noqa: E402
 
 # Register UUID adapter for sqlite3
-import sqlite3
+import sqlite3  # noqa: E402
 sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
 sqlite3.register_converter("uuid", lambda s: uuid.UUID(s.decode() if isinstance(s, bytes) else s))
 

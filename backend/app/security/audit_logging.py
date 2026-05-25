@@ -8,7 +8,6 @@ Integrates with Radix DLT for blockchain anchoring of critical events.
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Callable
 from functools import wraps
 
@@ -16,7 +15,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models import AuditLog, AuditActionEnum, User
+from app.models import AuditLog, AuditActionEnum
 from app.blockchain.radix_client import AuditTrailAnchor
 from app.core.logging import get_logger
 

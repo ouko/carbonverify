@@ -1,7 +1,6 @@
 """CarbonVerify WhatsApp Bot - main orchestrator for all conversation flows."""
 
-import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from app.services.whatsapp.message_templates import (
@@ -9,7 +8,6 @@ from app.services.whatsapp.message_templates import (
     get_photo_prompt,
     get_survey_questions,
     detect_language,
-    FLOW_TITLES,
 )
 from app.services.whatsapp.state_machine import conversation_state
 from app.services.whatsapp.intent_classifier import intent_classifier
@@ -141,7 +139,7 @@ class WhatsAppBot:
         """Handle survey flow messages."""
         lang = state.get("language", "en")
         step = state.get("step", 0)
-        project_id = state.get("project_id")
+        project_id = state.get("project_id")  # noqa: F841
         methodology = state.get("context_data", {}).get("methodology", "TPDDTEC_v4")
 
         # Check for cancel
@@ -249,7 +247,7 @@ class WhatsAppBot:
                 else:
                     # All photos collected
                     conversation_state.delete_state(phone)
-                    ref = f"PH-{datetime.utcnow().strftime('%Y%m%d')}-{phone[-4:]}"
+                    ref = f"PH-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{phone[-4:]}"
                     await self._send_text(
                         phone,
                         f"✅ {get_template('photo_welcome', lang, total_photos=total_photos).split(chr(10))[0]}\n\n"
@@ -286,7 +284,7 @@ class WhatsAppBot:
             conversation_state.advance_step(phone, {"issue_description": text})
 
             # Create support ticket reference
-            ticket_id = f"SUP-{datetime.utcnow().strftime('%Y%m%d')}-{phone[-4:]}"
+            ticket_id = f"SUP-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{phone[-4:]}"
 
             await self._send_text(phone, get_template("support_received", lang, ticket_id=ticket_id))
 
@@ -303,7 +301,7 @@ class WhatsAppBot:
     async def _start_survey(self, phone: str, state: Dict) -> Dict[str, Any]:
         """Start a new survey flow."""
         lang = state.get("language", "en")
-        project_id = state.get("project_id")
+        project_id = state.get("project_id")  # noqa: F841
         methodology = state.get("context_data", {}).get("methodology", "TPDDTEC_v4")
 
         conversation_state.start_flow(phone, "survey", project_id=project_id, language=lang)
@@ -328,7 +326,7 @@ class WhatsAppBot:
     async def _start_photo_collection(self, phone: str, state: Dict) -> Dict[str, Any]:
         """Start a new photo collection flow."""
         lang = state.get("language", "en")
-        project_id = state.get("project_id")
+        project_id = state.get("project_id")  # noqa: F841
 
         conversation_state.start_flow(phone, "photo_collection", project_id=project_id, language=lang)
 
@@ -345,7 +343,7 @@ class WhatsAppBot:
     async def _start_support(self, phone: str, state: Dict) -> Dict[str, Any]:
         """Start a support flow."""
         lang = state.get("language", "en")
-        project_id = state.get("project_id")
+        project_id = state.get("project_id")  # noqa: F841
 
         conversation_state.start_flow(phone, "support", project_id=project_id, language=lang)
 
@@ -378,10 +376,10 @@ class WhatsAppBot:
         """Complete a survey and store responses."""
         lang = state.get("language", "en")
         responses = state.get("responses", {})
-        project_id = state.get("project_id")
+        project_id = state.get("project_id")  # noqa: F841
 
         # Generate reference
-        ref = f"SV-{datetime.utcnow().strftime('%Y%m%d')}-{phone[-4:]}"
+        ref = f"SV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{phone[-4:]}"
 
         # In production, store to database as SurveyResponse
         logger.info(

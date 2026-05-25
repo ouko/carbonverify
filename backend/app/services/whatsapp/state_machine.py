@@ -1,8 +1,7 @@
 """Redis-based conversation state machine for WhatsApp bot."""
 
 import json
-import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import redis
@@ -53,7 +52,7 @@ class ConversationStateManager:
         try:
             r = self._get_redis()
             key = self.get_conversation_key(phone_number)
-            state["updated_at"] = datetime.utcnow().isoformat()
+            state["updated_at"] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
             r.setex(key, ttl, json.dumps(state))
         except Exception as exc:
             logger.error("redis_set_state_error", error=str(exc), phone=phone_number)
@@ -77,8 +76,8 @@ class ConversationStateManager:
             "responses": {},
             "photos": [],
             "message_count": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+            "updated_at": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         }
 
     def start_flow(self, phone_number: str, flow: str, project_id: Optional[str] = None,
@@ -112,7 +111,7 @@ class ConversationStateManager:
             "value": value,
             "valid": valid,
             "errors": errors or [],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         }
         state["message_count"] += 1
         self.set_state(phone_number, state)
@@ -122,7 +121,7 @@ class ConversationStateManager:
         state = self.get_state(phone_number)
         state["photos"].append({
             **photo_data,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         })
         state["message_count"] += 1
         self.set_state(phone_number, state)

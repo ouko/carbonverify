@@ -1,9 +1,10 @@
 """API endpoints for Kimi Claw multi-agent orchestration."""
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -12,11 +13,10 @@ from app.models import (
     AgentRun,
     HumanReviewQueue,
     Project,
-    ProjectStatusEnum,
     QueueStatusEnum,
     User,
 )
-from app.auth.dependencies import get_current_user, require_operator, require_admin, require_viewer
+from app.auth.dependencies import require_operator, require_viewer
 from app.orchestrator.orchestrator import KimiClawOrchestrator
 from app.orchestrator.events import EventLogger
 from app.services.kimi_api import get_kimi_client
@@ -156,7 +156,7 @@ async def list_orchestrator_review_queue(
             "priority_score": item.priority_score,
             "sla_deadline": item.sla_deadline.isoformat() if item.sla_deadline else None,
             "sla_remaining_hours": (
-                round((item.sla_deadline - __import__('datetime').datetime.utcnow()).total_seconds() / 3600, 1)
+                round((item.sla_deadline - datetime.now(timezone.utc)).total_seconds() / 3600, 1)
                 if item.sla_deadline else None
             ),
             "assigned_to": str(item.assigned_to) if item.assigned_to else None,

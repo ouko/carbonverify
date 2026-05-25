@@ -1,17 +1,13 @@
 """Report generator: Jinja2 templating + HTML→PDF compilation."""
 
+import os
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from app.calculations.fnrb_calculator import calculate_fnrb
-from app.calculations.emissions_quantifier import quantify_emissions
-from app.calculations.leakage_detector import assess_leakage
-from app.calculations.methodology_validator import validate_methodology
-from app.calculations.uncertainty_engine import run_full_uncertainty_analysis
 from app.reports.citations import build_citation_index
 from app.reports.quality_gates import run_quality_gates
 from app.core.logging import get_logger
@@ -163,7 +159,7 @@ def build_report_context(
         "monitoring_period_end": monitoring_period_end,
         "monitoring_days": monitoring_days,
         "flagged_sources": flagged_sources,
-        "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "cv_version": "1.1.0",
         "report_title": f"{methodology} Monitoring Report",
     }
@@ -193,7 +189,7 @@ def html_to_pdf(html_content: str, output_path: str) -> str:
     Returns the path to the generated PDF (or HTML if PDF generation unavailable).
     """
     try:
-        from weasyprint import HTML, CSS
+        from weasyprint import HTML
         
         html_doc = HTML(string=html_content)
         html_doc.write_pdf(output_path)
@@ -231,7 +227,8 @@ def generate_report(
     # Convert to PDF
     if output_path is None:
         report_id = str(uuid.uuid4())
-        output_path = f"/tmp/carbonverify_report_{report_id}.pdf"
+        import tempfile
+        output_path = os.path.join(tempfile.gettempdir(), f"carbonverify_report_{report_id}.pdf")
     
     final_path = html_to_pdf(html, output_path)
     
@@ -239,7 +236,7 @@ def generate_report(
         "html": html,
         "pdf_path": final_path,
         "quality_gates": quality_result,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "methodology": methodology,
         "status": "needs_human_review" if not quality_result["passed"] else "ready_for_submission",
     }

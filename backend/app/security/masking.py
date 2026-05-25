@@ -9,7 +9,7 @@ import re
 from typing import Any, Dict, Optional
 from enum import Enum as PyEnum
 
-from app.models import User, UserRoleEnum
+from app.models import UserRoleEnum
 
 
 class SensitivityLevel(PyEnum):

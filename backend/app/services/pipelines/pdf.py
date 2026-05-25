@@ -1,6 +1,6 @@
 import io
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 import pdfplumber
 from PyPDF2 import PdfReader
@@ -171,7 +171,7 @@ def process_pdf(file_bytes: bytes, filename: str) -> Dict[str, Any]:
                 if tables:
                     result["tables_found"] += len(tables)
     except Exception:
-        pass
+        logger.debug("pdf_table_extraction_failed", exc_info=True)
 
     logger.info(
         "pdf_processed",

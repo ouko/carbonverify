@@ -1,8 +1,8 @@
 """Kimi Claw Orchestrator: master controller for multi-agent project lifecycle."""
 
 import uuid
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -187,7 +187,7 @@ class KimiClawOrchestrator:
         agent_run.confidence_score = result.confidence_score
         agent_run.execution_time_ms = result.execution_time_ms
         agent_run.error_message = result.errors[0] if result.errors else None
-        agent_run.completed_at = datetime.utcnow()
+        agent_run.completed_at = datetime.now(timezone.utc)
         await self.db.commit()
 
         await self.event_logger.log_agent_complete(
@@ -295,7 +295,7 @@ class KimiClawOrchestrator:
 
         # SLA deadline: priority 5 = 4 hours, priority 3 = 24 hours, priority 1 = 72 hours
         sla_hours = {5: 4, 4: 8, 3: 24, 2: 48, 1: 72}.get(priority, 24)
-        sla_deadline = datetime.utcnow() + timedelta(hours=sla_hours)
+        sla_deadline = datetime.now(timezone.utc) + timedelta(hours=sla_hours)
 
         queue_item = HumanReviewQueue(
             item_type=QueueItemTypeEnum.agent_review,
@@ -376,7 +376,7 @@ class KimiClawOrchestrator:
         if not item:
             return {"error": "Queue item not found"}
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         item.status = QueueStatusEnum.resolved if decision == "approve" else QueueStatusEnum.escalated
         item.resolution_notes = resolution_notes
         item.human_decision = decision

@@ -1,6 +1,5 @@
 """CalculationAgent: runs the full carbon calculation pipeline."""
 
-import uuid
 from typing import Any, Dict
 
 from sqlalchemy import select

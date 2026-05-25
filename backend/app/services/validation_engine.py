@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from jsonschema import validate, ValidationError as JsonSchemaValidationError
@@ -112,7 +112,7 @@ def validate_temporal_consistency(
     sorted_ts = sorted(timestamps)
     if len(sorted_ts) >= 2:
         # Check for future dates
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for ts in sorted_ts:
             if ts > now:
                 errors.append(f"Timestamp {ts.isoformat()} is in the future")

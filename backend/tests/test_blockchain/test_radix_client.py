@@ -1,9 +1,6 @@
-import json
-import hashlib
 import pytest
-from datetime import datetime, timezone
 
-from app.blockchain.radix_client import RadixClient, AuditTrailAnchor, RadixAnchorResult
+from app.blockchain.radix_client import RadixClient, AuditTrailAnchor
 
 
 class TestRadixClient:

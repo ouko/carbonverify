@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import Dict
 
 from app.database import get_db
 from app.models import Project, CalculationRun, HumanReviewQueue, User
 from app.schemas import DashboardStats
-from app.auth.dependencies import get_current_user, require_viewer
+from app.auth.dependencies import require_viewer
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

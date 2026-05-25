@@ -1,6 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -38,19 +42,53 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="CarbonVerify API",
     description="Automated carbon credit MRV preparation platform",
     version="1.2.0",
     lifespan=lifespan,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.middleware("http")
+async def request_size_limit(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length:
+        max_size = 50 * 1024 * 1024 if request.url.path.startswith("/uploads") else 10 * 1024 * 1024
+        if int(content_length) > max_size:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request entity too large"},
+            )
+    return await call_next(request)
+
+# Production CORS: tighten in production, allow local dev
+allow_origins = [settings.FRONTEND_URL]
+if settings.ENVIRONMENT == "development":
+    allow_origins.extend(["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:5173"],
+    allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    max_age=600,
 )
 
 app.include_router(auth_router)

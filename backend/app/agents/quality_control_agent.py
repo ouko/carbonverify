@@ -1,13 +1,11 @@
 """QualityControlAgent: statistical sampling, cross-project anomaly detection, version audit."""
 
-import hashlib
-import uuid
 from typing import Any, Dict, List
 
 from sqlalchemy import select, func
 
 from app.agents.base import AgentResult, BaseAgent
-from app.models import CalculationRun, DataSource, FileUpload, Project
+from app.models import CalculationRun, FileUpload
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -20,7 +18,7 @@ class QualityControlAgent(BaseAgent):
 
     async def run(self, context: Dict[str, Any]) -> AgentResult:
         """Run quality control checks: sampling, anomaly detection, hash verification."""
-        project_id = self.project_id
+        # project_id available via self.project_id
         check_type = context.get("check_type", "milestone")  # "daily" or "milestone"
 
         flags: List[Dict[str, Any]] = []

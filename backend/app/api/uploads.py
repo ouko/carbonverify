@@ -1,14 +1,14 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
 from app.models import Project, FileUpload, FileUploadStatusEnum, User
 from app.schemas import FileUploadOut, FileUploadResponse
-from app.auth.dependencies import get_current_user, require_operator, require_viewer
+from app.auth.dependencies import require_operator, require_viewer
 from app.services.file_detector import detect_file_type, compute_sha256, generate_s3_key
 from app.services.s3 import upload_bytes
 from app.services.provenance import build_full_provenance

@@ -1,12 +1,11 @@
 import asyncio
-from celery import shared_task
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.tasks.celery_app import celery_app
 from app.database import AsyncSessionLocal
 from app.models import (
-    DataSource, Project, CalculationRun, Report, FileUpload,
+    DataSource, Project, FileUpload,
     FileUploadStatusEnum, SourceTypeEnum, ValidationStatusEnum,
     HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum,
 )
@@ -203,7 +202,7 @@ def process_uploaded_file(self, upload_id: str):
             upload.confidence_score = validation["confidence_score"]
             upload.validation_errors = validation["validation_errors"] or None
             upload.status = FileUploadStatusEnum.completed
-            upload.processed_at = datetime.utcnow()
+            upload.processed_at = datetime.now(timezone.utc)
 
             # Build provenance
             upload.provenance = build_full_provenance(

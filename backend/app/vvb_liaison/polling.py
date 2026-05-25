@@ -1,7 +1,7 @@
 """Registry polling and status tracking system."""
 
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
 from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient
@@ -58,7 +58,7 @@ class RegistryPoller:
             result["project_id"] = project_id
             result["registry"] = registry
             result["previous_status"] = last_status
-            result["polled_at"] = datetime.utcnow().isoformat()
+            result["polled_at"] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
             
             # Detect status changes
             if result.get("success"):
@@ -94,7 +94,7 @@ class RegistryPoller:
         
         Returns dict with action recommendation.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         days_pending = (now - submission_date).days
         
         # Don't follow up if already approved/rejected
@@ -160,7 +160,7 @@ def generate_follow_up_email(
     from pathlib import Path
     
     template_dir = Path(__file__).parent / "email_templates"
-    env = Environment(loader=FileSystemLoader(str(template_dir)))
+    env = Environment(loader=FileSystemLoader(str(template_dir)), autoescape=True)
     template = env.get_template("submission_follow_up.html")
     
     html = template.render(
@@ -174,7 +174,7 @@ def generate_follow_up_email(
         monitoring_period_end=monitoring_period_end,
         methodology=methodology,
         compliance_score=compliance_score,
-        generated_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"),
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         cv_version="1.1.0",
     )
     

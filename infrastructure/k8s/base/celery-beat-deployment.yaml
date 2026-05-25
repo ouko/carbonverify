@@ -17,10 +17,22 @@ spec:
       labels:
         app: carbonverify-celery-beat
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: beat
           image: <ECR_REGISTRY>/carbonverify-app:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           command: ["celery"]
           args:
             - "-A"

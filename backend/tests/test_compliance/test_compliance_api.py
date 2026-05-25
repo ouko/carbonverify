@@ -1,12 +1,7 @@
 import uuid
 import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
-from app.models import (
-    ConsentRecord, ConsentTypeEnum, DataSubjectRequest,
-    DSRTypeEnum, DSRStatusEnum, BreachNotification, BreachStatusEnum,
-    ConflictOfInterest, MethodologyVersion,
-)
 
 
 class TestConsentAPI:

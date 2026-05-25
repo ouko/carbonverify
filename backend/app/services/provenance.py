@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from app.core.logging import get_logger
@@ -34,7 +34,7 @@ def create_provenance_record(
         "validation_result": validation_result,
         "parent_hash": parent_hash,
         "metadata": metadata or {},
-        "storage_timestamp": datetime.utcnow().isoformat(),
+        "storage_timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
     }
 
     # Compute hash of this record for chain integrity
@@ -56,7 +56,7 @@ def add_transformation(
     transformation = {
         "step": step,
         "description": description,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         "input_hash": input_hash or provenance.get("record_hash"),
         "output_hash": hash_data(output_data) if output_data else None,
         "parameters": parameters or {},

@@ -1,7 +1,7 @@
 """Photo validation for WhatsApp uploads: GPS, quality, boundary checks."""
 
 import io
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
@@ -161,7 +161,7 @@ class PhotoValidator:
                     if TAGS.get(tag_id) == "DateTimeOriginal":
                         return str(value)
         except Exception:
-            pass
+            logger.debug("exif_extraction_failed", exc_info=True)
         return None
 
     def _check_boundary(self, lat: float, lon: float, boundary: Dict) -> bool:

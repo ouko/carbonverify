@@ -1,6 +1,5 @@
 """ReportingAgent: generates monitoring reports and submission packages."""
 
-import uuid
 from typing import Any, Dict
 
 from sqlalchemy import select
@@ -8,7 +7,6 @@ from sqlalchemy import select
 from app.agents.base import AgentResult, BaseAgent
 from app.models import CalculationRun, DataSource, Project, Report, ReportTemplateTypeEnum, ReportStatusEnum
 from app.reports.generator import generate_report
-from app.reports.quality_gates import run_quality_gates
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

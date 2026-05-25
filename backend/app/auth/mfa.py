@@ -9,7 +9,6 @@ import pyotp
 import qrcode
 import io
 import base64
-from typing import Optional
 
 from app.config import get_settings
 

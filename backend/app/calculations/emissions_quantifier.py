@@ -1,7 +1,7 @@
 """Emissions Quantifier Module - Baseline, Project, and Net Reduction Calculations."""
 
 import numpy as np
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 
 from app.calculations.constants import EMISSION_FACTORS, GWP_100
 from app.core.logging import get_logger

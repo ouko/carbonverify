@@ -1,10 +1,9 @@
 """Tests for report generation and VVB liaison system."""
 
-import pytest
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 
 from app.reports.citations import get_citations_for_calculation, auto_cite_number, build_citation_index
-from app.reports.cross_references import validate_report_cross_references, CrossReferenceValidator
+from app.reports.cross_references import validate_report_cross_references
 from app.reports.quality_gates import run_quality_gates
 from app.reports.generator import get_template_name, build_report_context
 from app.vvb_liaison.auto_responder import classify_query, draft_clarification_response
@@ -181,10 +180,10 @@ class TestRegistryPolling:
         poller.close()
 
     def test_follow_up_needed_escalation(self):
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         poller = RegistryPoller()
         result = poller.check_follow_up_needed(
-            submission_date=datetime.utcnow() - timedelta(days=35),
+            submission_date=datetime.now(timezone.utc) - timedelta(days=35),
             current_status="under_review",
         )
         assert result["action"] == "escalate"
@@ -192,20 +191,20 @@ class TestRegistryPolling:
         poller.close()
 
     def test_follow_up_needed_wait(self):
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         poller = RegistryPoller()
         result = poller.check_follow_up_needed(
-            submission_date=datetime.utcnow() - timedelta(days=5),
+            submission_date=datetime.now(timezone.utc) - timedelta(days=5),
             current_status="under_review",
         )
         assert result["action"] == "wait"
         poller.close()
 
     def test_no_follow_up_for_approved(self):
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         poller = RegistryPoller()
         result = poller.check_follow_up_needed(
-            submission_date=datetime.utcnow() - timedelta(days=60),
+            submission_date=datetime.now(timezone.utc) - timedelta(days=60),
             current_status="approved",
         )
         assert result["action"] == "none"

@@ -3,7 +3,7 @@
 Supports English (en) and Swahili (sw) with auto-detection fallback.
 """
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 # ─── Flow Titles ──────────────────────────────────────────────────────────────
 

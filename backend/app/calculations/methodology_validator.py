@@ -1,6 +1,6 @@
 """Methodology Validator Module - Rules engine for TPDDTEC v4, VM0050, VMR0006."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.calculations.constants import (

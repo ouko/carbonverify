@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List, Optional
 import uuid
 
 from app.database import get_db
 from app.models import Report, Project, CalculationRun, User
-from app.auth.dependencies import get_current_user, require_operator, require_viewer
+from app.auth.dependencies import require_operator
 from app.vvb_liaison.polling import RegistryPoller
 from app.vvb_liaison.auto_responder import draft_clarification_response
 from app.core.logging import get_logger
@@ -94,7 +93,7 @@ async def get_follow_up_drafts(
     _: User = Depends(require_operator),
 ):
     """Get all reports needing follow-up with email drafts."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     from app.vvb_liaison.polling import generate_follow_up_email
 
     result = await db.execute(select(Report).where(Report.status == "submitted"))
@@ -107,7 +106,7 @@ async def get_follow_up_drafts(
             continue
 
         submitted_date = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
-        days_pending = (datetime.utcnow() - submitted_date).days
+        days_pending = (datetime.now(timezone.utc) - submitted_date).days
 
         if days_pending >= 14:
             proj_result = await db.execute(select(Project).where(Project.id == report.project_id))

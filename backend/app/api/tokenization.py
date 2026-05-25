@@ -14,7 +14,6 @@ from sqlalchemy import select, desc
 from app.database import get_db
 from app.models import (
     User, Project, CarbonCreditToken, TokenListing, TokenRetirement,
-    TokenStatusEnum,
 )
 from app.auth.dependencies import get_current_user, require_admin
 from app.tokenization.token_service import TokenizationService

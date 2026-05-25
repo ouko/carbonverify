@@ -1,7 +1,6 @@
 """Auto-responder for VVB technical queries using project data + methodology knowledge base."""
 
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, Any, Optional
 
 from app.core.logging import get_logger
 

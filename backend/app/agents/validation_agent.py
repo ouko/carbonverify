@@ -1,12 +1,11 @@
 """ValidationAgent: comprehensive data quality and anomaly detection."""
 
-import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.agents.base import AgentResult, BaseAgent
-from app.models import DataSource, Project, ValidationStatusEnum
+from app.models import DataSource
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

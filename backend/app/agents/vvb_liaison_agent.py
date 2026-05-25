@@ -1,14 +1,11 @@
 """VVBLiaisonAgent: submits to registries and tracks status."""
 
-import uuid
 from typing import Any, Dict
 
 from sqlalchemy import select
 
 from app.agents.base import AgentResult, BaseAgent
 from app.models import Project, Report, ReportStatusEnum
-from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
-from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

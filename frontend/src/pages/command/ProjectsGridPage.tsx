@@ -14,7 +14,7 @@ export function ProjectsGridPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const filtered = useMemo(() => {
-    let list = (projects || []).filter((p: any) => {
+    const list = (projects || []).filter((p: any) => {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
       if (statusFilter !== 'all' && p.status !== statusFilter) return false
       if (methodologyFilter !== 'all' && p.methodology !== methodologyFilter) return false

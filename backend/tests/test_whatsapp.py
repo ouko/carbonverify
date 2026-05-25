@@ -1,7 +1,5 @@
 """Tests for CarbonVerify WhatsApp Business API bot."""
 
-import uuid
-import pytest
 
 from app.services.whatsapp.message_templates import (
     get_template,

@@ -3,7 +3,7 @@ import pytest
 import pytest_asyncio
 
 from app.tokenization.token_service import TokenizationService
-from app.models import CarbonCreditToken, TokenListing, TokenRetirement, TokenStatusEnum, CalculationRun, Project
+from app.models import CarbonCreditToken, TokenStatusEnum, CalculationRun
 
 
 class TestTokenization:

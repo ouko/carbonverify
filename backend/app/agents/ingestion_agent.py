@@ -1,12 +1,11 @@
 """IngestionAgent: processes uploaded data through appropriate pipelines."""
 
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from sqlalchemy import select
 
 from app.agents.base import AgentResult, BaseAgent
-from app.models import DataSource, FileUpload, Project, ValidationStatusEnum
+from app.models import DataSource, FileUpload, ValidationStatusEnum
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

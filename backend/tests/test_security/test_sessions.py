@@ -1,6 +1,5 @@
 import pytest
 import uuid
-from datetime import datetime, timezone
 
 from app.auth.sessions import SessionManager
 

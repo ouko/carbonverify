@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -28,6 +30,7 @@ from app.security.audit_logging import AuditLogger
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 MAX_FAILED_LOGINS = 5
@@ -51,8 +54,13 @@ def _get_client_ip(request: Request) -> str:
     return "unknown"
 
 
+@limiter.limit("5/minute")
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register(
+    payload: UserCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(User).where(User.email == payload.email))
     existing = result.scalar_one_or_none()
     if existing:
@@ -82,6 +90,7 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
     return user
 
 
+@limiter.limit("10/minute")
 @router.post("/login")
 async def login(
     payload: LoginRequest,
@@ -269,6 +278,7 @@ async def disable_mfa(
     return {"message": "MFA disabled"}
 
 
+@limiter.limit("20/minute")
 @router.post("/refresh", response_model=Token)
 async def refresh(
     payload: RefreshRequest,
@@ -371,6 +381,6 @@ async def _issue_tokens(
     return Token(
         access_token=access_token,
         refresh_token=refresh_token,
-        token_type="bearer",
+        token_type="bearer",  # nosec B106 — OAuth2 standard token type
         session_id=session_id,
     )

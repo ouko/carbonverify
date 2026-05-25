@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timedelta, timezone, date
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -559,7 +559,7 @@ async def get_current_methodology(
         select(MethodologyVersion)
         .where(
             MethodologyVersion.methodology_name == methodology_name,
-            MethodologyVersion.is_current == True,
+            MethodologyVersion.is_current.is_(True),
         )
         .order_by(desc(MethodologyVersion.effective_date))
     )

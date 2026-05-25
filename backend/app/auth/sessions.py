@@ -7,7 +7,7 @@ multi-device session control.
 
 import json
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 import redis.asyncio as redis

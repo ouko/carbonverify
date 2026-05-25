@@ -3,7 +3,7 @@ import pytest
 from datetime import date
 
 from app.brokerage.corporate_service import CorporateService
-from app.models import CorporatePortfolio, PortfolioHolding, CarbonCreditToken, TokenRetirement
+from app.models import CarbonCreditToken
 
 
 class TestCorporateService:

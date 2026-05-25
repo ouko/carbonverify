@@ -1,13 +1,12 @@
 """Event logging and audit trail for the orchestrator."""
 
 import uuid
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models import OrchestratorEvent, OrchestratorEventTypeEnum, AgentRun
+from app.models import OrchestratorEvent, OrchestratorEventTypeEnum
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

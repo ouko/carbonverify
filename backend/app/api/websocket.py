@@ -1,6 +1,5 @@
 """Enhanced WebSocket for real-time orchestrator and project updates."""
 
-import asyncio
 import json
 from typing import Dict, Optional, Set
 

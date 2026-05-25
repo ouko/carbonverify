@@ -1,6 +1,6 @@
 import hashlib
-from datetime import datetime
-from typing import Tuple, Optional
+from datetime import datetime, timezone
+from typing import Tuple
 import magic
 from app.core.logging import get_logger
 from app.models import DetectedFileTypeEnum
@@ -54,7 +54,7 @@ def detect_file_type(file_bytes: bytes) -> Tuple[DetectedFileTypeEnum, str]:
         if len(lines) >= 2 and ',' in lines[0]:
             return DetectedFileTypeEnum.csv, 'text/csv'
     except Exception:
-        pass
+        logger.debug("csv_detection_failed", exc_info=True)
 
     return DetectedFileTypeEnum.unknown, 'application/octet-stream'
 
@@ -64,6 +64,6 @@ def compute_sha256(file_bytes: bytes) -> str:
 
 
 def generate_s3_key(project_id: str, source_type: str, filename: str) -> str:
-    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')
     safe_filename = filename.replace(' ', '_')
     return f"{project_id}/{source_type}/{timestamp}/{safe_filename}"

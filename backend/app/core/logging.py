@@ -1,4 +1,3 @@
-import sys
 import structlog
 from app.config import get_settings
 

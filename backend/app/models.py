@@ -4,7 +4,6 @@ from typing import List, Optional
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
-    Column,
     String,
     Text,
     Float,
@@ -14,11 +13,10 @@ from sqlalchemy import (
     ForeignKey,
     Enum,
     Integer,
-    JSON,
     ARRAY,
     CheckConstraint,
     UniqueConstraint,
-    Interval,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -167,6 +165,11 @@ class OrchestratorEventTypeEnum(str, PyEnum):
 class User(Base):
     __tablename__ = "users"
 
+    __table_args__ = (
+        Index("ix_users_role", "role"),
+        Index("ix_users_created_at", "created_at"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -199,6 +202,12 @@ class Developer(Base):
 class Project(Base):
     __tablename__ = "projects"
 
+    __table_args__ = (
+        Index("ix_projects_developer_id", "developer_id"),
+        Index("ix_projects_status", "status"),
+        Index("ix_projects_methodology", "methodology"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     developer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("developers.id"), nullable=False)
@@ -228,6 +237,11 @@ class Project(Base):
 class FileUpload(Base):
     __tablename__ = "file_uploads"
 
+    __table_args__ = (
+        Index("ix_file_uploads_project_id", "project_id"),
+        Index("ix_file_uploads_status", "status"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -255,6 +269,11 @@ class FileUpload(Base):
 class DataSource(Base):
     __tablename__ = "data_sources"
 
+    __table_args__ = (
+        Index("ix_data_sources_project_id", "project_id"),
+        Index("ix_data_sources_source_type", "source_type"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     source_type: Mapped[SourceTypeEnum] = mapped_column(
@@ -276,6 +295,11 @@ class DataSource(Base):
 
 class CalculationRun(Base):
     __tablename__ = "calculation_runs"
+
+    __table_args__ = (
+        Index("ix_calculation_runs_project_id", "project_id"),
+        Index("ix_calculation_runs_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
@@ -301,6 +325,11 @@ class CalculationRun(Base):
 class Report(Base):
     __tablename__ = "reports"
 
+    __table_args__ = (
+        Index("ix_reports_project_id", "project_id"),
+        Index("ix_reports_status", "status"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     calculation_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calculation_runs.id"), nullable=False)
@@ -321,6 +350,11 @@ class Report(Base):
 
 class HumanReviewQueue(Base):
     __tablename__ = "human_review_queue"
+
+    __table_args__ = (
+        Index("ix_human_review_queue_assigned_to", "assigned_to"),
+        Index("ix_human_review_queue_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     item_type: Mapped[QueueItemTypeEnum] = mapped_column(
@@ -525,6 +559,12 @@ class AuditActionEnum(str, PyEnum):
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
+    __table_args__ = (
+        Index("ix_audit_logs_user_id", "user_id"),
+        Index("ix_audit_logs_action", "action"),
+        Index("ix_audit_logs_created_at", "created_at"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     action_type: Mapped[AuditActionEnum] = mapped_column(
         Enum(AuditActionEnum, name="audit_action_type"), nullable=False
@@ -551,6 +591,11 @@ class AuditLog(Base):
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
+
+    __table_args__ = (
+        Index("ix_refresh_tokens_user_id", "user_id"),
+        Index("ix_refresh_tokens_issued_at", "issued_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -730,6 +775,12 @@ class BuyerTypeEnum(str, PyEnum):
 class BrokerageListing(Base):
     __tablename__ = "brokerage_listings"
 
+    __table_args__ = (
+        Index("ix_brokerage_listings_seller_id", "seller_id"),
+        Index("ix_brokerage_listings_project_id", "project_id"),
+        Index("ix_brokerage_listings_status", "status"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     seller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -757,6 +808,10 @@ class BrokerageListing(Base):
 class BuyerProfile(Base):
     __tablename__ = "buyer_profiles"
 
+    __table_args__ = (
+        Index("ix_buyer_profiles_user_id", "user_id"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
     buyer_type: Mapped[BuyerTypeEnum] = mapped_column(
@@ -777,6 +832,11 @@ class BuyerProfile(Base):
 class TradeMatch(Base):
     __tablename__ = "trade_matches"
 
+    __table_args__ = (
+        Index("ix_trade_matches_listing_id", "listing_id"),
+        Index("ix_trade_matches_buyer_id", "buyer_id"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("brokerage_listings.id"), nullable=False)
     buyer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -794,6 +854,13 @@ class TradeMatch(Base):
 
 class BrokerageTransaction(Base):
     __tablename__ = "brokerage_transactions"
+
+    __table_args__ = (
+        Index("ix_brokerage_transactions_listing_id", "listing_id"),
+        Index("ix_brokerage_transactions_buyer_id", "buyer_id"),
+        Index("ix_brokerage_transactions_seller_id", "seller_id"),
+        Index("ix_brokerage_transactions_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     listing_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("brokerage_listings.id"), nullable=False)
@@ -867,6 +934,11 @@ class TokenStatusEnum(str, PyEnum):
 class CarbonCreditToken(Base):
     __tablename__ = "carbon_credit_tokens"
 
+    __table_args__ = (
+        Index("ix_carbon_credit_tokens_project_id", "project_id"),
+        Index("ix_carbon_credit_tokens_status", "status"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     calculation_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calculation_runs.id"), nullable=False)
@@ -891,6 +963,11 @@ class CarbonCreditToken(Base):
 
 class TokenListing(Base):
     __tablename__ = "token_listings"
+
+    __table_args__ = (
+        Index("ix_token_listings_token_id", "token_id"),
+        Index("ix_token_listings_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     token_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("carbon_credit_tokens.id"), nullable=False)
@@ -928,6 +1005,10 @@ class TokenRetirement(Base):
 class CorporatePortfolio(Base):
     __tablename__ = "corporate_portfolios"
 
+    __table_args__ = (
+        Index("ix_corporate_portfolios_user_id", "user_id"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
     total_credits_held: Mapped[float] = mapped_column(Float, default=0.0)
@@ -944,6 +1025,11 @@ class CorporatePortfolio(Base):
 
 class PortfolioHolding(Base):
     __tablename__ = "portfolio_holdings"
+
+    __table_args__ = (
+        Index("ix_portfolio_holdings_portfolio_id", "portfolio_id"),
+        Index("ix_portfolio_holdings_token_id", "token_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     portfolio_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("corporate_portfolios.id"), nullable=False)

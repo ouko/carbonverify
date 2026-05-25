@@ -1,6 +1,6 @@
 import io
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 
 import pandas as pd
 from dateutil import parser as date_parser

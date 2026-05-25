@@ -5,18 +5,17 @@ Portfolio management, ESG reporting, and due diligence access.
 """
 
 import uuid
-from datetime import date
-from typing import Optional, List
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import User, CorporatePortfolio, PortfolioHolding, CarbonCreditToken
+from app.models import User, CorporatePortfolio, PortfolioHolding
 from app.auth.dependencies import get_current_user
 from app.brokerage.corporate_service import CorporateService
-from app.schemas import ESGReportConfig, CorporatePortfolioOut, PortfolioHoldingOut
+from app.schemas import ESGReportConfig, PortfolioHoldingOut
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
