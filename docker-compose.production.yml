@@ -1,0 +1,68 @@
+# Production Docker Compose — no dev volumes, no exposed DB/Redis ports
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+#
+# For SSL termination, use nginx/traefik/caddy in front of the frontend service.
+
+services:
+  db:
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # No ports exposed to host
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    restart: always
+    # No ports exposed to host
+
+  app:
+    restart: always
+    # Production image should be pre-built and pushed to registry
+    # build:
+    #   context: ./backend
+    #   dockerfile: Dockerfile
+    command: >
+      gunicorn app.main:app
+      -w 4
+      -k uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8000
+      --access-logfile -
+      --error-logfile -
+      --timeout 60
+    # No dev volume mount
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+
+  celery-worker:
+    restart: always
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --without-gossip
+      --without-mingle
+      --without-heartbeat
+    # No dev volume mount
+
+  celery-beat:
+    restart: always
+    command: >
+      celery -A app.tasks.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat.PersistentScheduler
+    # No dev volume mount
+
+  frontend:
+    restart: always
+    # Production: serve static files via nginx
+    # image: nginx:alpine
+    # volumes:
+    #   - ./frontend/dist:/usr/share/nginx/html:ro
+    #   - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  postgres_data:

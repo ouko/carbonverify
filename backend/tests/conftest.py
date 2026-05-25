@@ -12,9 +12,11 @@ from sqlalchemy import JSON, String, TypeDecorator
 
 # Set test environment variables BEFORE any app imports
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["WHATSAPP_VERIFY_TOKEN"] = "test-whatsapp-token"
 os.environ["IOT_WEBHOOK_API_KEY"] = "test-iot-api-key"
+os.environ["ENVIRONMENT"] = "test"
 
 # Mock libmagic before any imports
 mock_magic = MagicMock()

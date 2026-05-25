@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,13 +7,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://carbonverify:carbonverify_secret@localhost:5432/carbonverify"
+    DATABASE_URL: str
+    DATABASE_READ_REPLICA_URL: str = ""  # Optional read replica
 
     # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str
 
     # JWT
-    SECRET_KEY: str
+    SECRET_KEY: str = Field(min_length=32)
+    SECRET_KEY_PREVIOUS: str = ""  # For zero-downtime rotation
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -24,20 +27,20 @@ class Settings(BaseSettings):
     # Session / Inactivity
     SESSION_INACTIVITY_TIMEOUT_MINUTES: int = 30
 
-    # AWS S3
+    # AWS S3 — no default; must be explicitly configured
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
-    S3_BUCKET_NAME: str = "carbonverify-uploads"
+    S3_BUCKET_NAME: str = ""
 
     # App
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "production"
     LOG_LEVEL: str = "INFO"
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = ""
 
     # Celery
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
 
     # Kimi API (Moonshot AI)
     KIMI_API_KEY: str = ""

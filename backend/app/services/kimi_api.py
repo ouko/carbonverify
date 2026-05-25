@@ -6,10 +6,12 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.logging import get_logger
+from app.core.circuit_breaker import with_circuit_breaker
+from app.config import get_settings
 
 logger = get_logger(__name__)
+settings = get_settings()
 
-KIMI_API_BASE = "https://api.moonshot.cn/v1"
 DEFAULT_MODEL = "moonshot-v1-8k"
 
 
@@ -17,11 +19,12 @@ class KimiAPIClient:
     """Client for Kimi API (Moonshot AI) providing NLP capabilities."""
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("KIMI_API_KEY", "")
-        self.base_url = KIMI_API_BASE
-        self.model = DEFAULT_MODEL
+        self.api_key = api_key or settings.KIMI_API_KEY or os.getenv("KIMI_API_KEY", "")
+        self.base_url = settings.KIMI_API_BASE
+        self.model = settings.KIMI_MODEL or DEFAULT_MODEL
         self.client = httpx.AsyncClient(timeout=60.0)
 
+    @with_circuit_breaker("kimi_api")
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],

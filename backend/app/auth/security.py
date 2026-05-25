@@ -40,11 +40,18 @@ def create_refresh_token(subject: str, expires_delta: Optional[timedelta] = None
 
 
 def decode_token(token: str) -> Optional[dict]:
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError:
-        return None
+    """Decode a JWT, trying current and previous secret keys for rotation support."""
+    secrets_to_try = [settings.SECRET_KEY]
+    if settings.SECRET_KEY_PREVIOUS:
+        secrets_to_try.append(settings.SECRET_KEY_PREVIOUS)
+
+    for secret in secrets_to_try:
+        try:
+            payload = jwt.decode(token, secret, algorithms=[settings.ALGORITHM])
+            return payload
+        except JWTError:
+            continue
+    return None
 
 
 def hash_token(token: str) -> str:

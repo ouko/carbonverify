@@ -25,7 +25,13 @@ It also includes a **Lead Intelligence Engine** that scrapes carbon registries (
 | **Cache/Queue** | Redis |
 | **Scraping** | Playwright (Chromium), playwright-stealth, BeautifulSoup4, lxml |
 | **PDF** | WeasyPrint |
-| **DevOps** | Docker Compose |
+| **Virus Scan** | ClamAV (docker-compose) |
+| **DevOps** | Docker Compose, Kubernetes manifests, GitHub Actions CI/CD |
+| **Backup** | K8s CronJob + S3, `scripts/backup-db.sh` |
+| **Load Testing** | k6 (auth stress, API soak, upload tests) |
+| **Secrets** | JWT dual-secret rotation, field-level encryption key rotation |
+| **Compliance** | SOC2 controls mapping, security audit checklist, GDPR erasure |
+| **Deployment** | Vercel (frontend), Railway/Render/AWS (backend) — see `docs/DEPLOYMENT.md` |
 
 ---
 
@@ -132,7 +138,8 @@ def _launch_browser(headless=False) -> Browser:
 
 - First scrape: ~36s (launch + page load)
 - Subsequent: ~18s (reuse)
-- Always non-headless for CDM (bypasses Incapsula)
+- CDM locally: non-headless bypasses Incapsula
+- Production: `SCRAPER_FORCE_HEADLESS=true` enforces headless; use `PROXY_URL` for IP rotation
 - `close_persistent_browser()` for cleanup
 
 ### Scraper Fallback Behavior
@@ -178,6 +185,10 @@ Key variables in `.env`:
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | S3 |
 | `S3_BUCKET_NAME` | File storage |
 | `LEAD_SCRAPER_MODE` | `live` or `demo` |
+| `PROXY_URL` | HTTP proxy for scraper IP rotation (e.g. `http://proxy:8080`) |
+| `SCRAPER_FORCE_HEADLESS` | `true` to force headless in production containers |
+| `ENCRYPTION_KEY_HEX` | 32-byte hex key for PII field-level encryption |
+| `IOT_WEBHOOK_API_KEY` | API key for IoT device webhook authentication |
 | `ENVIRONMENT` | `development` or `production` |
 
 ---
@@ -197,9 +208,14 @@ pytest tests/ -v
 cd frontend
 npm run dev
 npm run build
+npm test
 
 # Full stack
 docker-compose up --build
+
+# Backup (Docker Compose)
+./scripts/backup-db.sh
+S3_BUCKET=my-bucket ./scripts/backup-db.sh
 ```
 
 ---
@@ -209,5 +225,8 @@ docker-compose up --build
 - **Verra live scraping**: Blocked by Cloudflare. The Angular grid loads via XHR calls that are hard to intercept reliably without deep Playwright scripting. Demo fallback provides realistic Kenya VCS projects.
 - **Gold Standard live scraping**: Their public API now requires authentication (`"Can only accept requests of type: authenticated"`). Demo fallback provides realistic projects.
 - **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
-- **Vite chunk size**: Production build warns ~980KB JS bundle. Code-splitting recommended but not critical.
+- **Vite chunk size**: ✅ Resolved. Code-splitting + manual vendor chunks reduced main chunk to ~102KB.
+- **Verra live scraping**: Blocked by Cloudflare. Demo fallback provides realistic Kenya VCS projects.
+- **Gold Standard live scraping**: Their public API now requires authentication. Demo fallback provides realistic projects.
+- **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
 - **React Router v6 → v7**: Future flags enabled in `main.tsx` to suppress console warnings.

@@ -16,7 +16,7 @@ async def test_user(db_session):
         name="Test User",
         role=UserRoleEnum.admin,
         mfa_enabled=False,
-        hashed_password=get_password_hash("testpassword123"),
+        hashed_password=get_password_hash("Testpassword123!"),
     )
     db_session.add(user)
     await db_session.commit()
@@ -29,7 +29,7 @@ class TestLogin:
     async def test_login_success(self, client, test_user):
         response = await client.post("/auth/login", json={
             "email": "test@carbonverify.io",
-            "password": "testpassword123",
+            "password": "Testpassword123!",
         })
         assert response.status_code == 200
         data = response.json()
@@ -40,7 +40,7 @@ class TestLogin:
     async def test_login_invalid_password(self, client, test_user):
         response = await client.post("/auth/login", json={
             "email": "test@carbonverify.io",
-            "password": "wrongpassword",
+            "password": "Wrongpassword123!",
         })
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid credentials"
@@ -49,7 +49,7 @@ class TestLogin:
     async def test_login_nonexistent_user(self, client):
         response = await client.post("/auth/login", json={
             "email": "nonexistent@carbonverify.io",
-            "password": "somepassword",
+            "password": "Somepassword123!",
         })
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid credentials"
@@ -61,13 +61,13 @@ class TestLogin:
         for _ in range(5):
             await client.post("/auth/login", json={
                 "email": "test@carbonverify.io",
-                "password": "wrongpassword",
+                "password": "Wrongpassword123!",
             })
 
         # 6th attempt should be locked
         response = await client.post("/auth/login", json={
             "email": "test@carbonverify.io",
-            "password": "testpassword123",
+            "password": "Testpassword123!",
         })
         assert response.status_code == 403
         assert "Account locked" in response.json()["detail"]
@@ -78,7 +78,7 @@ class TestRegister:
     async def test_register_success(self, client):
         response = await client.post("/auth/register", json={
             "email": "newuser@carbonverify.io",
-            "password": "newpassword123",
+            "password": "Newpassword123!",
             "name": "New User",
             "role": "viewer",
         })
@@ -91,7 +91,7 @@ class TestRegister:
     async def test_register_duplicate_email(self, client, test_user):
         response = await client.post("/auth/register", json={
             "email": "test@carbonverify.io",
-            "password": "somepassword",
+            "password": "Somepassword123!",
             "name": "Duplicate",
             "role": "viewer",
         })
@@ -122,7 +122,7 @@ class TestLogout:
         # Login
         login_res = await client.post("/auth/login", json={
             "email": "test@carbonverify.io",
-            "password": "testpassword123",
+            "password": "Testpassword123!",
         })
         assert login_res.status_code == 200
         access_token = login_res.json()["access_token"]

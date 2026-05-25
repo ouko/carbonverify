@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import LoginPage from '../pages/LoginPage'
 import { useAuthStore } from '../stores/authStore'
+import { renderWithRouter } from './test-utils'
 
 vi.mock('../stores/authStore', () => ({
   useAuthStore: vi.fn(),
@@ -25,11 +25,7 @@ describe('LoginPage', () => {
   })
 
   it('renders login form with email and password inputs', () => {
-    render(
-      <BrowserRouter>
-        <LoginPage />
-      </BrowserRouter>
-    )
+    renderWithRouter(<LoginPage />)
 
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument()
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument()
@@ -39,11 +35,7 @@ describe('LoginPage', () => {
   it('shows error message when login fails', async () => {
     mockLogin.mockRejectedValue(new Error('Invalid credentials'))
 
-    render(
-      <BrowserRouter>
-        <LoginPage />
-      </BrowserRouter>
-    )
+    renderWithRouter(<LoginPage />)
 
     const form = document.querySelector('form')!
     fireEvent.change(screen.getByLabelText(/email address/i), {
@@ -60,11 +52,7 @@ describe('LoginPage', () => {
   })
 
   it('toggles password visibility', () => {
-    render(
-      <BrowserRouter>
-        <LoginPage />
-      </BrowserRouter>
-    )
+    renderWithRouter(<LoginPage />)
 
     const passwordInput = screen.getByPlaceholderText('••••••••') as HTMLInputElement
     expect(passwordInput.type).toBe('password')

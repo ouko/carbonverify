@@ -393,6 +393,7 @@ class HumanReviewQueue(Base):
     __table_args__ = (
         Index("ix_human_review_queue_assigned_to", "assigned_to"),
         Index("ix_human_review_queue_status", "status"),
+        CheckConstraint("priority BETWEEN 1 AND 5", name="check_priority_range"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -420,10 +421,6 @@ class HumanReviewQueue(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     assignee: Mapped[Optional["User"]] = relationship("User")
-
-    __table_args__ = (
-        CheckConstraint("priority BETWEEN 1 AND 5", name="check_priority_range"),
-    )
 
 
 # ─── Kimi Claw Orchestrator Models ────────────────────────────────────────────
@@ -599,9 +596,10 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     __table_args__ = (
-        Index("ix_audit_logs_user_id", "user_id"),
-        Index("ix_audit_logs_action", "action"),
-        Index("ix_audit_logs_created_at", "created_at"),
+        Index("ix_audit_logs_actor_id", "actor_id"),
+        Index("ix_audit_logs_action_type", "action_type"),
+        Index("ix_audit_logs_timestamp", "timestamp"),
+        CheckConstraint("actor_type IN ('user', 'agent', 'system')", name="check_actor_type"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -622,10 +620,6 @@ class AuditLog(Base):
     user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     actor: Mapped[Optional["User"]] = relationship("User")
-
-    __table_args__ = (
-        CheckConstraint("actor_type IN ('user', 'agent', 'system')", name="check_actor_type"),
-    )
 
 
 class RefreshToken(Base):

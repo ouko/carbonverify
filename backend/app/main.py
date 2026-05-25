@@ -1,5 +1,14 @@
+"""CarbonVerify FastAPI application entry point."""
+
+# Monkey-patch asyncio.iscoroutinefunction before slowapi imports
+# to suppress Python 3.14 DeprecationWarning (slowapi uses the deprecated API)
+import asyncio
+import inspect
+asyncio.iscoroutinefunction = inspect.iscoroutinefunction
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from contextlib import asynccontextmanager
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -64,9 +73,10 @@ async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # X-XSS-Protection removed — deprecated by OWASP, can enable XSS in some browsers
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     # Content Security Policy
     csp = (
         "default-src 'self'; "
@@ -96,8 +106,19 @@ async def request_size_limit(request: Request, call_next):
     return await call_next(request)
 
 
+# TrustedHostMiddleware — prevent Host header attacks
+# Skip in test environment to avoid breaking test clients
+if settings.ENVIRONMENT != "test":
+    allowed_hosts = ["carbonverify.io", "*.carbonverify.io"]
+    if settings.ENVIRONMENT == "development":
+        allowed_hosts.extend(["localhost", "127.0.0.1", "*"])
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=allowed_hosts,
+    )
+
 # Production CORS: tighten in production, allow local dev
-allow_origins = [settings.FRONTEND_URL]
+allow_origins = [settings.FRONTEND_URL] if settings.FRONTEND_URL else []
 if settings.ENVIRONMENT == "development":
     allow_origins.extend(["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"])
 

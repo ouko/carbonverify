@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useNotificationStore } from '../stores/notificationStore'
 
-const WS_URL = (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:8000/ws/notifications'
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/notifications'
 
 export function useCommandWebSocket() {
   const ws = useRef<WebSocket | null>(null)

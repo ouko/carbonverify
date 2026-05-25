@@ -242,6 +242,9 @@ class CDMScraper(BaseRegistryScraper):
         if self.live_mode:
             live_leads = _scrape_cdm_with_playwright(country)
             if live_leads:
+                for lead in live_leads:
+                    lead["registry_source"] = self.source
+                    lead["scraped_at"] = datetime.now(timezone.utc).isoformat()
                 leads.extend(live_leads)
                 data_source = "live"
             else:

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.logging import get_logger
+from app.core.circuit_breaker import with_circuit_breaker
 
 logger = get_logger(__name__)
 
@@ -27,6 +28,7 @@ class WhatsAppMetaAPI:
         self.base_url = f"https://graph.facebook.com/{api_version}"
         self.client = httpx.AsyncClient(timeout=30.0)
 
+    @with_circuit_breaker("whatsapp_meta")
     async def send_text_message(
         self,
         to: str,

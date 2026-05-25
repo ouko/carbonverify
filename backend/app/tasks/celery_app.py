@@ -16,6 +16,7 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    beat_scheduler="app.tasks.beat_scheduler.LeaderElectionScheduler",
     # Task execution settings
     task_acks_late=True,
     task_reject_on_worker_lost=True,

@@ -286,6 +286,9 @@ class GoldStandardScraper(BaseRegistryScraper):
                 # Try Playwright fallback
                 pw_leads = _scrape_gold_standard_with_playwright(country)
                 if pw_leads:
+                    for lead in pw_leads:
+                        lead["registry_source"] = self.source
+                        lead["scraped_at"] = datetime.now(timezone.utc).isoformat()
                     leads.extend(pw_leads)
                     data_source = "live"
                 else:

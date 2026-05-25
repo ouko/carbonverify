@@ -3,7 +3,7 @@ import re
 from typing import Dict, Any, List
 
 import pdfplumber
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 from app.core.logging import get_logger
 from app.models import DocumentTypeEnum
@@ -56,8 +56,8 @@ def extract_text_pdfplumber(file_bytes: bytes) -> str:
     return text
 
 
-def extract_text_pypdf2(file_bytes: bytes) -> str:
-    """Extract text using PyPDF2 as fallback."""
+def extract_text_pypdf(file_bytes: bytes) -> str:
+    """Extract text using pypdf as fallback."""
     text = ""
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
@@ -66,7 +66,7 @@ def extract_text_pypdf2(file_bytes: bytes) -> str:
             if page_text:
                 text += page_text + "\n"
     except Exception as e:
-        logger.warning("pypdf2_extraction_failed", error=str(e))
+        logger.warning("pypdf_extraction_failed", error=str(e))
     return text
 
 
@@ -129,7 +129,7 @@ def process_pdf(file_bytes: bytes, filename: str) -> Dict[str, Any]:
         "ocr_text": None,
     }
 
-    # Try PyPDF2 for page count
+    # Try pypdf for page count
     try:
         reader = PdfReader(io.BytesIO(file_bytes))
         result["num_pages"] = len(reader.pages)
@@ -140,7 +140,7 @@ def process_pdf(file_bytes: bytes, filename: str) -> Dict[str, Any]:
     # Extract text
     text = extract_text_pdfplumber(file_bytes)
     if not text.strip():
-        text = extract_text_pypdf2(file_bytes)
+        text = extract_text_pypdf(file_bytes)
 
     result["text_length"] = len(text)
 

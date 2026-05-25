@@ -25,7 +25,14 @@ _redis_pool: Optional[redis.Redis] = None
 def _get_redis() -> redis.Redis:
     global _redis_pool
     if _redis_pool is None:
-        _redis_pool = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        _redis_pool = redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_keepalive=True,
+            health_check_interval=30,
+            retry_on_timeout=True,
+        )
     return _redis_pool
 
 

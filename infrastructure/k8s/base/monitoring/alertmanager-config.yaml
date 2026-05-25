@@ -1,0 +1,174 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: carbonverify
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'smtp.example.com:587'
+      smtp_from: 'alerts@carbonverify.io'
+      smtp_auth_username: 'alerts@carbonverify.io'
+      smtp_auth_password: '${SMTP_PASSWORD}'
+      slack_api_url: '${SLACK_WEBHOOK_URL}'
+      pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+    route:
+      receiver: 'default'
+      group_by: ['alertname', 'severity', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        # Critical alerts → PagerDuty + Slack + Email
+        - match:
+            severity: critical
+          receiver: 'critical-pagerduty'
+          continue: true
+          group_wait: 0s
+          repeat_interval: 15m
+
+        # Warning alerts → Slack + Email
+        - match:
+            severity: warning
+          receiver: 'warning-slack'
+          continue: true
+
+        # Info alerts → Slack only
+        - match:
+            severity: info
+          receiver: 'info-slack'
+
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+
+    receivers:
+      - name: 'default'
+        slack_configs:
+          - channel: '#alerts'
+            title: 'CarbonVerify Alert'
+            text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+      - name: 'critical-pagerduty'
+        pagerduty_configs:
+          - service_key: '${PAGERDUTY_SERVICE_KEY}'
+            severity: critical
+            description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+            details:
+              firing: '{{ template "pagerduty.default.description" . }}'
+              resolved: '{{ template "pagerduty.default.instances" . }}'
+        slack_configs:
+          - channel: '#critical-alerts'
+            title: 'CRITICAL: CarbonVerify'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Severity:* {{ .Labels.severity }}
+              *Service:* {{ .Labels.service }}
+              *Description:* {{ .Annotations.description }}
+              *Runbook:* {{ .Annotations.runbook_url }}
+              {{ end }}
+        email_configs:
+          - to: 'oncall@carbonverify.io'
+            subject: '[CRITICAL] CarbonVerify: {{ .GroupLabels.alertname }}'
+            body: |
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Severity: {{ .Labels.severity }}
+              Description: {{ .Annotations.description }}
+              Runbook: {{ .Annotations.runbook_url }}
+              {{ end }}
+
+      - name: 'warning-slack'
+        slack_configs:
+          - channel: '#warnings'
+            title: 'WARNING: CarbonVerify'
+            text: |
+              {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Service:* {{ .Labels.service }}
+              *Description:* {{ .Annotations.description }}
+              {{ end }}
+        email_configs:
+          - to: 'team@carbonverify.io'
+            subject: '[WARNING] CarbonVerify: {{ .GroupLabels.alertname }}'
+
+      - name: 'info-slack'
+        slack_configs:
+          - channel: '#info'
+            title: 'INFO: CarbonVerify'
+            text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+    inhibit_rules:
+      # If API is down, suppress downstream service alerts
+      - source_match:
+          alertname: 'APIHighErrorRate'
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['service']
+
+      # If DB is down, suppress query timeout alerts
+      - source_match:
+          alertname: 'DatabaseDown'
+          severity: 'critical'
+        target_match:
+          alertname: 'DatabaseQuerySlow'
+        equal: []
+
+---
+# Alertmanager deployment with config mounted
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: carbonverify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.27.0
+          args:
+            - '--config.file=/etc/alertmanager/alertmanager.yml'
+            - '--storage.path=/alertmanager'
+            - '--web.external-url=https://alerts.carbonverify.io'
+          ports:
+            - containerPort: 9093
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+            - name: storage
+              mountPath: /alertmanager
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 50m
+            limits:
+              memory: 256Mi
+              cpu: 200m
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+        - name: storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: carbonverify
+spec:
+  selector:
+    app: alertmanager
+  ports:
+    - port: 9093
+      targetPort: 9093

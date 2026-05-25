@@ -1,5 +1,6 @@
 """Playwright utilities for bypassing anti-bot protection on carbon registries."""
 
+import os
 import time
 import threading
 from typing import Optional, Dict, Any, List
@@ -16,6 +17,11 @@ DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
 
+# Proxy rotation support
+PROXY_URL = os.getenv("PROXY_URL", "")
+# Production flag forces headless for security
+SCRAPER_FORCE_HEADLESS = os.getenv("SCRAPER_FORCE_HEADLESS", "false").lower() == "true"
+
 # Persistent browser instance to avoid ~40s launch cost per scrape
 _browser_instance: Optional[Browser] = None
 _playwright_instance = None
@@ -25,18 +31,24 @@ _browser_lock = threading.Lock()
 def _get_or_launch_browser(headless: bool = False) -> Browser:
     """Get or launch a persistent stealth Chromium browser."""
     global _browser_instance, _playwright_instance
+    # In production/containerized environments, always force headless
+    effective_headless = headless or SCRAPER_FORCE_HEADLESS
     with _browser_lock:
         if _browser_instance is None or _browser_instance.is_connected() is False:
             _playwright_instance = sync_playwright().start()
-            _browser_instance = _playwright_instance.chromium.launch(
-                headless=headless,
-                args=[
+            launch_kwargs = {
+                "headless": effective_headless,
+                "args": [
                     "--disable-blink-features=AutomationControlled",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
                 ],
-            )
-            logger.info("playwright_browser_launched", headless=headless)
+            }
+            if PROXY_URL:
+                launch_kwargs["proxy"] = {"server": PROXY_URL}
+                logger.info("playwright_proxy_configured", proxy=PROXY_URL)
+            _browser_instance = _playwright_instance.chromium.launch(**launch_kwargs)
+            logger.info("playwright_browser_launched", headless=effective_headless)
         return _browser_instance
 
 

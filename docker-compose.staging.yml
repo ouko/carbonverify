@@ -1,0 +1,118 @@
+# Staging environment — mirrors production configuration for testing.
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+asyncpg://carbonverify:carbonverify_secret@db:5432/carbonverify
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - FRONTEND_URL=https://staging.carbonverify.io
+      - LEAD_SCRAPER_MODE=demo
+    command: >
+      gunicorn app.main:app
+      -w 4
+      -k uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8000
+      --access-logfile -
+      --error-logfile -
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+    deploy:
+      replicas: 2
+
+  db:
+    environment:
+      - POSTGRES_DB=carbonverify
+      - POSTGRES_USER=carbonverify
+      - POSTGRES_PASSWORD=carbonverify_secret
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+asyncpg://carbonverify:carbonverify_secret@db:5432/carbonverify
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - LEAD_SCRAPER_MODE=demo
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --without-gossip
+      --without-mingle
+      --without-heartbeat
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - ENVIRONMENT=staging
+      - DATABASE_URL=postgresql+asyncpg://carbonverify:carbonverify_secret@db:5432/carbonverify
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - LEAD_SCRAPER_MODE=demo
+    command: >
+      celery -A app.tasks.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat.PersistentScheduler
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/staging.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+      - frontend
+
+volumes:
+  postgres_data_staging:

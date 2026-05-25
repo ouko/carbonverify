@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingSpinner } from './components/LoadingSpinner';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
@@ -13,21 +14,23 @@ import DataSourcesPage from './pages/DataSourcesPage';
 import CalculationsPage from './pages/CalculationsPage';
 import ReportsPage from './pages/ReportsPage';
 import ReviewQueuePage from './pages/ReviewQueuePage';
-import { FieldDashboardPage } from './pages/FieldDashboardPage';
-import { SecuritySettingsPage } from './pages/SecuritySettingsPage';
-import { AuditLogPage } from './pages/AuditLogPage';
-import { ComplianceDashboardPage } from './pages/ComplianceDashboardPage';
-import { BrokeragePage } from './pages/BrokeragePage';
-import { TokenizationPage } from './pages/TokenizationPage';
-import { CorporateDashboardPage } from './pages/CorporateDashboardPage';
-import LeadsPage from './pages/LeadsPage';
-import CommandLayout from './components/CommandLayout';
-import { InboxPage } from './pages/command/InboxPage';
-import { ProjectsGridPage } from './pages/command/ProjectsGridPage';
-import { VVBPipelinePage } from './pages/command/VVBPipelinePage';
-import { QualityMetricsPage } from './pages/command/QualityMetricsPage';
-import { AgentPerformancePage } from './pages/command/AgentPerformancePage';
-import { SettingsPage } from './pages/command/SettingsPage';
+
+// Lazy load heavy pages for code-splitting
+const FieldDashboardPage = lazy(() => import('./pages/FieldDashboardPage').then(m => ({ default: m.FieldDashboardPage })));
+const SecuritySettingsPage = lazy(() => import('./pages/SecuritySettingsPage').then(m => ({ default: m.SecuritySettingsPage })));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
+const ComplianceDashboardPage = lazy(() => import('./pages/ComplianceDashboardPage').then(m => ({ default: m.ComplianceDashboardPage })));
+const BrokeragePage = lazy(() => import('./pages/BrokeragePage').then(m => ({ default: m.BrokeragePage })));
+const TokenizationPage = lazy(() => import('./pages/TokenizationPage').then(m => ({ default: m.TokenizationPage })));
+const CorporateDashboardPage = lazy(() => import('./pages/CorporateDashboardPage').then(m => ({ default: m.CorporateDashboardPage })));
+const LeadsPage = lazy(() => import('./pages/LeadsPage').then(m => ({ default: m.default })));
+const CommandLayout = lazy(() => import('./components/CommandLayout').then(m => ({ default: m.default })));
+const InboxPage = lazy(() => import('./pages/command/InboxPage').then(m => ({ default: m.InboxPage })));
+const ProjectsGridPage = lazy(() => import('./pages/command/ProjectsGridPage').then(m => ({ default: m.ProjectsGridPage })));
+const VVBPipelinePage = lazy(() => import('./pages/command/VVBPipelinePage').then(m => ({ default: m.VVBPipelinePage })));
+const QualityMetricsPage = lazy(() => import('./pages/command/QualityMetricsPage').then(m => ({ default: m.QualityMetricsPage })));
+const AgentPerformancePage = lazy(() => import('./pages/command/AgentPerformancePage').then(m => ({ default: m.AgentPerformancePage })));
+const SettingsPage = lazy(() => import('./pages/command/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
 function App() {
   useEffect(() => {
@@ -48,22 +51,22 @@ function App() {
                 <Route path="/calculations" element={<CalculationsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/review-queue" element={<ReviewQueuePage />} />
-                <Route path="/field" element={<FieldDashboardPage />} />
-                <Route path="/security" element={<SecuritySettingsPage />} />
-                <Route path="/audit" element={<AuditLogPage />} />
-                <Route path="/compliance" element={<ComplianceDashboardPage />} />
-                <Route path="/brokerage" element={<BrokeragePage />} />
-                <Route path="/tokenization" element={<TokenizationPage />} />
-                <Route path="/corporate" element={<CorporateDashboardPage />} />
-                <Route path="/leads" element={<LeadsPage />} />
+                <Route path="/field" element={<Suspense fallback={<LoadingSpinner />}><FieldDashboardPage /></Suspense>} />
+                <Route path="/security" element={<Suspense fallback={<LoadingSpinner />}><SecuritySettingsPage /></Suspense>} />
+                <Route path="/audit" element={<Suspense fallback={<LoadingSpinner />}><AuditLogPage /></Suspense>} />
+                <Route path="/compliance" element={<Suspense fallback={<LoadingSpinner />}><ComplianceDashboardPage /></Suspense>} />
+                <Route path="/brokerage" element={<Suspense fallback={<LoadingSpinner />}><BrokeragePage /></Suspense>} />
+                <Route path="/tokenization" element={<Suspense fallback={<LoadingSpinner />}><TokenizationPage /></Suspense>} />
+                <Route path="/corporate" element={<Suspense fallback={<LoadingSpinner />}><CorporateDashboardPage /></Suspense>} />
+                <Route path="/leads" element={<Suspense fallback={<LoadingSpinner />}><LeadsPage /></Suspense>} />
               </Route>
-              <Route element={<CommandLayout />}>
-                <Route path="/command-center/inbox" element={<InboxPage />} />
-                <Route path="/command-center/projects" element={<ProjectsGridPage />} />
-                <Route path="/command-center/vvb" element={<VVBPipelinePage />} />
-                <Route path="/command-center/quality" element={<QualityMetricsPage />} />
-                <Route path="/command-center/agents" element={<AgentPerformancePage />} />
-                <Route path="/command-center/settings" element={<SettingsPage />} />
+              <Route element={<Suspense fallback={<LoadingSpinner />}><CommandLayout /></Suspense>}>
+                <Route path="/command-center/inbox" element={<Suspense fallback={<LoadingSpinner />}><InboxPage /></Suspense>} />
+                <Route path="/command-center/projects" element={<Suspense fallback={<LoadingSpinner />}><ProjectsGridPage /></Suspense>} />
+                <Route path="/command-center/vvb" element={<Suspense fallback={<LoadingSpinner />}><VVBPipelinePage /></Suspense>} />
+                <Route path="/command-center/quality" element={<Suspense fallback={<LoadingSpinner />}><QualityMetricsPage /></Suspense>} />
+                <Route path="/command-center/agents" element={<Suspense fallback={<LoadingSpinner />}><AgentPerformancePage /></Suspense>} />
+                <Route path="/command-center/settings" element={<Suspense fallback={<LoadingSpinner />}><SettingsPage /></Suspense>} />
                 <Route path="/command-center" element={<Navigate to="/command-center/inbox" replace />} />
               </Route>
             </Route>

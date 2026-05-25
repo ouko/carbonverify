@@ -1,0 +1,95 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup
+  namespace: carbonverify
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-dump
+              image: postgres:15-alpine
+              env:
+                - name: PGHOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-credentials
+                      key: host
+                - name: PGPORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-credentials
+                      key: port
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-credentials
+                      key: database
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-credentials
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: db-credentials
+                      key: password
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-backup-credentials
+                      key: aws_access_key_id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-backup-credentials
+                      key: aws_secret_access_key
+                - name: S3_BUCKET
+                  value: carbonverify-backups
+                - name: S3_PREFIX
+                  value: postgres
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="carbonverify_${TIMESTAMP}.sql.gz"
+                  echo "Starting backup: $BACKUP_FILE"
+                  pg_dump --clean --if-exists --create | gzip > "/tmp/$BACKUP_FILE"
+                  echo "Uploading to S3..."
+                  # Install aws-cli if not present (alpine uses apk)
+                  apk add --no-cache aws-cli 2>/dev/null || true
+                  aws s3 cp "/tmp/$BACKUP_FILE" "s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE}"
+                  echo "Backup complete: s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_FILE}"
+                  # Cleanup backups older than 30 days
+                  aws s3 ls "s3://${S3_BUCKET}/${S3_PREFIX}/" | \
+                    awk '{print $4}' | \
+                    while read -r file; do
+                      DATE_STR=$(echo "$file" | grep -oP '\d{8}_\d{6}' || true)
+                      if [ -n "$DATE_STR" ]; then
+                        FILE_EPOCH=$(date -d "${DATE_STR:0:8} ${DATE_STR:9:2}:${DATE_STR:11:2}:${DATE_STR:13:2}" +%s 2>/dev/null || date -j -f "%Y%m%d_%H%M%S" "$DATE_STR" +%s)
+                        CUTOFF_EPOCH=$(date -d "30 days ago" +%s)
+                        if [ "$FILE_EPOCH" -lt "$CUTOFF_EPOCH" ]; then
+                          echo "Deleting old backup: $file"
+                          aws s3 rm "s3://${S3_BUCKET}/${S3_PREFIX}/$file"
+                        fi
+                      fi
+                    done
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+          # Optional: use a dedicated service account with IAM role for S3
+          # serviceAccountName: db-backup-sa
