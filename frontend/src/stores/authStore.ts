@@ -53,7 +53,7 @@ export const useAuthStore = create<AuthState>()(
             .get<User>('/users/me')
             .then((res) => set({ user: res.data, isLoading: false }))
             .catch(() => {
-              get().logout()
+              set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false })
             })
         } else {
           set({ isLoading: false })
