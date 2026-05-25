@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,14 +27,17 @@ from app.auth.mfa import (
 from app.auth.sessions import SessionManager
 from app.auth.dependencies import validate_refresh_token
 from app.security.audit_logging import AuditLogger
+from app.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
 
 MAX_FAILED_LOGINS = 5
 LOCKOUT_DURATION_MINUTES = 30
+REFRESH_COOKIE_NAME = "refresh_token"
 
 
 def _get_device_fingerprint(request: Request) -> str:
@@ -52,6 +55,31 @@ def _get_client_ip(request: Request) -> str:
     if request.client:
         return request.client.host
     return "unknown"
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    """Set refresh token as httpOnly cookie."""
+    secure = settings.ENVIRONMENT == "production"
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    """Clear refresh token cookie."""
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+    )
 
 
 @limiter.limit("5/minute")
@@ -95,13 +123,14 @@ async def register(
 async def login(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Step 1 of login: Validate credentials.
 
     If MFA is required and enabled, returns mfa_required=True with a temp token.
-    Otherwise, returns full access + refresh tokens.
+    Otherwise, returns full access token and sets refresh token as httpOnly cookie.
     """
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
@@ -150,13 +179,14 @@ async def login(
         }
 
     # No MFA required - issue full tokens
-    return await _issue_tokens(user, request, db)
+    return await _issue_tokens(user, request, response, db)
 
 
 @router.post("/mfa/verify")
 async def verify_mfa(
     payload: MFAVerifyRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -180,7 +210,7 @@ async def verify_mfa(
         await audit.log_login(user_id=user.id, success=False, request=request, mfa_used=True)
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
 
-    return await _issue_tokens(user, request, db, mfa_used=True)
+    return await _issue_tokens(user, request, response, db, mfa_used=True)
 
 
 @router.post("/mfa/setup")
@@ -207,7 +237,6 @@ async def setup_mfa(
 
 @router.post("/mfa/confirm")
 async def confirm_mfa(
-    payload: MFAVerifyRequest,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -281,28 +310,33 @@ async def disable_mfa(
 @limiter.limit("20/minute")
 @router.post("/refresh", response_model=Token)
 async def refresh(
-    payload: RefreshRequest,
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Rotate refresh tokens.
 
-    Validates the old refresh token, revokes it, and issues a new pair.
+    Reads refresh token from httpOnly cookie, validates it, revokes it, and issues a new pair.
     """
-    user, old_token_record = await validate_refresh_token(payload.refresh_token, db)
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
+
+    user, old_token_record = await validate_refresh_token(refresh_token, db)
 
     # Revoke old token
     old_token_record.revoked_at = datetime.now(timezone.utc)
     await db.commit()
 
     # Issue new tokens
-    return await _issue_tokens(user, request, db, is_refresh=True)
+    return await _issue_tokens(user, request, response, db, is_refresh=True)
 
 
 @router.post("/logout")
 async def logout(
     request: Request,
+    response: Response,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -310,6 +344,9 @@ async def logout(
     session_id = request.headers.get("x-session-id")
     if session_id:
         await SessionManager.destroy_session(session_id)
+
+    # Clear refresh token cookie
+    _clear_refresh_cookie(response)
 
     audit = AuditLogger(db)
     await audit.log_logout(user_id=current_user.id, request=request)
@@ -321,6 +358,7 @@ async def logout(
 @router.post("/logout-all")
 async def logout_all_sessions(
     request: Request,
+    response: Response,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -336,6 +374,9 @@ async def logout_all_sessions(
     )
     await db.commit()
 
+    # Clear refresh token cookie
+    _clear_refresh_cookie(response)
+
     audit = AuditLogger(db)
     await audit.log_logout(user_id=current_user.id, request=request)
 
@@ -346,6 +387,7 @@ async def logout_all_sessions(
 async def _issue_tokens(
     user: User,
     request: Request,
+    response: Response,
     db: AsyncSession,
     mfa_used: bool = False,
     is_refresh: bool = False,
@@ -374,13 +416,15 @@ async def _issue_tokens(
 
     await db.commit()
 
+    # Set refresh token as httpOnly cookie
+    _set_refresh_cookie(response, refresh_token)
+
     audit = AuditLogger(db)
     await audit.log_login(user_id=user.id, success=True, request=request, mfa_used=mfa_used)
 
     logger.info("tokens_issued", user_id=str(user.id), is_refresh=is_refresh)
     return Token(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",  # nosec B106 — OAuth2 standard token type
         session_id=session_id,
     )

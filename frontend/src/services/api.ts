@@ -8,6 +8,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 api.interceptors.request.use((config) => {
@@ -25,21 +26,13 @@ api.interceptors.response.use(
     if (!originalRequest) return Promise.reject(error)
 
     if (error.response?.status === 401) {
-      const refreshToken = useAuthStore.getState().refreshToken
-      if (refreshToken) {
-        try {
-          const res = await axios.post(`${API_URL}/auth/refresh`, {
-            refresh_token: refreshToken,
-          })
-          const { access_token, refresh_token } = res.data
-          useAuthStore.getState().setTokens(access_token, refresh_token)
-          originalRequest.headers.Authorization = `Bearer ${access_token}`
-          return api(originalRequest)
-        } catch {
-          useAuthStore.getState().logout()
-          window.location.href = '/login'
-        }
-      } else {
+      try {
+        const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+        const { access_token } = res.data
+        useAuthStore.getState().setAccessToken(access_token)
+        originalRequest.headers.Authorization = `Bearer ${access_token}`
+        return api(originalRequest)
+      } catch {
         useAuthStore.getState().logout()
         window.location.href = '/login'
       }

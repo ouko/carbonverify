@@ -3,8 +3,9 @@
 import json
 from typing import Dict, Optional, Set
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from app.auth.security import decode_token
 from app.orchestrator.pubsub import agent_pubsub
 from app.core.logging import get_logger
 
@@ -91,9 +92,23 @@ class ProjectConnectionManager:
 manager = ProjectConnectionManager()
 
 
+def _validate_ws_token(websocket: WebSocket) -> bool:
+    """Validate JWT from query param before accepting WebSocket connection."""
+    token = websocket.query_params.get("token")
+    if not token:
+        return False
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "access":
+        return False
+    return True
+
+
 @router.websocket("/notifications")
 async def global_notifications_websocket(websocket: WebSocket):
     """Global notifications WebSocket."""
+    if not _validate_ws_token(websocket):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token")
+        return
     await manager.connect(websocket)
     try:
         while True:
@@ -111,6 +126,9 @@ async def global_notifications_websocket(websocket: WebSocket):
 @router.websocket("/projects/{project_id}")
 async def project_websocket(websocket: WebSocket, project_id: str):
     """Project-specific real-time updates WebSocket."""
+    if not _validate_ws_token(websocket):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token")
+        return
     await manager.connect(websocket, project_id)
     try:
         await websocket.send_json({
@@ -149,6 +167,9 @@ async def project_websocket(websocket: WebSocket, project_id: str):
 @router.websocket("/review-queue")
 async def review_queue_websocket(websocket: WebSocket):
     """Real-time review queue updates."""
+    if not _validate_ws_token(websocket):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token")
+        return
     await manager.connect(websocket)
     try:
         while True:

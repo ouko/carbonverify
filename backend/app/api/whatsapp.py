@@ -25,7 +25,9 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["whatsapp"])
 
-VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "change-me-in-production")
+VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN")
+if not VERIFY_TOKEN:
+    raise RuntimeError("WHATSAPP_VERIFY_TOKEN environment variable is required")
 
 
 # ─── Meta Webhook Endpoints ───────────────────────────────────────────────────

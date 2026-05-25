@@ -10,8 +10,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.pool import StaticPool
 from sqlalchemy import JSON, String, TypeDecorator
 
-# Set test database URL BEFORE any app imports
+# Set test environment variables BEFORE any app imports
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
+os.environ["WHATSAPP_VERIFY_TOKEN"] = "test-whatsapp-token"
+os.environ["IOT_WEBHOOK_API_KEY"] = "test-iot-api-key"
 
 # Mock libmagic before any imports
 mock_magic = MagicMock()

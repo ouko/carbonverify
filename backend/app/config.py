@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://carbonverify:carbonverify_secret@localhost:5432/carbonverify"
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # JWT
-    SECRET_KEY: str = "super-secret-key-change-in-production"
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     # Compliance
     BREACH_NOTIFICATION_SLA_HOURS: int = 72
     DSR_RESPONSE_SLA_DAYS: int = 30
+
+    # IoT Webhook
+    IOT_WEBHOOK_API_KEY: str = ""
 
     # Lead Intelligence Engine
     LEAD_SCRAPER_MODE: str = "demo"  # "demo" or "live"

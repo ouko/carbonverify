@@ -40,7 +40,7 @@ services:
     command: >
       sh -c "
         alembic upgrade head &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --access-logfile - --error-logfile -
       "
     ports:
       - "8000:8000"
@@ -135,13 +135,9 @@ services:
     container_name: cv-frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "80:80"
     environment:
       - VITE_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host
 
 volumes:
   postgres_data:

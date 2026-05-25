@@ -1,7 +1,7 @@
 import uuid
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -11,10 +11,29 @@ from app.schemas import IoTWebhookResponse
 from app.services.pipelines.iot import process_iot_webhook
 from app.services.validation_engine import run_full_validation
 from app.services.provenance import build_full_provenance
+from app.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+settings = get_settings()
+
+
+def _require_iot_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> str:
+    """Validate IoT webhook API key."""
+    if not settings.IOT_WEBHOOK_API_KEY:
+        logger.error("iot_webhook_api_key_not_configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Webhook authentication not configured",
+        )
+    if x_api_key != settings.IOT_WEBHOOK_API_KEY:
+        logger.warning("iot_webhook_invalid_api_key")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+    return x_api_key
 
 
 @router.post("/iot/{project_id}", response_model=IoTWebhookResponse)
@@ -22,6 +41,7 @@ async def receive_iot_webhook(
     project_id: uuid.UUID,
     payload: Dict[str, Any],
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(_require_iot_api_key),
 ):
     # Validate project exists
     result = await db.execute(select(Project).where(Project.id == project_id))

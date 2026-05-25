@@ -1,18 +1,17 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api } from '../services/api'
-import type { User, TokenResponse } from '../types'
+import type { User } from '../types'
 
 interface AuthState {
   user: User | null
   accessToken: string | null
-  refreshToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
-  setTokens: (access: string, refresh: string) => void
+  setAccessToken: (access: string) => void
   setUser: (user: User | null) => void
   login: (email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   initialize: () => void
 }
 
@@ -21,26 +20,30 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: true,
 
-      setTokens: (access, refresh) => {
-        set({ accessToken: access, refreshToken: refresh, isAuthenticated: true })
+      setAccessToken: (access) => {
+        set({ accessToken: access, isAuthenticated: true })
       },
 
       setUser: (user) => set({ user }),
 
       login: async (email, password) => {
-        const res = await api.post<TokenResponse>('/auth/login', { email, password })
-        const { access_token, refresh_token } = res.data
-        set({ accessToken: access_token, refreshToken: refresh_token, isAuthenticated: true })
+        const res = await api.post('/auth/login', { email, password }, { withCredentials: true })
+        const { access_token } = res.data
+        set({ accessToken: access_token, isAuthenticated: true })
         const me = await api.get<User>('/users/me')
         set({ user: me.data, isLoading: false })
       },
 
-      logout: () => {
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, isLoading: false })
+      logout: async () => {
+        try {
+          await api.post('/auth/logout', {}, { withCredentials: true })
+        } catch {
+          // Ignore logout errors
+        }
+        set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false })
       },
 
       initialize: () => {
@@ -61,7 +64,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'cv-auth',
       partialize: (state) => ({
         accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
       }),
     }
   )
