@@ -8,61 +8,148 @@
   html {
     @apply antialiased;
   }
-  
+
   body {
     @apply font-sans text-surface-700 bg-surface-50 dark:bg-surface-950 dark:text-surface-300;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-  
+
   ::selection {
     @apply bg-primary-500/20 text-primary-700 dark:text-primary-300;
   }
 }
 
 @layer components {
+  /* ─── Glassmorphism Base ─────────────────────────────────────────────────── */
+
   .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/20 dark:bg-surface-900/80 dark:border-surface-700/30;
+    @apply bg-white/70 backdrop-blur-glass border border-white/30
+           dark:bg-surface-900/60 dark:border-white/10;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
-  
+
   .glass-strong {
-    @apply bg-white/95 backdrop-blur-2xl border border-surface-200/50 dark:bg-surface-900/95 dark:border-surface-700/40;
+    @apply bg-white/85 backdrop-blur-glass-lg border border-white/40
+           dark:bg-surface-900/80 dark:border-white/15;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
-  
+
+  .glass-dark {
+    @apply bg-surface-900/50 backdrop-blur-glass border border-white/10;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-dark-strong {
+    @apply bg-surface-900/70 backdrop-blur-glass-lg border border-white/15;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* ─── Cards ──────────────────────────────────────────────────────────────── */
+
   .card {
-    @apply bg-white rounded-2xl border border-surface-200/60 shadow-soft 
-           dark:bg-surface-900 dark:border-surface-800/60 dark:shadow-none
+    @apply bg-white rounded-2xl border border-surface-200/60 shadow-soft
+           dark:bg-surface-900/70 dark:border-surface-700/30 dark:shadow-none
            transition-all duration-300 ease-out;
   }
-  
+
+  .card-glass {
+    @apply rounded-2xl border transition-all duration-300 ease-out;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .card-glass {
+    background: rgba(15, 23, 42, 0.55);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .card-glass:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .dark .card-glass:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
   .card-hover {
     @apply card hover:shadow-soft-lg hover:border-primary-200/50 dark:hover:border-primary-800/30;
   }
-  
+
+  .card-hover-glass {
+    @apply card-glass;
+  }
+
+  .card-hover-glass:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .dark .card-hover-glass:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  /* ─── Buttons ────────────────────────────────────────────────────────────── */
+
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
            bg-primary-600 text-white font-medium rounded-xl
            hover:bg-primary-500 active:scale-[0.98]
            transition-all duration-200 ease-spring
            shadow-glow hover:shadow-glow-lg
            disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600;
   }
-  
+
+  .btn-glass {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           font-medium rounded-xl text-surface-700
+           active:scale-[0.98] transition-all duration-200 ease-spring;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .btn-glass {
+    @apply text-surface-200;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
            bg-surface-100 text-surface-700 font-medium rounded-xl
            hover:bg-surface-200 active:scale-[0.98]
            dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700
            transition-all duration-200 ease-spring;
   }
-  
+
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2
            text-surface-600 font-medium rounded-xl
            hover:bg-surface-100 active:scale-[0.98]
            dark:text-surface-400 dark:hover:bg-surface-800
            transition-all duration-200;
   }
-  
+
+  /* ─── Inputs ─────────────────────────────────────────────────────────────── */
+
   .input-modern {
     @apply w-full px-4 py-3 bg-surface-50 border border-surface-200 rounded-xl
            text-surface-900 placeholder:text-surface-400
@@ -71,73 +158,214 @@
            dark:placeholder:text-surface-500 dark:focus:border-primary-600
            transition-all duration-200;
   }
-  
+
+  .input-glass {
+    @apply w-full px-4 py-3 rounded-xl text-surface-900 placeholder:text-surface-400
+           focus:outline-none focus:ring-2 focus:ring-primary-500/30
+           dark:text-surface-100 dark:placeholder:text-surface-500
+           transition-all duration-200;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .input-glass:focus {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .input-glass {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .input-glass:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ─── Navigation ─────────────────────────────────────────────────────────── */
+
   .nav-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
            text-surface-500 hover:text-surface-900 hover:bg-surface-100/80
            dark:text-surface-400 dark:hover:text-surface-100 dark:hover:bg-surface-800/60
            transition-all duration-200;
   }
-  
+
   .nav-item-active {
     @apply nav-item text-primary-700 bg-primary-50/80 dark:text-primary-300 dark:bg-primary-950/40;
   }
-  
+
+  .nav-item-glass {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+           text-surface-600 hover:text-surface-900
+           dark:text-surface-300 dark:hover:text-surface-100
+           transition-all duration-200;
+  }
+
+  .nav-item-glass:hover {
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  .dark .nav-item-glass:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  /* ─── Layout & Surfaces ──────────────────────────────────────────────────── */
+
+  .sidebar-glass {
+    @apply backdrop-blur-glass-lg;
+    background: rgba(255, 255, 255, 0.75);
+    border-right: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04), inset -1px 0 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .sidebar-glass {
+    background: rgba(15, 23, 42, 0.7);
+    border-right-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2), inset -1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .header-glass {
+    @apply backdrop-blur-glass;
+    background: rgba(255, 255, 255, 0.65);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  .dark .header-glass {
+    background: rgba(15, 23, 42, 0.6);
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  /* ─── Ambient Background ─────────────────────────────────────────────────── */
+
+  .ambient-bg {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ambient-bg::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .dark .ambient-bg::before {
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(16, 185, 129, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 70%);
+  }
+
+  /* ─── Utility Classes ────────────────────────────────────────────────────── */
+
   .stat-card {
     @apply card-hover p-6;
   }
-  
+
+  .stat-card-glass {
+    @apply card-glass p-6;
+  }
+
   .page-title {
     @apply text-2xl font-bold tracking-tight text-surface-900 dark:text-surface-100;
   }
-  
+
   .section-title {
     @apply text-sm font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500;
   }
-  
+
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
-  
+
   .badge-green {
     @apply badge bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300;
   }
-  
+
   .badge-blue {
     @apply badge bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300;
   }
-  
+
   .badge-amber {
     @apply badge bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300;
   }
-  
+
   .badge-red {
     @apply badge bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300;
   }
-  
+
   .badge-slate {
     @apply badge bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400;
   }
-  
+
   .divider {
     @apply h-px bg-gradient-to-r from-transparent via-surface-200 to-transparent dark:via-surface-800;
   }
-  
+
+  .divider-glass {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  }
+
+  .dark .divider-glass {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  }
+
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: rgba(100,116,139,0.3) transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 5px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: rgba(100,116,139,0.3);
     border-radius: 20px;
+  }
+
+  /* ─── Depth & Z-Index Layers ─────────────────────────────────────────────── */
+
+  .depth-1 {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .depth-2 {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .depth-3 {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .depth-1 {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .dark .depth-2 {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .depth-3 {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
 }

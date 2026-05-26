@@ -29,12 +29,17 @@ const iconBgMap = {
 export default function StatCard({ title, value, icon, subtitle, trend, color = 'emerald', delay = 0 }: StatCardProps) {
   return (
     <div
-      className="stat-card relative overflow-hidden"
-      style={{ animationDelay: `${delay}ms` }}
+      className="stat-card-glass relative overflow-hidden"
+      style={{
+        animationDelay: `${delay}ms`,
+        background: 'rgba(255, 255, 255, 0.55)',
+        backdropFilter: 'blur(16px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+      }}
     >
       {/* Background gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${colorMap[color]} opacity-50`} />
-      
+      <div className={`absolute inset-0 bg-gradient-to-br ${colorMap[color]} opacity-40`} />
+
       <div className="relative">
         <div className="flex items-start justify-between mb-4">
           <div className={`p-2.5 rounded-xl ${iconBgMap[color]}`}>

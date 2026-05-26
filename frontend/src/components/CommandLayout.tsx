@@ -44,20 +44,18 @@ export default function CommandLayout() {
   const currentLabel = navItems.find((n) => location.pathname.startsWith(n.to))?.label || 'Command Center'
 
   return (
-    <div className="flex h-screen bg-surface-50 dark:bg-surface-950">
+    <div className="flex h-screen bg-surface-50 dark:bg-surface-950 ambient-bg">
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-surface-950/20 backdrop-blur-sm lg:hidden animate-fade-in" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col
-          bg-white/95 dark:bg-surface-900/95 backdrop-blur-xl
-          border-r border-surface-200/60 dark:border-surface-800/40
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col sidebar-glass
           transition-transform duration-300 ease-spring lg:static lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex items-center justify-between px-5 h-16 border-b border-surface-100 dark:border-surface-800/50">
+        <div className="flex items-center justify-between px-5 h-16 border-b border-surface-100/50 dark:border-surface-800/30">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
               <Bot className="w-5 h-5 text-white" />
@@ -83,8 +81,8 @@ export default function CommandLayout() {
           </Link>
         </div>
 
-        <div className="px-3 py-3">
-          <div className="flex items-center rounded-xl bg-surface-100/80 dark:bg-surface-800/50 px-3.5 py-2.5">
+        <div className="px-3 py-3 relative z-10">
+          <div className="flex items-center rounded-xl bg-surface-100/60 dark:bg-surface-800/40 backdrop-blur-sm px-3.5 py-2.5">
             <Search className="h-4 w-4 text-surface-400" />
             <input
               type="text"
@@ -101,7 +99,7 @@ export default function CommandLayout() {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 space-y-0.5">
+        <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 space-y-0.5 relative z-10">
           {navItems.map((item) => {
             const active = location.pathname.startsWith(item.to)
             return (
@@ -123,7 +121,7 @@ export default function CommandLayout() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-surface-100 dark:border-surface-800/50">
+        <div className="p-3 border-t border-surface-100/50 dark:border-surface-800/30 relative z-10">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs">
               <p className="font-semibold text-surface-700 dark:text-surface-200">{user?.name || 'Operator'}</p>
@@ -149,7 +147,7 @@ export default function CommandLayout() {
 
       {/* Main content */}
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        <header className="flex h-14 items-center justify-between border-b border-surface-200/60 dark:border-surface-800/40 bg-white/50 dark:bg-surface-950/50 backdrop-blur-sm px-4 lg:px-6">
+        <header className="flex h-14 items-center justify-between header-glass px-4 lg:px-6 z-20">
           <div className="flex items-center">
             <button onClick={() => setSidebarOpen(true)} aria-label="Open sidebar" className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
               <Menu className="h-5 w-5" />

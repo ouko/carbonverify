@@ -134,7 +134,7 @@ export default function DashboardPage() {
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Projects Bar Chart */}
-        <div className="lg:col-span-3 card p-6">
+        <div className="lg:col-span-3 card-glass p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-base font-semibold text-surface-900 dark:text-surface-100">Projects by Status</h3>
@@ -185,7 +185,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Emissions Trend */}
-        <div className="lg:col-span-2 card p-6">
+        <div className="lg:col-span-2 card-glass p-6">
           <div className="mb-6">
             <h3 className="text-base font-semibold text-surface-900 dark:text-surface-100">Emissions Trend</h3>
             <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">tCO2e reduced per month</p>
@@ -247,7 +247,7 @@ export default function DashboardPage() {
           <button
             key={action.label}
             onClick={() => navigate(action.to)}
-            className="card-hover p-5 text-left group"
+            className="card-hover-glass p-5 text-left group"
             style={{ animationDelay: `${400 + i * 100}ms` }}
           >
             <action.icon className="w-5 h-5 text-primary-500 mb-3 group-hover:scale-110 transition-transform duration-300" />

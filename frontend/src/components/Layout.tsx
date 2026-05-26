@@ -71,7 +71,7 @@ export default function Layout() {
   const { isDark, toggle } = useThemeStore()
 
   return (
-    <div className="flex h-screen bg-surface-50 dark:bg-surface-950">
+    <div className="flex h-screen bg-surface-50 dark:bg-surface-950 ambient-bg">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -82,14 +82,12 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col 
-          bg-white/95 dark:bg-surface-900/95 backdrop-blur-xl
-          border-r border-surface-200/60 dark:border-surface-800/40
+        className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col sidebar-glass
           transition-transform duration-300 ease-spring lg:static lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-surface-100 dark:border-surface-800/50">
+        <div className="flex items-center gap-3 px-5 h-16 border-b border-surface-100/50 dark:border-surface-800/30">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500 text-white">
             <Leaf className="w-5 h-5" />
           </div>
@@ -106,7 +104,7 @@ export default function Layout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
+        <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6 relative z-10">
           {navGroups.map((group) => (
             <div key={group.label}>
               <div className="section-title px-3 mb-2">{group.label}</div>
@@ -131,7 +129,7 @@ export default function Layout() {
         </nav>
 
         {/* Bottom actions */}
-        <div className="p-3 border-t border-surface-100 dark:border-surface-800/50">
+        <div className="p-3 border-t border-surface-100/50 dark:border-surface-800/30 relative z-10">
           <div className="flex items-center gap-2 mb-2 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-700 dark:text-primary-300 text-sm font-semibold">
               {user?.name?.charAt(0) || 'U'}
@@ -168,7 +166,7 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="flex items-center h-16 px-4 lg:px-8 border-b border-surface-200/60 dark:border-surface-800/40 bg-white/50 dark:bg-surface-950/50 backdrop-blur-sm">
+        <header className="flex items-center h-16 px-4 lg:px-8 header-glass z-20">
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Open sidebar"
