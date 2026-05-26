@@ -162,16 +162,9 @@ def _scrape_cdm_with_playwright(country: str) -> List[Dict[str, Any]]:
     logger.info("cdm_playwright_scrape_start", country=country)
 
     try:
+        from app.services.lead_intelligence.playwright_utils import _new_stealth_page
         browser = _get_or_launch_browser(headless=False)
-        context = browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-            ),
-        )
-        page = context.new_page()
-        Stealth().apply_stealth_sync(page)
+        page = _new_stealth_page(browser)
 
         page.goto(
             "https://cdm.unfccc.int/Projects/projsearch.html",
@@ -215,9 +208,7 @@ class CDMScraper(BaseRegistryScraper):
             from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
 
             browser = _get_or_launch_browser(headless=False)
-            context = browser.new_context(viewport={"width": 1920, "height": 1080})
-            page = context.new_page()
-            Stealth().apply_stealth_sync(page)
+            page = _new_stealth_page(browser)
             page.goto(
                 "https://cdm.unfccc.int/Projects/projsearch.html",
                 timeout=30000,

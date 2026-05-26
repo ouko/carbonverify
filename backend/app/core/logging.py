@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 # Log retention: maximum log level for production to control volume
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+# NOTE: Use configure_logging() to read from Settings, not os.getenv directly.
 
 # Sensitive fields that should never be logged
 SENSITIVE_FIELDS = {
@@ -161,7 +161,10 @@ def configure_logging() -> None:
     root_logger = logging.getLogger()
     root_logger.handlers = []
     root_logger.addHandler(handler)
-    root_logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    from app.config import get_settings
+    settings = get_settings()
+    level = settings.LOG_LEVEL.upper() if hasattr(settings, "LOG_LEVEL") else "INFO"
+    root_logger.setLevel(getattr(logging, level, logging.INFO))
 
     # Reduce noise from third-party libraries
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

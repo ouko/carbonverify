@@ -28,9 +28,12 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["whatsapp"])
 limiter = Limiter(key_func=get_remote_address)
 
-VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN")
-if not VERIFY_TOKEN:
-    raise RuntimeError("WHATSAPP_VERIFY_TOKEN environment variable is required")
+from app.config import get_settings
+
+_settings = get_settings()
+_VERIFY_TOKEN = _settings.WHATSAPP_VERIFY_TOKEN
+if not _VERIFY_TOKEN:
+    logger.warning("whatsapp_verify_token_not_set", message="WHATSAPP_VERIFY_TOKEN is not configured. Webhook verification will fail.")
 
 
 # ─── Meta Webhook Endpoints ───────────────────────────────────────────────────
@@ -45,7 +48,7 @@ async def whatsapp_webhook_verify(
 ):
     """Verify webhook subscription with Meta."""
     api = get_whatsapp_api()
-    result = await api.verify_webhook(hub_mode, hub_verify_token, hub_challenge, VERIFY_TOKEN)
+    result = await api.verify_webhook(hub_mode, hub_verify_token, hub_challenge, _VERIFY_TOKEN)
     if result:
         logger.info("whatsapp_webhook_verified")
         return PlainTextResponse(content=result)

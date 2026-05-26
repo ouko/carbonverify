@@ -64,10 +64,14 @@ sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
 sqlite3.register_converter("uuid", lambda s: uuid.UUID(s.decode() if isinstance(s, bytes) else s))
 
 
+from app.core.encryption import compute_searchable_hash
+
 def _create_mock_user(role: UserRoleEnum = UserRoleEnum.admin, suffix: str = ""):
+    email = f"test{suffix}@carbonverify.io"
     user = User(
         id=uuid.uuid4(),
-        email=f"test{suffix}@carbonverify.io",
+        email=email,
+        email_hash=compute_searchable_hash(email),
         name="Test User",
         role=role,
         mfa_enabled=False,
@@ -130,7 +134,7 @@ async def authenticated_client(engine):
     async def override_get_current_user():
         async with async_session() as session:
             result = await session.execute(
-                __import__("sqlalchemy").select(User).where(User.email.like("test%@carbonverify.io")).order_by(User.created_at.desc())
+                __import__("sqlalchemy").select(User).where(User.id == mock_user.id)
             )
             return result.scalar_one()
 

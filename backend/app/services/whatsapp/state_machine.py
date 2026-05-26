@@ -26,7 +26,14 @@ class ConversationStateManager:
 
     def _get_redis(self) -> redis.Redis:
         if self._redis is None:
-            self._redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
+            self._redis = redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_keepalive=True,
+                health_check_interval=30,
+                retry_on_timeout=True,
+            )
         return self._redis
 
     def get_conversation_key(self, phone_number: str) -> str:

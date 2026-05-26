@@ -1,4 +1,6 @@
 from celery import Celery
+from celery.signals import worker_process_shutdown, worker_shutdown
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -21,6 +23,9 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
+    # Worker observability
+    worker_send_task_events=True,
+    worker_enable_remote_control=True,
     # Dead Letter Queue for failed tasks
     task_routes={
         "app.tasks.jobs.*": {"queue": "default"},
@@ -73,3 +78,15 @@ celery_app.conf.broker_transport_options = {
     "sep": ":",
     "queue_order_strategy": "priority",
 }
+
+
+@worker_process_shutdown.connect
+@worker_shutdown.connect
+def _on_worker_shutdown(signal=None, sender=None, **kwargs):
+    """Graceful shutdown: close persistent Playwright browser and clean up resources."""
+    from app.services.lead_intelligence.playwright_utils import close_persistent_browser
+    from app.core.logging import get_logger
+
+    logger = get_logger(__name__)
+    logger.info("celery_worker_shutdown", signal=signal, sender=str(sender))
+    close_persistent_browser()

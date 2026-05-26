@@ -1,6 +1,8 @@
 """Field-level encryption for PII using Fernet (symmetric AES-128-CBC + HMAC)."""
 
 import base64
+import hashlib
+import hmac
 from typing import Optional
 from cryptography.fernet import Fernet
 from app.config import get_settings
@@ -8,6 +10,20 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 settings = get_settings()
+
+
+def compute_searchable_hash(value: str, key_hex: Optional[str] = None) -> str:
+    """Create a deterministic HMAC-SHA256 hash for searchable encrypted fields.
+
+    This allows exact-match lookups on encrypted columns without exposing
+    the plaintext. Uses the same key as field encryption for simplicity.
+    """
+    raw_key = key_hex or settings.ENCRYPTION_KEY_HEX
+    if not raw_key:
+        # Fallback: return raw SHA-256 (deterministic but not keyed)
+        return hashlib.sha256(value.lower().encode("utf-8")).hexdigest()
+    key_bytes = bytes.fromhex(raw_key)
+    return hmac.new(key_bytes, value.lower().encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 class FieldEncryption:

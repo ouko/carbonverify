@@ -13,6 +13,7 @@ from app.services.file_detector import detect_file_type, compute_sha256, generat
 from app.services.s3 import upload_bytes
 from app.services.provenance import build_full_provenance
 from app.tasks.jobs import process_uploaded_file
+from app.services.clamav_scanner import get_scanner, ScanStatus
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -67,6 +68,13 @@ async def upload_file(
             raise HTTPException(status_code=400, detail="Could not determine file type")
     else:
         detected_type_str = detected_type.value
+
+    # Virus scan
+    scanner = get_scanner()
+    scan_result = await scanner.scan_buffer(file_bytes)
+    if scan_result.status == ScanStatus.infected:
+        logger.warning("upload_rejected_malware", filename=filename, signature=scan_result.signature)
+        raise HTTPException(status_code=400, detail=f"File rejected: malware detected ({scan_result.signature})")
 
     # Compute hash
     file_hash = compute_sha256(file_bytes)

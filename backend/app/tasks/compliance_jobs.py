@@ -36,29 +36,33 @@ def process_erasure_request(self, dsr_id: str):
     6. Mark DSR as completed
     """
     import asyncio
-    asyncio.run(_async_process_erasure(dsr_id))
+    try:
+        asyncio.run(_async_process_erasure(dsr_id))
+    except Exception as exc:
+        logger.error("erasure_failed", dsr_id=dsr_id, error=str(exc))
+        raise self.retry(exc=exc, countdown=60)
 
 
 async def _async_process_erasure(dsr_id: str):
     async with AsyncSessionLocal() as db:
+        # Fetch DSR
+        result = await db.execute(
+            select(DataSubjectRequest).where(DataSubjectRequest.id == uuid.UUID(dsr_id))
+        )
+        dsr = result.scalar_one_or_none()
+        if not dsr:
+            logger.error("erasure_dsr_not_found", dsr_id=dsr_id)
+            return
+
+        dsr.status = DSRStatusEnum.in_progress
+        await db.commit()
+
+        subject_id = dsr.subject_id
+        subject_type = dsr.subject_type
+
+        logger.info("erasure_started", dsr_id=dsr_id, subject_id=subject_id, subject_type=subject_type)
+
         try:
-            # Fetch DSR
-            result = await db.execute(
-                select(DataSubjectRequest).where(DataSubjectRequest.id == uuid.UUID(dsr_id))
-            )
-            dsr = result.scalar_one_or_none()
-            if not dsr:
-                logger.error("erasure_dsr_not_found", dsr_id=dsr_id)
-                return
-
-            dsr.status = DSRStatusEnum.in_progress
-            await db.commit()
-
-            subject_id = dsr.subject_id
-            subject_type = dsr.subject_type
-
-            logger.info("erasure_started", dsr_id=dsr_id, subject_id=subject_id, subject_type=subject_type)
-
             # Delete/redact based on subject type
             if subject_type == "enumerator":
                 await _erase_enumerator(db, subject_id)
@@ -75,13 +79,12 @@ async def _async_process_erasure(dsr_id: str):
             await db.commit()
 
             logger.info("erasure_completed", dsr_id=dsr_id)
-
         except Exception as exc:
             logger.error("erasure_failed", dsr_id=dsr_id, error=str(exc))
             dsr.status = DSRStatusEnum.rejected
             dsr.details = {**(dsr.details or {}), "error": str(exc)}
             await db.commit()
-            raise self.retry(exc=exc, countdown=60)
+            raise
 
 
 async def _erase_enumerator(db: AsyncSession, subject_id: str):
@@ -102,24 +105,45 @@ async def _erase_enumerator(db: AsyncSession, subject_id: str):
 
 
 async def _erase_household(db: AsyncSession, subject_id: str):
-    """Erase household survey data."""
-    await db.execute(
-        delete(SurveyResponse).where(SurveyResponse.household_id == subject_id)
-    )
+    """Erase household survey data.
+
+    NOTE: household_id is encrypted with non-deterministic Fernet, so exact-match
+    SQL queries don't work. We load all responses and filter in Python.
+    For production scale, add a household_id_hash column for searchable lookup.
+    """
+    result = await db.execute(select(SurveyResponse).limit(1000))
+    responses = result.scalars().all()
+    deleted = 0
+    for response in responses:
+        if response.household_id == subject_id:
+            await db.delete(response)
+            deleted += 1
     await db.commit()
-    logger.info("erasure_household", household_id=subject_id)
+    if len(responses) >= 1000:
+        logger.warning("erasure_household_batch_limit", household_id=subject_id, hint="Add household_id_hash for scalable lookup")
+    logger.info("erasure_household", household_id=subject_id, deleted=deleted)
 
 
 async def _erase_developer(db: AsyncSession, subject_id: str):
-    """Erase developer contact info from leads."""
+    """Erase developer contact info from leads.
+
+    NOTE: developer_email is encrypted with non-deterministic Fernet, so exact-match
+    SQL queries don't work. We load all leads and filter in Python.
+    For production scale, add a developer_email_hash column for searchable lookup.
+    """
     # Anonymize lead developer info instead of deleting (leads are business records)
-    result = await db.execute(select(Lead).where(Lead.developer_email == subject_id))
+    result = await db.execute(select(Lead).limit(1000))
     leads = result.scalars().all()
+    anonymized = 0
     for lead in leads:
-        lead.developer_contact = None
-        lead.developer_email = None
+        if lead.developer_email == subject_id:
+            lead.developer_contact = None
+            lead.developer_email = None
+            anonymized += 1
     await db.commit()
-    logger.info("erasure_developer", developer_email=subject_id, leads_anonymized=len(leads))
+    if len(leads) >= 1000:
+        logger.warning("erasure_developer_batch_limit", developer_email=subject_id, hint="Add developer_email_hash for scalable lookup")
+    logger.info("erasure_developer", developer_email=subject_id, leads_anonymized=anonymized)
 
 
 async def _erase_user(db: AsyncSession, subject_id: str):

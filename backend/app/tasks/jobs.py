@@ -160,6 +160,17 @@ def process_uploaded_file(self, upload_id: str):
                 await db.commit()
                 return {"error": "s3 download failed"}
 
+            # Virus scan (defense in depth: scan again after S3 retrieval)
+            from app.services.clamav_scanner import get_scanner, ScanStatus
+            scanner = get_scanner()
+            scan_result = await scanner.scan_buffer(file_bytes)
+            if scan_result.status == ScanStatus.infected:
+                logger.warning("processing_rejected_malware", upload_id=upload_id, signature=scan_result.signature)
+                upload.status = FileUploadStatusEnum.failed
+                upload.validation_errors = [f"Malware detected: {scan_result.signature}"]
+                await db.commit()
+                return {"error": "malware detected"}
+
             detected_type = upload.detected_type.value
             processing_result = None
 

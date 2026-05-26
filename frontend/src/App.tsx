@@ -6,16 +6,18 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import ProjectsPage from './pages/ProjectsPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
-import ProjectCreatePage from './pages/ProjectCreatePage';
-import DataSourcesPage from './pages/DataSourcesPage';
-import CalculationsPage from './pages/CalculationsPage';
-import ReportsPage from './pages/ReportsPage';
-import ReviewQueuePage from './pages/ReviewQueuePage';
 
-// Lazy load heavy pages for code-splitting
+// Core dashboard pages (eager — visited on every login)
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.default })));
+
+// Lazy load all other pages for code-splitting
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ default: m.default })));
+const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.default })));
+const ProjectCreatePage = lazy(() => import('./pages/ProjectCreatePage').then(m => ({ default: m.default })));
+const DataSourcesPage = lazy(() => import('./pages/DataSourcesPage').then(m => ({ default: m.default })));
+const CalculationsPage = lazy(() => import('./pages/CalculationsPage').then(m => ({ default: m.default })));
+const ReportsPage = lazy(() => import('./pages/ReportsPage').then(m => ({ default: m.default })));
+const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then(m => ({ default: m.default })));
 const FieldDashboardPage = lazy(() => import('./pages/FieldDashboardPage').then(m => ({ default: m.FieldDashboardPage })));
 const SecuritySettingsPage = lazy(() => import('./pages/SecuritySettingsPage').then(m => ({ default: m.SecuritySettingsPage })));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
@@ -43,14 +45,14 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/projects/new" element={<ProjectCreatePage />} />
-                <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                <Route path="/data-sources" element={<DataSourcesPage />} />
-                <Route path="/calculations" element={<CalculationsPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/review-queue" element={<ReviewQueuePage />} />
+                <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><DashboardPage /></Suspense>} />
+                <Route path="/projects" element={<Suspense fallback={<LoadingSpinner />}><ProjectsPage /></Suspense>} />
+                <Route path="/projects/new" element={<Suspense fallback={<LoadingSpinner />}><ProjectCreatePage /></Suspense>} />
+                <Route path="/projects/:id" element={<Suspense fallback={<LoadingSpinner />}><ProjectDetailPage /></Suspense>} />
+                <Route path="/data-sources" element={<Suspense fallback={<LoadingSpinner />}><DataSourcesPage /></Suspense>} />
+                <Route path="/calculations" element={<Suspense fallback={<LoadingSpinner />}><CalculationsPage /></Suspense>} />
+                <Route path="/reports" element={<Suspense fallback={<LoadingSpinner />}><ReportsPage /></Suspense>} />
+                <Route path="/review-queue" element={<Suspense fallback={<LoadingSpinner />}><ReviewQueuePage /></Suspense>} />
                 <Route path="/field" element={<Suspense fallback={<LoadingSpinner />}><FieldDashboardPage /></Suspense>} />
                 <Route path="/security" element={<Suspense fallback={<LoadingSpinner />}><SecuritySettingsPage /></Suspense>} />
                 <Route path="/audit" element={<Suspense fallback={<LoadingSpinner />}><AuditLogPage /></Suspense>} />

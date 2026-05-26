@@ -121,13 +121,9 @@ def _scrape_gold_standard_with_playwright(country: str) -> List[Dict[str, Any]]:
     leads = []
 
     try:
+        from app.services.lead_intelligence.playwright_utils import _new_stealth_page
         browser = _get_or_launch_browser(headless=False)
-        context = browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            user_agent=DEFAULT_HEADERS["User-Agent"],
-        )
-        page = context.new_page()
-        Stealth().apply_stealth_sync(page)
+        page = _new_stealth_page(browser)
 
         page.goto(
             "https://registry.goldstandard.org/projects",
@@ -252,9 +248,7 @@ class GoldStandardScraper(BaseRegistryScraper):
             from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
 
             browser = _get_or_launch_browser(headless=False)
-            context = browser.new_context(viewport={"width": 1920, "height": 1080})
-            page = context.new_page()
-            Stealth().apply_stealth_sync(page)
+            page = _new_stealth_page(browser)
             page.goto(
                 "https://registry.goldstandard.org/projects",
                 timeout=20000,

@@ -207,10 +207,12 @@ class User(Base):
     __table_args__ = (
         Index("ix_users_role", "role"),
         Index("ix_users_created_at", "created_at"),
+        Index("ix_users_email_hash", "email_hash"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(EncryptedString(255), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
+    email_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRoleEnum] = mapped_column(Enum(UserRoleEnum, name="user_role"), nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)

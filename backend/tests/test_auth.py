@@ -6,13 +6,16 @@ from datetime import datetime, timezone, timedelta
 
 from app.models import User, UserRoleEnum
 from app.auth.security import get_password_hash
+from app.core.encryption import compute_searchable_hash
 from sqlalchemy import select
 
 
 @pytest_asyncio.fixture
 async def test_user(db_session):
+    email = "test@carbonverify.io"
     user = User(
-        email="test@carbonverify.io",
+        email=email,
+        email_hash=compute_searchable_hash(email),
         name="Test User",
         role=UserRoleEnum.admin,
         mfa_enabled=False,

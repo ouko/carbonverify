@@ -7,6 +7,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
+from app.core.encryption import compute_searchable_hash
 from app.database import get_db
 from app.models import User, RefreshToken
 from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest
@@ -89,13 +90,15 @@ async def register(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(User).where(User.email == payload.email))
+    email_hash = compute_searchable_hash(payload.email)
+    result = await db.execute(select(User).where(User.email_hash == email_hash))
     existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
         email=payload.email,
+        email_hash=email_hash,
         name=payload.name,
         role=payload.role,
         mfa_enabled=payload.mfa_enabled,
@@ -132,7 +135,8 @@ async def login(
     If MFA is required and enabled, returns mfa_required=True with a temp token.
     Otherwise, returns full access token and sets refresh token as httpOnly cookie.
     """
-    result = await db.execute(select(User).where(User.email == payload.email))
+    email_hash = compute_searchable_hash(payload.email)
+    result = await db.execute(select(User).where(User.email_hash == email_hash))
     user = result.scalar_one_or_none()
 
     audit = AuditLogger(db)

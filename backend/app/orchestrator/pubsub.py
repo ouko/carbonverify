@@ -34,11 +34,34 @@ class AgentPubSub:
 
     async def connect(self):
         if self._redis is None:
-            self._redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
-            self._pubsub = self._redis.pubsub()
-            await self._pubsub.subscribe("orchestrator:events", "agent:results")
-            logger.info("redis_pubsub_connected")
-            asyncio.create_task(self._listen_loop())
+            try:
+                self._redis = redis.from_url(
+                    settings.REDIS_URL,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_keepalive=True,
+                    health_check_interval=30,
+                    retry_on_timeout=True,
+                )
+                self._pubsub = self._redis.pubsub()
+                await self._pubsub.subscribe("orchestrator:events", "agent:results")
+                logger.info("redis_pubsub_connected")
+                task = asyncio.create_task(self._listen_loop())
+                task.add_done_callback(self._on_listen_done)
+            except Exception as exc:
+                logger.error("redis_pubsub_connect_failed", error=str(exc))
+                self._redis = None
+                self._pubsub = None
+                raise
+
+    def _on_listen_done(self, task: asyncio.Task):
+        """Log unhandled exceptions from the listen loop."""
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            logger.error("redis_pubsub_listen_error", error=str(exc))
 
     async def disconnect(self):
         if self._pubsub:

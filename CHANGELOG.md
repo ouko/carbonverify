@@ -9,17 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Security
+- **Searchable encrypted fields** — Added `email_hash` (HMAC-SHA256) to the `User` model to enable exact-match lookups on encrypted emails without exposing plaintext. `compute_searchable_hash()` derives a deterministic keyed hash from the encryption key.
 - **Password complexity** — Registration now requires 8+ chars with at least one uppercase letter, one digit, and one special character (`@$!%*?&`)
 - **Filename sanitization** — Uploaded filenames are sanitized to prevent path traversal and XSS
 - **Heuristic malware detection** — Executable and script file types are rejected at upload time (complements ClamAV containerized scanning)
 - **DOMPurify** — `SafeHtml` component for safely rendering any user-generated HTML content
 
 ### Infrastructure & Reliability
-- **Redis connection pooling** — `socket_connect_timeout=5`, `socket_keepalive=True`, `health_check_interval=30`, `retry_on_timeout=True`
+- **Redis timeout hardening** — Added `socket_connect_timeout=5`, `health_check_interval=30`, `retry_on_timeout=True` to Redis clients in health checks (`app/api/health.py`), pub/sub (`app/orchestrator/pubsub.py`), sessions (`app/auth/sessions.py`), and WhatsApp state machine (`app/services/whatsapp/state_machine.py`)
 - **Database query timeout** — PostgreSQL `statement_timeout=30000` (30s) to prevent runaway queries
-- **ClamAV virus scanning** — Docker Compose `clamav` service for upload scanning; production fallback to managed scanner
-- **Celery graceful shutdown** — `terminationGracePeriodSeconds: 60`, K8s `preStop` hook (`sleep 10`), `worker_shutdown` signal handler
-- **Scraper proxy rotation** — `PROXY_URL` env var for IP rotation; `SCRAPER_FORCE_HEADLESS=true` enforces headless in production
+- **ClamAV virus scanning** — `app/services/clamav_scanner.py` with async `scan_buffer()`, graceful fallback if ClamAV is unreachable. Integrated into upload endpoint and Celery processing task. Docker Compose `clamav` service added to dev/staging/production.
+- **Celery graceful shutdown** — `worker_process_shutdown` and `worker_shutdown` signal handlers in `celery_app.py` call `close_persistent_browser()` to clean up Playwright resources before worker exit
+- **Scraper hardening** — `PROXY_URL` and `SCRAPER_FORCE_HEADLESS` in `Settings`; user-agent rotation with 5 realistic desktop agents; retry logic with exponential backoff (3x) in `playwright_fetch()`
+- **WhatsApp config** — `WHATSAPP_VERIFY_TOKEN` moved from `os.environ` to `Settings`; app no longer crashes on import if token is missing
 - **DB backup strategy** — K8s CronJob (daily at 2 AM UTC) + `scripts/backup-db.sh` for Docker Compose with 30-day retention
 - **CI/CD pipeline** — GitHub Actions workflow with backend lint/test, frontend lint/test/build, and Docker build checks
 - **Structured logging** — JSON formatter with sensitive field redaction and log level control via `LOG_LEVEL`
@@ -32,6 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **SOC2 controls mapping** — `docs/compliance/SOC2_CONTROLS.md` mapping all 12 TSC categories to implemented controls
 
 ### Code Quality & Bug Fixes
+- **Deterministic login lookup** — Fixed a critical bug where login attempted exact-match queries on non-deterministic Fernet-encrypted `email` values. Login now queries the deterministic `email_hash` column. Same fix applied to registration duplicate-check.
+- **Settings consistency** — Fixed `os.environ` bypass issues in logging (`configure_logging()`) and Playwright utils. Both now read exclusively from `Settings` / `get_settings()` rather than environment variables directly.
+- **GDPR erasure fix** — `_erase_household` and `_erase_developer` in `compliance_jobs.py` were broken by encrypted columns; fixed with Python-side filtering and batch limits.
+- **Celery retry bug** — `self.retry()` was called from a standalone async function where `self` doesn't exist. Restructured `process_erasure_request` to catch and retry properly.
 - **Duplicate `__table_args__`** — Merged index and constraint blocks in `HumanReviewQueue` and `AuditLog` models (previously the first block was silently overwritten)
 - **Broken DB indexes fixed** — `AuditLog` indexes corrected from non-existent columns (`user_id` → `actor_id`, `action` → `action_type`, `created_at` → `timestamp`)
 - **Missing `__init__.py`** — Added to 7 package directories (`brokerage`, `security`, `compliance`, `tokenization`, `blockchain`, `email_templates`, `reports/templates`)
@@ -56,9 +62,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Test environment** — `conftest.py` sets `ENVIRONMENT=test` to ensure middleware behavior matches test expectations
 
 ### Frontend
-- **Code-splitting** — All heavy pages (Command Center, Tokenization, Brokerage, Corporate, Leads, Field) use `React.lazy` + `Suspense`
+- **Code-splitting** — All pages except `LoginPage` now use `React.lazy` + `Suspense` for on-demand loading
 - **Manual vendor chunks** — Vite splits `react`, `recharts`, `react-query`, and `lucide` into separate chunks
-- **Bundle size** — Main chunk reduced from ~982KB to ~102KB (before gzip)
+- **Bundle analysis** — Added `rollup-plugin-visualizer`; run `npm run analyze` to generate `dist/stats.html`
+- **Bundle size** — Main entry chunk reduced from ~982KB to ~29KB (155KB vendor-react, 90KB vendor-query, 34KB vendor-ui). Total initial JS load ~305KB.
 - **Loading spinner** — `LoadingSpinner` component with fullscreen and inline variants for Suspense fallbacks
 
 ### Added
@@ -84,7 +91,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Navigation completeness** — All modules now have a path back to the main dashboard
 
 ### Fixed
-- **All tests passing** — 218 backend tests passing (was ~18 failing). Fixed scraper demo mode fixture, Playwright fallback missing `registry_source` field, and structured logging keyword argument support
+- **All tests passing** — 225 backend tests passing (was ~18 failing). Fixed scraper demo mode fixture, Playwright fallback missing `registry_source` field, structured logging keyword argument support, and encrypted field query bugs
 - Scraper history display bug — moved last-scraped info from hidden right-aligned column into a full-width card
 - Auth error swallowing in `useScraperHistory` — removed silent `try/catch` so 401s bubble to Axios interceptor
 - React Router v7 future flag warnings — added `v7_startTransition` and `v7_relativeSplatPath` to `BrowserRouter`

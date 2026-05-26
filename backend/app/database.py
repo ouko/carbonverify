@@ -30,8 +30,7 @@ if settings.DATABASE_URL.startswith("postgresql"):
         "pool_recycle": 3600,
         "pool_pre_ping": True,
         "connect_args": {
-            "server_settings": {"jit": "off"},
-            "options": "-c statement_timeout=30000",
+            "server_settings": {"jit": "off", "statement_timeout": "30000"},
         },
     })
     engine: AsyncEngine = create_async_engine(

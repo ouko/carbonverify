@@ -120,6 +120,7 @@ docker-compose up --build
 | FastAPI | `cv-app` | 8000 | REST API |
 | Celery Worker | `cv-celery-worker` | — | Async task processing |
 | Celery Beat | `cv-celery-beat` | — | Scheduled tasks |
+| ClamAV | `cv-clamav` | — | Virus scanning for uploads |
 | Frontend | `cv-frontend` | 5173 | Vite dev server |
 
 ### Local Backend Development
@@ -456,6 +457,13 @@ See `.env.example` for all required variables. Key ones:
 | `S3_BUCKET_NAME` | File storage bucket |
 | `ENVIRONMENT` | `development` or `production` |
 | `LEAD_SCRAPER_MODE` | `live` or `demo` (controls scraper behavior) |
+| `WHATSAPP_VERIFY_TOKEN` | Meta webhook verification token for WhatsApp bot |
+| `PROXY_URL` | HTTP proxy for scraper IP rotation |
+| `SCRAPER_FORCE_HEADLESS` | `true` to force headless Playwright in production |
+| `SCRAPER_USER_AGENTS` | Comma-separated custom user agents for scraper rotation |
+| `CLAMAV_HOST` | ClamAV daemon hostname (e.g., `clamav`) |
+| `CLAMAV_PORT` | ClamAV daemon TCP port (default `3310`) |
+| `CLAMAV_SOCKET_PATH` | Unix socket path for ClamAV (alternative to host/port) |
 
 ---
 

@@ -146,6 +146,8 @@ After both are deployed:
 3. Start Command: `celery -A app.tasks.celery_app worker --loglevel=info`
 4. Same environment variables as backend
 
+> **Graceful shutdown:** The app registers `worker_shutdown` signal handlers to close the persistent Playwright browser. Ensure your platform allows at least 10–15 seconds for cleanup before force-terminating the worker process.
+
 ### Cron Job (Scheduled Tasks)
 
 1. Create **Cron Job** on Render
@@ -209,9 +211,11 @@ Use **Traefik** or **Caddy** as reverse proxy with automatic HTTPS.
 - [ ] `SECRET_KEY` is at least 32 random characters
 - [ ] `ENCRYPTION_KEY_HEX` is a 64-character hex string (32 bytes)
 - [ ] `IOT_WEBHOOK_API_KEY` is a secure random token
+- [ ] `WHATSAPP_VERIFY_TOKEN` is set (if using WhatsApp bot)
 - [ ] HTTPS enforced (handled by platform or reverse proxy)
 - [ ] CORS `FRONTEND_URL` matches your actual domain
 - [ ] `ENVIRONMENT=production` set
+- [ ] `CLAMAV_HOST` / `CLAMAV_PORT` or `CLAMAV_SOCKET_PATH` configured (if using containerized scanning)
 
 ### Database
 - [ ] PostgreSQL 15+ running and accessible
@@ -263,7 +267,14 @@ Use **Traefik** or **Caddy** as reverse proxy with automatic HTTPS.
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `ENCRYPTION_KEY_HEX` | `0000...` (64 hex chars) | PII encryption |
 | `IOT_WEBHOOK_API_KEY` | `secure_token...` | IoT device auth |
+| `WHATSAPP_VERIFY_TOKEN` | `verify_...` | Meta WhatsApp webhook verify token |
 | `KIMI_API_KEY` | `sk-...` | Moonshot AI (optional) |
+| `PROXY_URL` | `http://proxy:8080` | HTTP proxy for scrapers (optional) |
+| `SCRAPER_FORCE_HEADLESS` | `true` | Force Playwright headless mode |
+| `SCRAPER_USER_AGENTS` | `Mozilla/5.0...,Mozilla/5.0...` | Comma-separated UA rotation list |
+| `CLAMAV_HOST` | `clamav` | ClamAV daemon hostname |
+| `CLAMAV_PORT` | `3310` | ClamAV daemon port |
+| `CLAMAV_SOCKET_PATH` | `/tmp/clamd.socket` | ClamAV Unix socket (alt to TCP) |
 | `CELERY_BROKER_URL` | `redis://...` | Celery queue |
 | `CELERY_RESULT_BACKEND` | `redis://...` | Celery results |
 
@@ -294,3 +305,4 @@ Use **Traefik** or **Caddy** as reverse proxy with automatic HTTPS.
 - Verify `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` point to Redis
 - Check worker logs for connection errors
 - Ensure worker service is running (not just the web service)
+- On Kubernetes, set `terminationGracePeriodSeconds: 60` so the `worker_shutdown` signal handler has time to clean up Playwright/browser resources

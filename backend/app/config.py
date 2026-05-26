@@ -58,12 +58,18 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY_HEX: str = ""  # 32-byte hex for field-level encryption
     DATA_RETENTION_YEARS_RAW_PHOTOS: int = 7
 
+    # ClamAV
+    CLAMAV_SOCKET_PATH: str = ""  # e.g., /tmp/clamd.socket
+    CLAMAV_HOST: str = ""  # e.g., clamav
+    CLAMAV_PORT: int = 3310
+
     # Compliance
     BREACH_NOTIFICATION_SLA_HOURS: int = 72
     DSR_RESPONSE_SLA_DAYS: int = 30
 
     # IoT Webhook
     IOT_WEBHOOK_API_KEY: str = ""
+    WHATSAPP_VERIFY_TOKEN: str = ""
 
     # Lead Intelligence Engine
     LEAD_SCRAPER_MODE: str = "demo"  # "demo" or "live"
@@ -71,6 +77,10 @@ class Settings(BaseSettings):
     LEAD_SCRAPER_REQUEST_TIMEOUT: int = 30
     LEAD_SCRAPER_MAX_RETRIES: int = 3
     LEAD_SCRAPER_RETRY_DELAY: int = 5
+    PROXY_URL: str = ""  # HTTP proxy for scraper (e.g., http://proxy:8080)
+    SCRAPER_FORCE_HEADLESS: bool = False  # Force headless mode in production
+    # Comma-separated list of user agents for rotation; falls back to default if empty
+    SCRAPER_USER_AGENTS: str = ""
 
 
 @lru_cache()

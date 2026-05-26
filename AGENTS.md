@@ -57,7 +57,7 @@ carbonverify/
 │   │   ├── tasks/                  # Celery tasks
 │   │   └── vvb_liaison/            # Registry clients
 │   ├── alembic/                    # DB migrations
-│   └── tests/                      # pytest suite (143 tests)
+│   └── tests/                      # pytest suite (225 tests)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx                 # Router config
@@ -140,6 +140,8 @@ def _launch_browser(headless=False) -> Browser:
 - Subsequent: ~18s (reuse)
 - CDM locally: non-headless bypasses Incapsula
 - Production: `SCRAPER_FORCE_HEADLESS=true` enforces headless; use `PROXY_URL` for IP rotation
+- User-agent rotation via `_pick_user_agent()` (5 default agents, override with `SCRAPER_USER_AGENTS`)
+- Retry logic with exponential backoff (3x) in `playwright_fetch()`
 - `close_persistent_browser()` for cleanup
 
 ### Scraper Fallback Behavior
@@ -158,6 +160,22 @@ The `data_source` field tracks which mode succeeded (`"live"` or `"demo"`).
 - Refresh token: 7 day expiry, stored in httpOnly cookie
 - Axios interceptor: on 401, attempts refresh; on refresh failure, redirects to `/login`
 - **Do not** wrap API calls in `try/catch` that swallows errors — let the interceptor work
+
+### Searchable Encrypted Fields
+
+PII columns (e.g., `User.email`) are encrypted with non-deterministic Fernet. To enable exact-match queries (login, uniqueness), a deterministic HMAC-SHA256 hash is stored alongside the ciphertext:
+
+```python
+email_hash = compute_searchable_hash(email)
+```
+
+- Never query the encrypted column directly for equality.
+- `compute_searchable_hash()` uses the same `ENCRYPTION_KEY_HEX` as the Fernet layer.
+- Falls back to raw SHA-256 only if no key is configured (development).
+
+### Celery Graceful Shutdown
+
+Signal handlers (`worker_process_shutdown`, `worker_shutdown`) in `celery_app.py` call `close_persistent_browser()` to clean up the persistent Playwright browser before worker exit. This prevents resource leaks in containerized environments.
 
 ### Route Ordering (Critical)
 
@@ -187,8 +205,13 @@ Key variables in `.env`:
 | `LEAD_SCRAPER_MODE` | `live` or `demo` |
 | `PROXY_URL` | HTTP proxy for scraper IP rotation (e.g. `http://proxy:8080`) |
 | `SCRAPER_FORCE_HEADLESS` | `true` to force headless in production containers |
+| `SCRAPER_USER_AGENTS` | Comma-separated custom user agents for scraper rotation |
 | `ENCRYPTION_KEY_HEX` | 32-byte hex key for PII field-level encryption |
 | `IOT_WEBHOOK_API_KEY` | API key for IoT device webhook authentication |
+| `WHATSAPP_VERIFY_TOKEN` | Meta webhook verification token for WhatsApp bot |
+| `CLAMAV_HOST` | ClamAV daemon hostname (e.g., `clamav`) |
+| `CLAMAV_PORT` | ClamAV daemon TCP port (default `3310`) |
+| `CLAMAV_SOCKET_PATH` | Unix socket path for ClamAV (alternative to TCP) |
 | `ENVIRONMENT` | `development` or `production` |
 
 ---
@@ -208,6 +231,7 @@ pytest tests/ -v
 cd frontend
 npm run dev
 npm run build
+npm run analyze   # Build + open bundle size visualization (rollup-plugin-visualizer)
 npm test
 
 # Full stack
@@ -225,7 +249,7 @@ S3_BUCKET=my-bucket ./scripts/backup-db.sh
 - **Verra live scraping**: Blocked by Cloudflare. The Angular grid loads via XHR calls that are hard to intercept reliably without deep Playwright scripting. Demo fallback provides realistic Kenya VCS projects.
 - **Gold Standard live scraping**: Their public API now requires authentication (`"Can only accept requests of type: authenticated"`). Demo fallback provides realistic projects.
 - **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
-- **Vite chunk size**: ✅ Resolved. Code-splitting + manual vendor chunks reduced main chunk to ~102KB.
+- **Vite chunk size**: ✅ Resolved. Code-splitting + manual vendor chunks reduced main entry chunk to ~29KB.
 - **Verra live scraping**: Blocked by Cloudflare. Demo fallback provides realistic Kenya VCS projects.
 - **Gold Standard live scraping**: Their public API now requires authentication. Demo fallback provides realistic projects.
 - **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
