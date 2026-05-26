@@ -12,7 +12,7 @@ from app.reports.quality_gates import run_quality_gates
 from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
 from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient
 from app.vvb_liaison.auto_responder import draft_clarification_response
-from app.tasks.jobs import generate_report_async
+from app.tasks.report_jobs import generate_report_async
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

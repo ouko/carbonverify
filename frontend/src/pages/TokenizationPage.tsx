@@ -378,7 +378,7 @@ export function TokenizationPage() {
             </div>
             <div className="space-y-3 text-sm">
               {[
-                { label: 'Token ID', value: selectedToken.token_id || selectedToken.id, mono: true },
+                { label: 'Token ID', value: ('token_id' in selectedToken ? selectedToken.token_id : selectedToken.id), mono: true },
                 { label: 'Project', value: selectedToken.project },
                 { label: 'Tonnes CO₂e', value: selectedToken.tonnes.toLocaleString() },
                 { label: 'Vintage', value: selectedToken.vintage },

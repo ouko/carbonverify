@@ -42,6 +42,13 @@ export interface DataSource {
   created_at: string
 }
 
+export interface DataSourceCreate {
+  project_id: string
+  source_type: DataSource['source_type']
+  schema_version: string
+  validation_status?: DataSource['validation_status']
+}
+
 export interface CalculationRun {
   id: string
   project_id: string
@@ -58,6 +65,15 @@ export interface CalculationRun {
   created_at: string
 }
 
+export interface CalculationRunCreate {
+  project_id: string
+  monitoring_period_start: string
+  monitoring_period_end: string
+  fNRB_value?: number
+  emissions_reduction_tCO2e?: number
+  status?: CalculationRun['status']
+}
+
 export interface Report {
   id: string
   project_id: string
@@ -68,6 +84,14 @@ export interface Report {
   status: 'draft' | 'human_review' | 'approved' | 'submitted' | 'vvb_approved' | 'rejected'
   vvb_feedback: Record<string, unknown> | null
   created_at: string
+}
+
+export interface ReportCreate {
+  project_id: string
+  calculation_run_id: string
+  template_type: Report['template_type']
+  draft_content?: Record<string, unknown>
+  status?: Report['status']
 }
 
 export interface ReviewQueueItem {
