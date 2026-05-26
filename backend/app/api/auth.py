@@ -251,25 +251,13 @@ async def setup_mfa(
     }
 
 
-@router.post("/mfa/confirm")
-async def confirm_mfa(
-    current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Confirm MFA setup by verifying a TOTP code generated from the secret."""
-    # The secret is passed in the totp_code field for confirmation
-    # Actually, we need to receive the secret separately. Let me adjust.
-    # For now, require the user to pass the secret they received from setup
-    raise HTTPException(status_code=501, detail="Use /mfa/setup and provide secret in confirm payload")
-
-
 class MFAConfirmRequest(LoginRequest):
     secret: str
     totp_code: str
 
 
 @router.post("/mfa/confirm", response_model=UserOut)
-async def confirm_mfa_v2(
+async def confirm_mfa(
     payload: MFAConfirmRequest,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
     db: AsyncSession = Depends(get_db),

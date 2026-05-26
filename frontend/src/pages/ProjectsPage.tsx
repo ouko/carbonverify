@@ -27,7 +27,7 @@ const statusOptions: { value: ProjectStatus | 'all'; label: string }[] = [
 
 export default function ProjectsPage() {
   const navigate = useNavigate()
-  const { data: projects, isLoading } = useProjects()
+  const { data: projects, isLoading, isError, error } = useProjects()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ProjectStatus | 'all'>('all')
 
@@ -87,7 +87,12 @@ export default function ProjectsPage() {
       </div>
 
       {/* Table */}
-      {isLoading ? (
+      {isError ? (
+        <div className="card p-8 text-center">
+          <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+          <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+        </div>
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="relative">
             <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />

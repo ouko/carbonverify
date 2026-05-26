@@ -97,27 +97,11 @@ def process_data_source_validation(ds_id: str):
 
 
 @celery_app.task(bind=True, max_retries=3)
-def generate_report_async(self, report_id: str):
-    """Generate a report PDF asynchronously."""
-    logger.info("task_generate_report_started", report_id=report_id)
-
-    async def _generate():
-        async with AsyncSessionLocal() as db:
-            from app.models import Report
-            result = await db.execute(select(Report).where(Report.id == report_id))
-            report = result.scalar_one_or_none()
-            if not report:
-                return {"error": "report not found"}
-            # Placeholder: actual PDF generation would happen here
-            report.status = "approved"
-            await db.commit()
-            return {"report_id": report_id, "status": "generated"}
-
-    try:
-        return run_async(_generate())
-    except Exception as exc:
-        logger.error("generate_report_failed", report_id=report_id, error=str(exc))
-        raise self.retry(exc=exc, countdown=60)
+def generate_report_stub(self, report_id: str):
+    """[DEPRECATED] Stub replaced by generate_report_async in report_jobs.py.
+    Kept for backward compatibility during transition."""
+    logger.warning("generate_report_stub_called", report_id=report_id)
+    return {"report_id": report_id, "status": "deprecated", "message": "Use report_jobs.generate_report_async"}
 
 
 @celery_app.task(bind=True, max_retries=3)

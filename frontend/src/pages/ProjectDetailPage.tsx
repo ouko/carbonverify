@@ -15,7 +15,7 @@ const statusColor: Record<string, string> = {
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { data: project, isLoading } = useProject(id || '')
+  const { data: project, isLoading, isError, error } = useProject(id || '')
 
   if (isLoading) {
     return (
@@ -24,6 +24,15 @@ export default function ProjectDetailPage() {
           <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
           <div className="absolute inset-0 h-10 w-10 rounded-full border-[3px] border-transparent border-b-primary-300/30 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
         </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="card p-8 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+        <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
       </div>
     )
   }

@@ -36,7 +36,7 @@ const emissionsTrend = [
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const { data: stats, isLoading } = useDashboardStats()
+  const { data: stats, isLoading, isError, error } = useDashboardStats()
   const { data: leadStats } = useLeadsStats()
 
   const chartData = stats
@@ -54,6 +54,15 @@ export default function DashboardPage() {
           <div className="h-10 w-10 rounded-full border-[3px] border-primary-200 border-t-primary-500 animate-spin" />
           <div className="absolute inset-0 h-10 w-10 rounded-full border-[3px] border-transparent border-b-primary-300/30 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
         </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="card p-8 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+        <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
       </div>
     )
   }

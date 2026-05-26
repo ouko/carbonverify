@@ -25,7 +25,7 @@ from app.services.whatsapp.state_machine import conversation_state
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/webhooks", tags=["whatsapp"])
+router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 limiter = Limiter(key_func=get_remote_address)
 
 from app.config import get_settings

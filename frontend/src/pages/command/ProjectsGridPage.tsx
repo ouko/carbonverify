@@ -4,7 +4,7 @@ import { useProjectsHealth } from '../../hooks/useCommandData'
 import { useNavigate } from 'react-router-dom'
 
 export function ProjectsGridPage() {
-  const { data: projects, isLoading } = useProjectsHealth()
+  const { data: projects, isLoading, isError, error } = useProjectsHealth()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -81,6 +81,13 @@ export function ProjectsGridPage() {
           <p className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.red}</p>
         </div>
       </div>
+
+      {isError && (
+        <div className="card p-8 text-center">
+          <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+          <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 card p-3">
         <div className="flex items-center rounded-xl bg-surface-100/80 dark:bg-surface-800/50 px-3 py-2">

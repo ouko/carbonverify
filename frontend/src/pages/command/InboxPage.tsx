@@ -7,7 +7,7 @@ import { usePriorityQueue } from '../../hooks/useCommandData'
 import { useCommandWebSocket } from '../../hooks/useCommandWebSocket'
 
 export function InboxPage() {
-  const { data: items, isLoading } = usePriorityQueue()
+  const { data: items, isLoading, isError, error } = usePriorityQueue()
   const [localItems, setLocalItems] = useState<any[]>([])
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [filterType, setFilterType] = useState('all')
@@ -135,7 +135,16 @@ export function InboxPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-              {isLoading ? (
+              {isError ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8">
+                    <div className="card p-8 text-center">
+                      <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+                      <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : isLoading ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-surface-400">Loading...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-surface-400">No items in queue</td></tr>

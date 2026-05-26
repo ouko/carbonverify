@@ -8,7 +8,7 @@ import { TrendingUp, AlertTriangle, ThumbsUp, Ticket } from 'lucide-react'
 import { useQualityMetrics } from '../../hooks/useCommandData'
 
 export function QualityMetricsPage() {
-  const { data, isLoading } = useQualityMetrics()
+  const { data, isLoading, isError, error } = useQualityMetrics()
   const [calibrationAgent, setCalibrationAgent] = useState('all')
 
   if (isLoading) return (
@@ -18,6 +18,15 @@ export function QualityMetricsPage() {
       </div>
     </div>
   )
+
+  if (isError) {
+    return (
+      <div className="card p-8 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+        <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+      </div>
+    )
+  }
 
   const metrics = data || {
     accuracyOverTime: [],

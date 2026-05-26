@@ -12,7 +12,7 @@ const STAGES = [
 ]
 
 export function VVBPipelinePage() {
-  const { data: pipeline, isLoading } = useVVBPipeline()
+  const { data: pipeline, isLoading, isError, error } = useVVBPipeline()
   const [selectedCard, setSelectedCard] = useState<any>(null)
   const [draftCard, setDraftCard] = useState<any>(null)
   const [draftResponse, setDraftResponse] = useState('')
@@ -70,6 +70,13 @@ export function VVBPipelinePage() {
           <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> &lt; 7 days</span>
         </div>
       </div>
+
+      {isError && (
+        <div className="card p-8 text-center">
+          <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+          <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="py-12 text-center text-surface-400">Loading pipeline...</div>

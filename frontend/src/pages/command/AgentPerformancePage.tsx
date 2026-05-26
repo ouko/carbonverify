@@ -7,7 +7,7 @@ import { Bot, AlertTriangle, Zap } from 'lucide-react'
 import { useAgentPerformance } from '../../hooks/useCommandData'
 
 export function AgentPerformancePage() {
-  const { data: agents, isLoading } = useAgentPerformance()
+  const { data: agents, isLoading, isError, error } = useAgentPerformance()
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
 
   if (isLoading) return (
@@ -17,6 +17,14 @@ export function AgentPerformancePage() {
       </div>
     </div>
   )
+  if (isError) {
+    return (
+      <div className="card p-8 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+        <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+      </div>
+    )
+  }
 
   const agentList = agents || []
 

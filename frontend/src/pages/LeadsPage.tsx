@@ -244,7 +244,7 @@ export default function LeadsPage() {
   if (statusFilter !== 'all') filters.lead_status = statusFilter
   if (search) filters.search = search
 
-  const { data: leads, isLoading } = useLeads(filters)
+  const { data: leads, isLoading, isError, error } = useLeads(filters)
   const { data: stats } = useLeadsStats()
   const { data: health } = useScraperHealth()
   const { data: history } = useScraperHistory()
@@ -452,7 +452,12 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="card p-8 text-center">
+          <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
+          <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+        </div>
+      ) : isLoading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="relative">
             <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
