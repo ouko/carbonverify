@@ -28,22 +28,26 @@ router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 
 # ─── Orchestrator Control ─────────────────────────────────────────────────────
 
+class ProjectTriggerRequest(BaseModel):
+    trigger: str
+    context: Optional[Dict[str, Any]] = None
+
+
 @router.post("/projects/{project_id}/trigger")
 async def trigger_project_state(
     project_id: uuid.UUID,
-    trigger: str,
-    context: Optional[Dict[str, Any]] = None,
+    payload: ProjectTriggerRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
     """Trigger a state transition for a project."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
+    result = await db.execute(select(Project).where(Project.id == payload.project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     orchestrator = KimiClawOrchestrator(db)
-    result = await orchestrator.process_project(project_id, trigger, context or {})
+    result = await orchestrator.process_project(project_id, payload.trigger, payload.context or {})
 
     logger.info(
         "orchestrator_triggered",
@@ -170,23 +174,27 @@ async def list_orchestrator_review_queue(
     ]
 
 
+class ReviewResolutionRequest(BaseModel):
+    decision: str  # approve | reject | escalate
+    resolution_notes: str
+
+
 @router.post("/review-queue/{item_id}/resolve")
 async def resolve_review_item(
     item_id: uuid.UUID,
-    decision: str,  # approve | reject | escalate
-    resolution_notes: str,
+    payload: ReviewResolutionRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
     """Resolve a human review queue item."""
-    if decision not in ("approve", "reject", "escalate"):
+    if payload.decision not in ("approve", "reject", "escalate"):
         raise HTTPException(status_code=400, detail="Decision must be 'approve', 'reject', or 'escalate'")
 
     orchestrator = KimiClawOrchestrator(db)
     result = await orchestrator.resolve_human_review(
         queue_item_id=item_id,
-        decision=decision,
-        resolution_notes=resolution_notes,
+        decision=payload.decision,
+        resolution_notes=payload.resolution_notes,
         user_id=current_user.id,
     )
 
@@ -228,10 +236,14 @@ async def assign_review_item(
 
 # ─── Kimi AI Integration ──────────────────────────────────────────────────────
 
+class DraftVVBResponseRequest(BaseModel):
+    query_text: str
+    project_id: uuid.UUID
+
+
 @router.post("/ai/draft-vvb-response")
 async def draft_vvb_response(
-    query_text: str,
-    project_id: uuid.UUID,
+    payload: DraftVVBResponseRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
@@ -249,10 +261,10 @@ async def draft_vvb_response(
     }
 
     content = await client.draft_vvb_response(
-        query_text=query_text,
+        query_text=payload.query_text,
         project_data=project_data,
     )
-    return {"draft": content, "project_id": str(project_id)}
+    return {"draft": content, "project_id": str(payload.project_id)}
 
 
 @router.post("/ai/executive-summary")
@@ -296,38 +308,46 @@ async def generate_executive_summary(
     return {"summary": content, "project_id": str(project_id), "calculation_run_id": str(calculation_run_id)}
 
 
+class MethodologyQARequest(BaseModel):
+    question: str
+    methodology: str
+    context_documents: Optional[List[str]] = None
+
+
 @router.post("/ai/methodology-qa")
 async def methodology_qa(
-    question: str,
-    methodology: str,
-    context_documents: Optional[List[str]] = None,
+    payload: MethodologyQARequest,
     _: User = Depends(require_viewer),
 ):
     """Ask a methodology question using Kimi AI RAG."""
     client = get_kimi_client()
     answer = await client.answer_methodology_question(
-        question=question,
-        methodology=methodology,
-        context_documents=context_documents,
+        question=payload.question,
+        methodology=payload.methodology,
+        context_documents=payload.context_documents,
     )
-    return {"question": question, "methodology": methodology, "answer": answer}
+    return {"question": payload.question, "methodology": payload.methodology, "answer": answer}
+
+
+class ExplainAnomalyRequest(BaseModel):
+    data_point: Dict[str, Any]
+    field_name: str = "value"
+    historical_context: Optional[List[Dict[str, Any]]] = None
 
 
 @router.post("/ai/explain-anomaly")
 async def explain_anomaly(
-    data_point: Dict[str, Any],
-    field_name: str = "value",
-    historical_context: Optional[List[Dict[str, Any]]] = None,
+    payload: ExplainAnomalyRequest,
     _: User = Depends(require_operator),
 ):
     """Get a natural language explanation of an anomalous data point."""
     client = get_kimi_client()
     explanation = await client.explain_anomaly(
-        data_point=data_point,
-        field_name=field_name,
-        historical_context=historical_context,
+        data_point=payload.data_point,
+        field_name=payload.field_name,
+        historical_context=payload.historical_context,
     )
-    return {"explanation": explanation, "data_point": data_point}
+    return {"explanation": explanation, "data_point": payload.data_point}
 
 
 # ─── Agent Direct Invocation ──────────────────────────────────────────────────

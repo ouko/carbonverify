@@ -108,11 +108,11 @@ export default function DataSourceDetailPage() {
             <div className="flex-1 h-2 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
               <div
                 className="h-full rounded-full bg-primary-500"
-                style={{ width: `${Math.round(((source as any).confidence_score || 0) * 100)}%` }}
+                style={{ width: `${Math.round((source.confidence_score || 0) * 100)}%` }}
               />
             </div>
             <span className="text-sm font-bold text-surface-900 dark:text-surface-100 tabular-nums">
-              {Math.round(((source as any).confidence_score || 0) * 100)}%
+              {Math.round((source.confidence_score || 0) * 100)}%
             </span>
           </div>
         </div>

@@ -13,11 +13,11 @@ export function FieldDashboardPage() {
     setTimeout(() => setToast(null), 2500);
   };
 
-  const filtered = enumerators.filter((e: any) =>
+  const filtered = enumerators.filter((e) =>
     e.name.toLowerCase().includes(filter.toLowerCase())
   );
 
-  const alerts = filtered.filter((e: any) => e.rejectionRate > 15 || e.qualityScore < 80);
+  const alerts = filtered.filter((e) => e.rejectionRate > 15 || e.qualityScore < 80);
 
   return (
     <div className="space-y-6 relative">

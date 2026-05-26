@@ -9,7 +9,19 @@ import { useAgentPerformance } from '../../hooks/useValidation'
 
 export function AgentPerformancePage() {
   const { data: agents, isLoading, isError, error } = useAgentPerformance()
-  const [selectedAgent, setSelectedAgent] = useState<any>(null)
+  interface Agent {
+    name: string
+    tasksCompleted: number
+    avgConfidence: number
+    escalationRate: number
+    errorRate: number
+    avgExecutionTimeMs: number
+    humanReviewsRequired: number
+    trend: number[]
+    improvementSuggestion?: string
+  }
+
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
 
   if (isLoading) return (
     <LoadingSpinner />
@@ -39,7 +51,7 @@ export function AgentPerformancePage() {
     <div className="space-y-6">
       {/* Agent Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {agentList.map((agent: any) => (
+        {agentList.map((agent: Agent) => (
           <div
             key={agent.name}
             onClick={() => setSelectedAgent(agent)}

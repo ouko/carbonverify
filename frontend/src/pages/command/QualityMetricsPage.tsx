@@ -37,7 +37,7 @@ export function QualityMetricsPage() {
 
   const filteredCalibration = calibrationAgent === 'all'
     ? metrics.calibrationData
-    : metrics.calibrationData.filter((d: any) => d.agent === calibrationAgent)
+    : metrics.calibrationData.filter((d: { agent: string }) => d.agent === calibrationAgent)
 
   const agents = ['all', 'Ingestion', 'Validation', 'Calculation', 'Reporting']
   const agentColors: Record<string, string> = {

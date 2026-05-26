@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Search, Shield, CheckCircle, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useAuditLogs } from '../hooks/useAuditLogs'
+import { useAuditLogs, type AuditLog } from '../hooks/useAuditLogs'
 import { api } from '../services/api'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
@@ -18,7 +18,7 @@ export function AuditLogPage() {
   const { data: logs, isLoading, isError, error } = useAuditLogs()
   const [search, setSearch] = useState('')
   const [filterAction, setFilterAction] = useState('')
-  const [selectedLog, setSelectedLog] = useState<any>(null)
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
   const [verifying, setVerifying] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const perPage = 10
@@ -81,7 +81,7 @@ export function AuditLogPage() {
         </div>
         <div className="card p-8 text-center">
           <p className="text-red-600 dark:text-red-400 font-medium">Failed to load audit logs</p>
-          <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+          <p className="text-sm text-surface-500 mt-2">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
         </div>
       </div>
     )

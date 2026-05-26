@@ -9,8 +9,26 @@ import { useCommandWebSocket } from '../../hooks/useCommandWebSocket'
 export function InboxPage() {
   const { data: items, isLoading, isError, error } = useReviewQueue()
   const updateMutation = useUpdateReviewQueueItem()
-  const [localItems, setLocalItems] = useState<any[]>([])
-  const [selectedItem, setSelectedItem] = useState<any>(null)
+  interface LocalItem {
+    id: string
+    priority: number
+    itemType: string
+    reason: string
+    subject: string
+    assignedTo: string | null
+    status: string
+    createdAt: string
+    resolvedAt: string | null
+    projectName: string
+    projectId: string
+    financialImpact: number
+    confidence: number
+    hoursInQueue: number
+    suggestedAction: string
+  }
+
+  const [localItems, setLocalItems] = useState<LocalItem[]>([])
+  const [selectedItem, setSelectedItem] = useState<LocalItem | null>(null)
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [actingId, setActingId] = useState<string | null>(null)

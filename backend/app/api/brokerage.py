@@ -283,16 +283,22 @@ async def get_transaction_summary(
     return summary
 
 
+from pydantic import BaseModel
+
+class CancelTransactionRequest(BaseModel):
+    reason: str
+
+
 @router.post("/transactions/{transaction_id}/cancel")
 async def cancel_transaction(
     transaction_id: uuid.UUID,
-    reason: str,
+    payload: CancelTransactionRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel a transaction (buyer or seller)."""
     engine = TransactionEngine(db)
-    tx = await engine.cancel_transaction(transaction_id, reason)
+    tx = await engine.cancel_transaction(transaction_id, payload.reason)
     return tx
 
 

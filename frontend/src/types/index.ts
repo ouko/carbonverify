@@ -39,6 +39,7 @@ export interface DataSource {
   validation_status: 'pending' | 'valid' | 'flagged' | 'rejected'
   validation_errors: string[] | null
   provenance: Record<string, unknown>
+  confidence_score: number | null
   created_at: string
 }
 

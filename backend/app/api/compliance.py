@@ -77,6 +77,13 @@ class MethodologyCreateRequest(BaseModel):
     change_summary: str
 
 
+class DSRUpdateRequest(BaseModel):
+    status: Optional[DSRStatusEnum] = None
+    assigned_to: Optional[uuid.UUID] = None
+    fulfillment_notes: Optional[str] = None
+    rejection_reason: Optional[str] = None
+
+
 class MethodologyUpdateRequest(BaseModel):
     status: Optional[DSRStatusEnum] = None
     assigned_to: Optional[uuid.UUID] = None
@@ -204,6 +211,8 @@ async def submit_dsr(
 async def list_dsrs(
     status: Optional[DSRStatusEnum] = None,
     assigned_to_me: bool = False,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(require_operator),
     db: AsyncSession = Depends(get_db),
 ):
@@ -214,6 +223,7 @@ async def list_dsrs(
     if assigned_to_me:
         stmt = stmt.where(DataSubjectRequest.assigned_to == current_user.id)
 
+    stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     dsrs = result.scalars().all()
 
@@ -236,7 +246,7 @@ async def list_dsrs(
 @router.patch("/dsr/{dsr_id}")
 async def update_dsr(
     dsr_id: uuid.UUID,
-    payload: MethodologyUpdateRequest,
+    payload: DSRUpdateRequest,
     current_user: User = Depends(require_operator),
     db: AsyncSession = Depends(get_db),
 ):

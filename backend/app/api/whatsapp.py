@@ -109,31 +109,37 @@ async def list_enumerators(
     ]
 
 
+from pydantic import BaseModel
+
+class CreateEnumeratorRequest(BaseModel):
+    project_id: uuid.UUID
+    name: str
+    phone_number: str
+    language_preference: str = "en"
+
+
 @router.post("/enumerators", status_code=status.HTTP_201_CREATED)
 async def create_enumerator(
-    project_id: uuid.UUID,
-    name: str,
-    phone_number: str,
-    language_preference: str = "en",
+    payload: CreateEnumeratorRequest,
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(require_operator),
 ):
     """Register a new enumerator for a project."""
     enumerator = Enumerator(
-        project_id=project_id,
-        name=name,
-        phone_number=phone_number,
-        language_preference=language_preference,
+        project_id=payload.project_id,
+        name=payload.name,
+        phone_number=payload.phone_number,
+        language_preference=payload.language_preference,
     )
     db.add(enumerator)
     await db.commit()
     await db.refresh(enumerator)
 
-    logger.info("enumerator_created", enumerator_id=str(enumerator.id), phone=phone_number)
+    logger.info("enumerator_created", enumerator_id=str(enumerator.id), phone=payload.phone_number)
     return {
         "id": str(enumerator.id),
-        "name": name,
-        "phone_number": phone_number,
+        "name": payload.name,
+        "phone_number": payload.phone_number,
         "message": "Enumerator registered successfully. Share the bot link to begin surveys.",
     }
 

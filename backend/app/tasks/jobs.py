@@ -79,23 +79,6 @@ def generate_overdue_reports(self):
         raise self.retry(exc=exc, countdown=60)
 
 
-@celery_app.task
-def process_data_source_validation(ds_id: str):
-    logger.info("task_process_ds_validation_started", ds_id=ds_id)
-
-    async def _process():
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(DataSource).where(DataSource.id == ds_id))
-            ds = result.scalar_one_or_none()
-            if not ds:
-                return {"error": "not found"}
-            ds.validation_status = "valid"
-            await db.commit()
-            return {"ds_id": ds_id, "status": "valid"}
-
-    return run_async(_process())
-
-
 @celery_app.task(bind=True, max_retries=3)
 def generate_report_stub(self, report_id: str):
     """[DEPRECATED] Stub replaced by generate_report_async in report_jobs.py.

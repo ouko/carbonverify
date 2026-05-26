@@ -97,13 +97,13 @@ export function SettingsPage() {
               key={ch.key}
               onClick={() => toggle(ch.key)}
               className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-all ${
-                (settings as any)[ch.key]
+                settings[ch.key as keyof typeof settings]
                   ? 'border-primary-400 bg-primary-50/50 dark:border-primary-500/50 dark:bg-primary-950/10'
                   : 'border-surface-200 hover:bg-surface-50 dark:border-surface-700 dark:hover:bg-surface-800/50'
               }`}
             >
-              <ch.icon className={`h-6 w-6 ${(settings as any)[ch.key] ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400'}`} />
-              <span className={`text-xs font-medium ${(settings as any)[ch.key] ? 'text-primary-700 dark:text-primary-300' : 'text-surface-600 dark:text-surface-400'}`}>
+              <ch.icon className={`h-6 w-6 ${settings[ch.key as keyof typeof settings] ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400'}`} />
+              <span className={`text-xs font-medium ${settings[ch.key as keyof typeof settings] ? 'text-primary-700 dark:text-primary-300' : 'text-surface-600 dark:text-surface-400'}`}>
                 {ch.label}
               </span>
             </button>

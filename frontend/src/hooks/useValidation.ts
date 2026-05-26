@@ -11,8 +11,20 @@ export function useQualityMetrics() {
   })
 }
 
+export interface AgentPerformance {
+  name: string
+  tasksCompleted: number
+  avgConfidence: number
+  escalationRate: number
+  errorRate: number
+  avgExecutionTimeMs: number
+  humanReviewsRequired: number
+  trend: number[]
+  improvementSuggestion?: string
+}
+
 export function useAgentPerformance() {
-  return useQuery<any[]>({
+  return useQuery<AgentPerformance[]>({
     queryKey: ['agentPerformance'],
     queryFn: async () => {
       const res = await api.get('/validation/metrics/agents')
