@@ -70,7 +70,6 @@ export default {
       backdropBlur: {
         'glass': '12px',
         'glass-lg': '20px',
-        'glass-xl': '40px',
       },
       transitionTimingFunction: {
         'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
