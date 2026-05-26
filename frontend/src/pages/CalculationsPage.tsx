@@ -115,7 +115,7 @@ export default function CalculationsPage() {
                   <span className="font-semibold text-surface-900 dark:text-surface-100">Calculation</span>
                 </div>
                 <span className={`badge ${statusBadge[calc.status] || 'badge-slate'}`}>
-                  {calc.status.replace('_', ' ')}
+                  {(calc.status || '').replace('_', ' ')}
                 </span>
               </div>
               <div className="space-y-3 text-sm">

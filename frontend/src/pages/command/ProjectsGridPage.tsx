@@ -159,7 +159,7 @@ export function ProjectsGridPage() {
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <div className="flex items-center gap-1.5 text-xs text-surface-600 dark:text-surface-300">
                         {getStatusDot(p.status)}
-                        <span className="capitalize">{p.status.replace('_', ' ')}</span>
+                        <span className="capitalize">{(p.status || '').replace('_', ' ')}</span>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">

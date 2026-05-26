@@ -112,7 +112,7 @@ export default function DataSourcesPage() {
                           <Database className="w-4 h-4 text-surface-500 dark:text-surface-400" />
                         </div>
                         <span className="font-semibold text-surface-900 dark:text-surface-100 capitalize">
-                          {source.source_type.replace('_', ' ')}
+                          {(source.source_type || '').replace('_', ' ')}
                         </span>
                       </div>
                     </td>

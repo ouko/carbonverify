@@ -160,7 +160,7 @@ export function InboxPage() {
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1.5 text-xs text-surface-600 dark:text-surface-300">
                         {getTypeIcon(item.itemType)}
-                        <span className="capitalize">{item.itemType.replace('_', ' ')}</span>
+                        <span className="capitalize">{(item.itemType || '').replace('_', ' ')}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-xs text-surface-600 dark:text-surface-300 max-w-[200px] truncate">

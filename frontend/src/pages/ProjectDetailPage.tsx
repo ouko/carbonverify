@@ -61,7 +61,7 @@ export default function ProjectDetailPage() {
           <h1 className="page-title">{project.name}</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className={`badge ${statusColor[project.status] || 'badge-slate'}`}>
-              {project.status.replace('_', ' ')}
+              {(project.status || '').replace('_', ' ')}
             </span>
             <span className="text-xs text-surface-400 dark:text-surface-500">{project.methodology}</span>
           </div>
@@ -86,7 +86,7 @@ export default function ProjectDetailPage() {
             </div>
             <span className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Status</span>
           </div>
-          <p className="text-lg font-bold text-surface-900 dark:text-surface-100 capitalize">{project.status.replace('_', ' ')}</p>
+          <p className="text-lg font-bold text-surface-900 dark:text-surface-100 capitalize">{(project.status || '').replace('_', ' ')}</p>
         </div>
         <div className="card p-5">
           <div className="flex items-center gap-3 mb-3">

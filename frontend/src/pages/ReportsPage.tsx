@@ -78,13 +78,13 @@ export default function ReportsPage() {
                   <span className="font-semibold text-surface-900 dark:text-surface-100">Report</span>
                 </div>
                 <span className={`badge ${statusBadge[report.status] || 'badge-slate'}`}>
-                  {report.status.replace('_', ' ')}
+                  {(report.status || '').replace('_', ' ')}
                 </span>
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-surface-400 dark:text-surface-500">Template</span>
-                  <span className="text-surface-600 dark:text-surface-300 capitalize">{report.template_type.replace('_', ' ')}</span>
+                  <span className="text-surface-600 dark:text-surface-300 capitalize">{(report.template_type || '').replace('_', ' ')}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-surface-400 dark:text-surface-500">Project</span>

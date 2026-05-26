@@ -186,7 +186,7 @@ export function BrokeragePage() {
                       tx.status === 'in_escrow' ? 'badge-amber' :
                       'badge-blue'
                     }`}>
-                      {tx.status.replace('_', ' ')}
+                      {(tx.status || '').replace('_', ' ')}
                     </span>
                     <span className="rounded-md bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-[10px] text-surface-500 dark:text-surface-400 uppercase">
                       {tx.type}

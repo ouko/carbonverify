@@ -119,7 +119,7 @@ export function AuditLogPage() {
                 >
                   <td className="px-4 py-3">
                     <span className={`badge text-[10px] ${ACTION_COLORS[log.action] || 'badge-slate'}`}>
-                      {log.action.replace('_', ' ')}
+                      {(log.action || '').replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-surface-700 dark:text-surface-300">{log.actor}</td>

@@ -106,7 +106,7 @@ export function ComplianceDashboardPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{dsr.id}</span>
                     <span className={`badge text-[10px] ${STATUS_COLORS[dsr.status]}`}>
-                      {dsr.status.replace('_', ' ')}
+                      {(dsr.status || '').replace('_', ' ')}
                     </span>
                   </div>
                   <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
@@ -152,7 +152,7 @@ export function ComplianceDashboardPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-surface-400 dark:text-surface-500">
-                  Status: {b.status.replace('_', ' ')} · ID: {b.id}
+                  Status: {(b.status || '').replace('_', ' ')} · ID: {b.id}
                 </p>
               </div>
             ))}
@@ -173,7 +173,7 @@ export function ComplianceDashboardPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{coi.user}</span>
                     <span className={`badge text-[10px] ${STATUS_COLORS[coi.status]}`}>
-                      {coi.status.replace('_', ' ')}
+                      {(coi.status || '').replace('_', ' ')}
                     </span>
                   </div>
                   <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">

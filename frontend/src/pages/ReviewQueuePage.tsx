@@ -95,7 +95,7 @@ export default function ReviewQueuePage() {
                           <ClipboardList className="w-4 h-4 text-primary-500 dark:text-primary-400" />
                         </div>
                         <span className="font-semibold text-surface-900 dark:text-surface-100 capitalize">
-                          {item.item_type.replace('_', ' ')}
+                          {(item.item_type || '').replace('_', ' ')}
                         </span>
                       </div>
                     </td>
@@ -111,7 +111,7 @@ export default function ReviewQueuePage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`badge ${statusBadge[item.status] || 'badge-slate'}`}>
-                        {item.status.replace('_', ' ')}
+                        {(item.status || '').replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4">

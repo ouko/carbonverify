@@ -143,7 +143,7 @@ export function VVBPipelinePage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-1">Stage</p>
-                  <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 capitalize">{selectedCard.stage?.replace('_', ' ')}</p>
+                  <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 capitalize">{(selectedCard.stage || '').replace('_', ' ')}</p>
                 </div>
                 <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3">
                   <p className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-1">Days in Stage</p>

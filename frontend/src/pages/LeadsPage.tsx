@@ -125,7 +125,7 @@ function LeadDetailModal({ lead, onClose }: { lead: Lead; onClose: () => void })
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
               <p className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-1">Registry Status</p>
-              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 capitalize">{lead.status.replace('_', ' ')}</p>
+              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 capitalize">{(lead.status || '').replace('_', ' ')}</p>
             </div>
             <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
               <p className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-1">Days in Stage</p>
@@ -343,7 +343,7 @@ export default function LeadsPage() {
               <div key={s.source} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span className="capitalize font-medium text-surface-700 dark:text-surface-300">
-                    {s.source.replace('_', ' ')}
+                    {(s.source || '').replace('_', ' ')}
                   </span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                     s.status === 'live'
@@ -494,7 +494,7 @@ export default function LeadsPage() {
                       {lead.project_developer || '—'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="badge badge-slate text-[10px] capitalize">{lead.status.replace('_', ' ')}</span>
+                      <span className="badge badge-slate text-[10px] capitalize">{(lead.status || '').replace('_', ' ')}</span>
                     </td>
                     <td className="px-6 py-4 text-surface-600 dark:text-surface-300 text-xs">
                       {lead.days_in_status ?? '—'}
@@ -506,7 +506,7 @@ export default function LeadsPage() {
                       <span className={`badge ${PRIORITY_COLORS[lead.priority]} text-[10px]`}>{lead.priority}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`badge ${LEAD_STATUS_COLORS[lead.lead_status]} text-[10px] capitalize`}>{lead.lead_status.replace('_', ' ')}</span>
+                      <span className={`badge ${LEAD_STATUS_COLORS[lead.lead_status]} text-[10px] capitalize`}>{(lead.lead_status || '').replace('_', ' ')}</span>
                     </td>
                   </tr>
                 ))}
