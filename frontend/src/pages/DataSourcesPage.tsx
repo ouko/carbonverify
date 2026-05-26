@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Database, Search, CheckCircle, AlertTriangle, XCircle, Clock, HardDrive, Plus, X } from 'lucide-react'
 import { useDataSources, useCreateDataSource } from '../hooks/useDataSources'
 import { useProjects } from '../hooks/useProjects'
@@ -20,6 +21,7 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function DataSourcesPage() {
+  const navigate = useNavigate()
   const [projectFilter, setProjectFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const { data: projects } = useProjects()
@@ -103,7 +105,7 @@ export default function DataSourcesPage() {
               </thead>
               <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
                 {filtered?.map((source) => (
-                  <tr key={source.id} className="hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors">
+                  <tr key={source.id} className="hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors cursor-pointer" onClick={() => navigate(`/data-sources/${source.id}`)}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center">

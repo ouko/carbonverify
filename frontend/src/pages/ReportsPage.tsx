@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { FileText, Download, ExternalLink, FileArchive, Plus, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { FileText, Download, FileArchive, Plus, X } from 'lucide-react'
 import { useReports, useCreateReport } from '../hooks/useReports'
 import { useProjects } from '../hooks/useProjects'
 import { useCalculations } from '../hooks/useCalculations'
@@ -15,6 +16,7 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function ReportsPage() {
+  const navigate = useNavigate()
   const [showCreate, setShowCreate] = useState(false)
   const { data: projects } = useProjects()
   const { data: calculations } = useCalculations()
@@ -71,7 +73,7 @@ export default function ReportsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {reports?.map((report) => (
-            <div key={report.id} className="card-hover p-5 group">
+            <div key={report.id} className="card-hover p-5 group cursor-pointer" onClick={() => navigate(`/reports/${report.id}`)}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
@@ -101,16 +103,16 @@ export default function ReportsPage() {
                   </span>
                 </div>
               </div>
-              {report.final_pdf && (
+              {report.final_pdf && !report.final_pdf.includes('example.com') ? (
                 <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
-                  <a href={report.final_pdf} target="_blank" rel="noopener noreferrer" className="btn-ghost flex-1 justify-center text-xs">
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    View
-                  </a>
-                  <a href={report.final_pdf} download className="btn-primary flex-1 text-xs">
+                  <a href={report.final_pdf} download className="btn-primary flex-1 text-xs" onClick={(e) => e.stopPropagation()}>
                     <Download className="w-3.5 h-3.5" />
                     Download
                   </a>
+                </div>
+              ) : (
+                <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
+                  <span className="text-xs text-surface-400 dark:text-surface-500 italic flex-1 text-center">Not generated</span>
                 </div>
               )}
             </div>

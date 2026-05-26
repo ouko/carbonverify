@@ -15,8 +15,11 @@ const ProjectsPage = lazy(() => import('./pages/ProjectsPage').then(m => ({ defa
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage').then(m => ({ default: m.default })));
 const ProjectCreatePage = lazy(() => import('./pages/ProjectCreatePage').then(m => ({ default: m.default })));
 const DataSourcesPage = lazy(() => import('./pages/DataSourcesPage').then(m => ({ default: m.default })));
+const DataSourceDetailPage = lazy(() => import('./pages/DataSourceDetailPage').then(m => ({ default: m.default })));
 const CalculationsPage = lazy(() => import('./pages/CalculationsPage').then(m => ({ default: m.default })));
+const CalculationDetailPage = lazy(() => import('./pages/CalculationDetailPage').then(m => ({ default: m.default })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then(m => ({ default: m.default })));
+const ReportDetailPage = lazy(() => import('./pages/ReportDetailPage').then(m => ({ default: m.default })));
 const ReviewQueuePage = lazy(() => import('./pages/ReviewQueuePage').then(m => ({ default: m.default })));
 const FieldDashboardPage = lazy(() => import('./pages/FieldDashboardPage').then(m => ({ default: m.FieldDashboardPage })));
 const SecuritySettingsPage = lazy(() => import('./pages/SecuritySettingsPage').then(m => ({ default: m.SecuritySettingsPage })));
@@ -50,8 +53,11 @@ function App() {
                 <Route path="/projects/new" element={<Suspense fallback={<LoadingSpinner />}><ProjectCreatePage /></Suspense>} />
                 <Route path="/projects/:id" element={<Suspense fallback={<LoadingSpinner />}><ProjectDetailPage /></Suspense>} />
                 <Route path="/data-sources" element={<Suspense fallback={<LoadingSpinner />}><DataSourcesPage /></Suspense>} />
+                <Route path="/data-sources/:id" element={<Suspense fallback={<LoadingSpinner />}><DataSourceDetailPage /></Suspense>} />
                 <Route path="/calculations" element={<Suspense fallback={<LoadingSpinner />}><CalculationsPage /></Suspense>} />
+                <Route path="/calculations/:id" element={<Suspense fallback={<LoadingSpinner />}><CalculationDetailPage /></Suspense>} />
                 <Route path="/reports" element={<Suspense fallback={<LoadingSpinner />}><ReportsPage /></Suspense>} />
+                <Route path="/reports/:id" element={<Suspense fallback={<LoadingSpinner />}><ReportDetailPage /></Suspense>} />
                 <Route path="/review-queue" element={<Suspense fallback={<LoadingSpinner />}><ReviewQueuePage /></Suspense>} />
                 <Route path="/field" element={<Suspense fallback={<LoadingSpinner />}><FieldDashboardPage /></Suspense>} />
                 <Route path="/security" element={<Suspense fallback={<LoadingSpinner />}><SecuritySettingsPage /></Suspense>} />

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Calculator, Filter, FileBarChart, Plus, X } from 'lucide-react'
 import { useCalculations, useCreateCalculation } from '../hooks/useCalculations'
 import { useProjects } from '../hooks/useProjects'
@@ -20,6 +21,7 @@ const statusOptions = [
 ]
 
 export default function CalculationsPage() {
+  const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showCreate, setShowCreate] = useState(false)
   const { data: projects } = useProjects()
@@ -103,7 +105,7 @@ export default function CalculationsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered?.map((calc) => (
-            <div key={calc.id} className="card-hover p-5 group">
+            <div key={calc.id} className="card-hover p-5 group cursor-pointer" onClick={() => navigate(`/calculations/${calc.id}`)}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
