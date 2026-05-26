@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check, AlertTriangle } from 'lucide-react'
 import { useTokens, useMarketplace, useMintToken, useBuyToken, useRetireToken } from '../hooks/useTokenization'
+import type { Token, MarketplaceListing } from '../hooks/useTokenization'
 import { useCalculations } from '../hooks/useCalculations'
+
+type SelectableToken = Token | MarketplaceListing
 
 export function TokenizationPage() {
   const [tab, setTab] = useState<'marketplace' | 'mint' | 'retire'>('marketplace')
-  const [selectedToken, setSelectedToken] = useState<any | null>(null)
+  const [selectedToken, setSelectedToken] = useState<SelectableToken | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   const [mintForm, setMintForm] = useState({

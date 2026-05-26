@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { ArrowUpDown, Search, FolderOpen } from 'lucide-react'
-import { useProjectsHealth } from '../../hooks/useCommandData'
+import { useProjects } from '../../hooks/useProjects'
+import type { Project } from '../../types'
 import { useNavigate } from 'react-router-dom'
 
 export function ProjectsGridPage() {
-  const { data: projects, isLoading, isError, error } = useProjectsHealth()
+  const { data: rawProjects, isLoading, isError, error } = useProjects()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -12,6 +13,30 @@ export function ProjectsGridPage() {
   const [alertFilter, setAlertFilter] = useState('all')
   const [sortKey, setSortKey] = useState<string>('readiness')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const projects = useMemo(() => {
+    return (rawProjects || []).map((p: Project) => {
+      const days = Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(p.created_at).getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+      )
+      return {
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        methodology: p.methodology,
+        developer: '',
+        readiness: Math.round((p.confidence_threshold ?? 0) * 100),
+        creditsForecast: 0,
+        lastActivityDays: days,
+        alertLevel: 'green',
+        overdue: false,
+      }
+    })
+  }, [rawProjects])
 
   const filtered = useMemo(() => {
     const list = (projects || []).filter((p: any) => {

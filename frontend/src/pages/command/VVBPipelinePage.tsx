@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Clock, AlertTriangle, Send, FileText, X, CheckCircle, ArrowRight, GitPullRequest } from 'lucide-react'
-import { useVVBPipeline } from '../../hooks/useCommandData'
+import { useEscalations, useAcknowledgeEscalation, useResolveEscalation } from '../../hooks/useValidation'
+import type { Escalation } from '../../hooks/useValidation'
 
 const STAGES = [
   { id: 'draft', label: 'Draft', color: 'bg-surface-100 dark:bg-surface-800' },
@@ -11,45 +12,151 @@ const STAGES = [
   { id: 'rejected', label: 'Rejected', color: 'bg-red-50 dark:bg-red-950/20' },
 ]
 
+interface PipelineCard {
+  id: string
+  projectId: string
+  projectName: string
+  title: string
+  description: string
+  methodology: string
+  registry: string
+  daysInStage: number
+  deadlineWarning: boolean
+  overdue: boolean
+  clarificationQuery: string | null
+  draftResponse: string | null
+  stage: string
+  priority: string
+  createdAt: string
+  escalationStatus: string
+}
+
+function mapEscalationToCard(esc: Escalation): PipelineCard {
+  const statusToStage: Record<string, string> = {
+    pending: 'draft',
+    acknowledged: 'under_review',
+    resolved: 'approved',
+    timed_out: 'rejected',
+  }
+
+  const now = Date.now()
+  const createdAt = new Date(esc.created_at).getTime()
+  const slaDeadline = esc.sla_deadline ? new Date(esc.sla_deadline).getTime() : null
+  const daysInStage = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24))
+
+  let overdue = false
+  let deadlineWarning = false
+  if (slaDeadline) {
+    overdue = now > slaDeadline
+    const daysToDeadline = Math.floor((slaDeadline - now) / (1000 * 60 * 60 * 24))
+    deadlineWarning = !overdue && daysToDeadline <= 7
+  }
+
+  const stage = statusToStage[esc.status] || 'draft'
+
+  return {
+    id: esc.id,
+    projectId: esc.id,
+    projectName: `Escalation ${esc.id.slice(0, 8)}`,
+    title: esc.escalation_reason.length > 60 ? esc.escalation_reason.slice(0, 60) + '...' : esc.escalation_reason,
+    description: esc.escalation_reason,
+    methodology: '—',
+    registry: '—',
+    daysInStage,
+    deadlineWarning,
+    overdue,
+    clarificationQuery: stage === 'under_review' ? esc.escalation_reason : null,
+    draftResponse: null,
+    stage,
+    priority: esc.severity_score >= 0.7 ? 'high' : esc.severity_score >= 0.4 ? 'medium' : 'low',
+    createdAt: esc.created_at,
+    escalationStatus: esc.status,
+  }
+}
+
 export function VVBPipelinePage() {
-  const { data: pipeline, isLoading, isError, error } = useVVBPipeline()
-  const [selectedCard, setSelectedCard] = useState<any>(null)
-  const [draftCard, setDraftCard] = useState<any>(null)
+  const { data: escalations, isLoading, isError, error } = useEscalations()
+  const acknowledge = useAcknowledgeEscalation()
+  const resolve = useResolveEscalation()
+  const [selectedCard, setSelectedCard] = useState<PipelineCard | null>(null)
+  const [draftCard, setDraftCard] = useState<PipelineCard | null>(null)
   const [draftResponse, setDraftResponse] = useState('')
   const [toast, setToast] = useState<string | null>(null)
+
+  const pipeline = useMemo(() => {
+    const result: Record<string, PipelineCard[]> = {
+      draft: [],
+      submitted: [],
+      under_review: [],
+      clarification_requested: [],
+      approved: [],
+      rejected: [],
+    }
+    if (!escalations) return result
+    for (const esc of escalations) {
+      const card = mapEscalationToCard(esc)
+      if (result[card.stage]) {
+        result[card.stage].push(card)
+      } else {
+        result.draft.push(card)
+      }
+    }
+    return result
+  }, [escalations])
 
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
   }
 
-  const getDeadlineBadge = (card: any) => {
+  const getDeadlineBadge = (card: PipelineCard) => {
     if (card.overdue) return <span className="badge badge-red animate-pulse text-[10px]"><AlertTriangle className="h-3 w-3 mr-0.5" />OVERDUE</span>
     if (card.deadlineWarning) return <span className="badge bg-orange-50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-300 text-[10px]"><Clock className="h-3 w-3 mr-0.5" />&lt;7d</span>
     return <span className="badge badge-slate text-[10px]"><Clock className="h-3 w-3 mr-0.5" />{card.daysInStage}d</span>
   }
 
-  const openDetails = (card: any) => {
+  const openDetails = (card: PipelineCard) => {
     setSelectedCard(card)
     setDraftCard(null)
   }
 
-  const openDraftResponse = (card: any) => {
+  const openDraftResponse = (card: PipelineCard) => {
     setDraftCard(card)
     setDraftResponse(`Dear VVB Reviewer,\n\nThank you for your query regarding ${card.projectName}.\n\nRegarding your question about ${card.clarificationQuery}:\n\n[Auto-drafted response based on project data and methodology KB]\n\nPlease let us know if you require any further information.\n\nBest regards,\nCarbonVerify Operations Team`)
   }
 
-  const handleSubmitResponse = () => {
-    showToast(`Response submitted for ${draftCard?.projectName}`)
-    setDraftCard(null)
+  const handleSubmitResponse = async () => {
+    if (!draftCard) return
+    try {
+      await resolve.mutateAsync({
+        id: draftCard.id,
+        decision: 'responded',
+        notes: draftResponse,
+      })
+      showToast(`Response submitted for ${draftCard.projectName}`)
+      setDraftCard(null)
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to submit response')
+    }
   }
 
-  const handleAdvanceStage = (card: any) => {
-    const currentIdx = STAGES.findIndex((s) => s.id === card.stage)
-    if (currentIdx >= 0 && currentIdx < STAGES.length - 1) {
-      showToast(`Moved ${card.projectName} to ${STAGES[currentIdx + 1].label}`)
+  const handleAdvanceStage = async (card: PipelineCard) => {
+    try {
+      if (card.escalationStatus === 'pending') {
+        await acknowledge.mutateAsync(card.id)
+        showToast(`Acknowledged ${card.projectName}`)
+      } else {
+        await resolve.mutateAsync({
+          id: card.id,
+          decision: 'approved',
+          notes: 'Advanced via pipeline',
+        })
+        showToast(`Resolved ${card.projectName}`)
+      }
+      setSelectedCard(null)
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to advance stage')
     }
-    setSelectedCard(null)
   }
 
   return (
@@ -93,7 +200,7 @@ export function VVBPipelinePage() {
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col gap-2">
-                  {cards.map((card: any) => (
+                  {cards.map((card: PipelineCard) => (
                     <div
                       key={card.id}
                       onClick={() => openDetails(card)}
@@ -115,7 +222,7 @@ export function VVBPipelinePage() {
                           <p className="line-clamp-2">{card.clarificationQuery}</p>
                         </div>
                       )}
-                      {card.stage === 'clarification_requested' && (
+                      {(card.stage === 'clarification_requested' || card.stage === 'under_review') && (
                         <button
                           onClick={(e) => { e.stopPropagation(); openDraftResponse(card) }}
                           className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-primary-600 px-2 py-1.5 text-[10px] font-medium text-white hover:bg-primary-500 active:scale-[0.98] transition-all"
@@ -187,7 +294,7 @@ export function VVBPipelinePage() {
               )}
 
               <div className="flex gap-2 pt-2">
-                {selectedCard.stage === 'clarification_requested' && (
+                {(selectedCard.stage === 'clarification_requested' || selectedCard.stage === 'under_review') && (
                   <button onClick={() => openDraftResponse(selectedCard)} className="btn-primary flex-1 text-sm">
                     <FileText className="mr-1 inline h-4 w-4" /> Draft Response
                   </button>

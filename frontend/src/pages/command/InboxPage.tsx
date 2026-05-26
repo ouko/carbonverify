@@ -3,11 +3,12 @@ import {
   CheckCircle, XCircle, HelpCircle, ArrowUpCircle, UserCheck,
   Clock, AlertTriangle, TrendingUp, Filter,
 } from 'lucide-react'
-import { usePriorityQueue } from '../../hooks/useCommandData'
+import { useReviewQueue, useUpdateReviewQueueItem } from '../../hooks/useReviewQueue'
 import { useCommandWebSocket } from '../../hooks/useCommandWebSocket'
 
 export function InboxPage() {
-  const { data: items, isLoading, isError, error } = usePriorityQueue()
+  const { data: items, isLoading, isError, error } = useReviewQueue()
+  const updateMutation = useUpdateReviewQueueItem()
   const [localItems, setLocalItems] = useState<any[]>([])
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [filterType, setFilterType] = useState('all')
@@ -16,7 +17,28 @@ export function InboxPage() {
   useCommandWebSocket()
 
   useEffect(() => {
-    if (items) setLocalItems(items)
+    if (items) {
+      setLocalItems(
+        items.map((item) => ({
+          id: item.id,
+          priority: item.priority,
+          itemType: item.item_type,
+          reason: item.reason,
+          subject: item.reason.length > 60 ? item.reason.slice(0, 60) + '…' : item.reason,
+          assignedTo: item.assigned_to,
+          status: item.status,
+          createdAt: item.created_at,
+          resolvedAt: item.resolved_at,
+          // Fallbacks for fields the UI expects but the API doesn't provide
+          projectName: item.item_id,
+          projectId: item.item_id,
+          financialImpact: 0,
+          confidence: 1,
+          hoursInQueue: Math.max(0, Math.round((Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60) * 10) / 10),
+          suggestedAction: 'Review',
+        }))
+      )
+    }
   }, [items])
 
   const filtered = localItems.filter((item: any) => {
@@ -52,34 +74,38 @@ export function InboxPage() {
 
   const handleApprove = (id: string) => {
     setActingId(id)
-    setTimeout(() => {
-      mutateItem(id, { status: 'resolved', resolvedAt: new Date().toISOString() })
-      setActingId(null)
-    }, 400)
+    mutateItem(id, { status: 'resolved', resolvedAt: new Date().toISOString() })
+    updateMutation.mutate(
+      { id, updates: { status: 'resolved', resolved_at: new Date().toISOString() } },
+      { onSettled: () => setActingId(null) }
+    )
   }
 
   const handleRequestInfo = (id: string) => {
     setActingId(id)
-    setTimeout(() => {
-      mutateItem(id, { status: 'info_requested' })
-      setActingId(null)
-    }, 400)
+    mutateItem(id, { status: 'pending' })
+    updateMutation.mutate(
+      { id, updates: { status: 'pending', resolution_notes: 'Information requested' } },
+      { onSettled: () => setActingId(null) }
+    )
   }
 
   const handleEscalate = (id: string) => {
     setActingId(id)
-    setTimeout(() => {
-      mutateItem(id, { status: 'escalated', priority: Math.min(5, (localItems.find((i) => i.id === id)?.priority || 1) + 1) })
-      setActingId(null)
-    }, 400)
+    mutateItem(id, { status: 'escalated', priority: Math.min(5, (localItems.find((i) => i.id === id)?.priority || 1) + 1) })
+    updateMutation.mutate(
+      { id, updates: { status: 'escalated' } },
+      { onSettled: () => setActingId(null) }
+    )
   }
 
   const handleAssign = (id: string) => {
     setActingId(id)
-    setTimeout(() => {
-      mutateItem(id, { assignedTo: 'Current User', status: 'in_review' })
-      setActingId(null)
-    }, 400)
+    mutateItem(id, { assignedTo: 'Current User', status: 'in_review' })
+    updateMutation.mutate(
+      { id, updates: { assigned_to: 'Current User', status: 'in_review' } },
+      { onSettled: () => setActingId(null) }
+    )
   }
 
   return (
@@ -173,7 +199,7 @@ export function InboxPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-xs text-surface-600 dark:text-surface-300 max-w-[200px] truncate">
-                      {item.reason}
+                      {item.subject}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right text-xs">
                       <span className={item.confidence < 0.85 ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-surface-600 dark:text-surface-300'}>
