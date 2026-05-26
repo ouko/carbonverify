@@ -125,8 +125,8 @@ export default function ProjectsPage() {
                       {project.methodology}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`badge ${statusBadge[project.status]}`}>
-                        {project.status.replace('_', ' ')}
+                      <span className={`badge ${statusBadge[project.status as ProjectStatus] || 'badge-slate'}`}>
+                        {(project.status || 'unknown').replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-surface-600 dark:text-surface-300">
