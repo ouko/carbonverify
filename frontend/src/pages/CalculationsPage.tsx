@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Calculator, Filter, FileBarChart, Plus, X } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCalculations, useCreateCalculation } from '../hooks/useCalculations'
+import { useProjects } from '../hooks/useProjects'
 import type { CalculationRun } from '../types'
-import { mockCalculations, addCalculation, mockProjects } from '../lib/mockData'
 
 const statusBadge: Record<string, string> = {
   draft: 'badge-slate',
@@ -20,11 +20,14 @@ const statusOptions = [
 ]
 
 export default function CalculationsPage() {
-  const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [showCreate, setShowCreate] = useState(false)
+  const { data: projects } = useProjects()
+  const { data: calculations, isLoading } = useCalculations()
+  const createCalculation = useCreateCalculation()
+
   const [form, setForm] = useState({
-    project_id: mockProjects[0]?.id || '',
+    project_id: '',
     monitoring_period_start: '2024-01-01',
     monitoring_period_end: '2024-03-31',
     fNRB_value: 0.4,
@@ -33,29 +36,18 @@ export default function CalculationsPage() {
     status: 'draft' as CalculationRun['status'],
   })
 
-  const { data: calculations, isLoading } = useQuery<CalculationRun[]>({
-    queryKey: ['calculations'],
-    queryFn: async () => mockCalculations,
-  })
-
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
-    addCalculation({
+    createCalculation.mutate({
       project_id: form.project_id,
       monitoring_period_start: form.monitoring_period_start,
       monitoring_period_end: form.monitoring_period_end,
       fNRB_value: form.fNRB_value,
       emissions_reduction_tCO2e: form.emissions_reduction_tCO2e,
-      uncertainty_95CI: 0.1,
-      leakage_assessment: {},
-      methodology_compliance_score: 0.85,
-      confidence_score: form.confidence_score,
       status: form.status,
-      approved_by: null,
     })
-    qc.invalidateQueries({ queryKey: ['calculations'] })
     setShowCreate(false)
-    setForm({ project_id: mockProjects[0]?.id || '', monitoring_period_start: '2024-01-01', monitoring_period_end: '2024-03-31', fNRB_value: 0.4, emissions_reduction_tCO2e: 10000, confidence_score: 0.85, status: 'draft' })
+    setForm({ project_id: '', monitoring_period_start: '2024-01-01', monitoring_period_end: '2024-03-31', fNRB_value: 0.4, emissions_reduction_tCO2e: 10000, confidence_score: 0.85, status: 'draft' })
   }
 
   const filtered = calculations?.filter((c) =>
@@ -178,7 +170,8 @@ export default function CalculationsPage() {
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
                 <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="input-modern appearance-none cursor-pointer">
-                  {mockProjects.map((p) => (
+                  <option value="">Select a project</option>
+                  {(projects || []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>

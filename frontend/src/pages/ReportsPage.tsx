@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { FileText, Download, ExternalLink, FileArchive, Plus, X } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useReports, useCreateReport } from '../hooks/useReports'
+import { useProjects } from '../hooks/useProjects'
+import { useCalculations } from '../hooks/useCalculations'
 import type { Report } from '../types'
-import { mockReports, addReport, mockProjects, mockCalculations } from '../lib/mockData'
 
 const statusBadge: Record<string, string> = {
   draft: 'badge-slate',
@@ -14,34 +15,30 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function ReportsPage() {
-  const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const { data: projects } = useProjects()
+  const { data: calculations } = useCalculations()
+  const { data: reports, isLoading } = useReports()
+  const createReport = useCreateReport()
+
   const [form, setForm] = useState({
-    project_id: mockProjects[0]?.id || '',
-    calculation_run_id: mockCalculations[0]?.id || '',
+    project_id: '',
+    calculation_run_id: '',
     template_type: 'GoldStandard_TPDDTEC' as Report['template_type'],
     status: 'draft' as Report['status'],
   })
 
-  const { data: reports, isLoading } = useQuery<Report[]>({
-    queryKey: ['reports'],
-    queryFn: async () => mockReports,
-  })
-
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
-    addReport({
+    createReport.mutate({
       project_id: form.project_id,
       calculation_run_id: form.calculation_run_id,
       template_type: form.template_type,
       draft_content: {},
-      final_pdf: null,
       status: form.status,
-      vvb_feedback: null,
     })
-    qc.invalidateQueries({ queryKey: ['reports'] })
     setShowCreate(false)
-    setForm({ project_id: mockProjects[0]?.id || '', calculation_run_id: mockCalculations[0]?.id || '', template_type: 'GoldStandard_TPDDTEC', status: 'draft' })
+    setForm({ project_id: '', calculation_run_id: '', template_type: 'GoldStandard_TPDDTEC', status: 'draft' })
   }
 
   return (
@@ -140,7 +137,8 @@ export default function ReportsPage() {
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
                 <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="input-modern appearance-none cursor-pointer">
-                  {mockProjects.map((p) => (
+                  <option value="">Select a project</option>
+                  {(projects || []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
@@ -148,7 +146,8 @@ export default function ReportsPage() {
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Calculation Run</label>
                 <select value={form.calculation_run_id} onChange={(e) => setForm({ ...form, calculation_run_id: e.target.value })} className="input-modern appearance-none cursor-pointer">
-                  {mockCalculations.map((c) => (
+                  <option value="">Select a calculation</option>
+                  {(calculations || []).map((c) => (
                     <option key={c.id} value={c.id}>{c.id} — {c.emissions_reduction_tCO2e?.toLocaleString()} tCO2e</option>
                   ))}
                 </select>

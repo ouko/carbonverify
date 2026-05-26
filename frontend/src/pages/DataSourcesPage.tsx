@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Database, Search, CheckCircle, AlertTriangle, XCircle, Clock, HardDrive, Plus, X } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useDataSources, useCreateDataSource } from '../hooks/useDataSources'
+import { useProjects } from '../hooks/useProjects'
 import type { DataSource } from '../types'
-import { mockDataSources, addDataSource, mockProjects } from '../lib/mockData'
 
 const statusIcons: Record<string, ReactNode> = {
   pending: <Clock className="h-3.5 w-3.5 text-amber-500" />,
@@ -20,36 +20,29 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function DataSourcesPage() {
-  const qc = useQueryClient()
   const [projectFilter, setProjectFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const { data: projects } = useProjects()
+  const { data: sources, isLoading } = useDataSources()
+  const createDataSource = useCreateDataSource()
+
   const [form, setForm] = useState({
-    project_id: mockProjects[0]?.id || '',
+    project_id: '',
     source_type: 'mobile_survey' as DataSource['source_type'],
     schema_version: 'v1.0',
     validation_status: 'pending' as DataSource['validation_status'],
   })
 
-  const { data: sources, isLoading } = useQuery<DataSource[]>({
-    queryKey: ['data-sources'],
-    queryFn: async () => mockDataSources,
-  })
-
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
-    addDataSource({
+    createDataSource.mutate({
       project_id: form.project_id,
       source_type: form.source_type,
       schema_version: form.schema_version,
-      raw_data: {},
-      processed_data: {},
       validation_status: form.validation_status,
-      validation_errors: null,
-      provenance: {},
     })
-    qc.invalidateQueries({ queryKey: ['data-sources'] })
     setShowCreate(false)
-    setForm({ project_id: mockProjects[0]?.id || '', source_type: 'mobile_survey', schema_version: 'v1.0', validation_status: 'pending' })
+    setForm({ project_id: '', source_type: 'mobile_survey', schema_version: 'v1.0', validation_status: 'pending' })
   }
 
   const filtered = sources?.filter((s) =>
@@ -169,7 +162,8 @@ export default function DataSourcesPage() {
                   onChange={(e) => setForm({ ...form, project_id: e.target.value })}
                   className="input-modern appearance-none cursor-pointer"
                 >
-                  {mockProjects.map((p) => (
+                  <option value="">Select a project</option>
+                  {(projects || []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
