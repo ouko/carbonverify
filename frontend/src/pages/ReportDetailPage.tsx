@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Calendar, Activity, Hash, AlertCircle } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Breadcrumbs from '../components/Breadcrumbs'
 import { useReport } from '../hooks/useReports'
 
 const statusColor: Record<string, string> = {
@@ -49,6 +50,7 @@ export default function ReportDetailPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: 'Home', to: '/' }, { label: 'Reports', to: '/reports' }, { label: report.id }]} />
       {/* Header */}
       <div className="flex items-center gap-3">
         <button

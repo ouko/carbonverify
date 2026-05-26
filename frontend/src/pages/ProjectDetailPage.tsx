@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { ArrowLeft, Database, Calculator, FileText, MapPin, Calendar, Activity } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Breadcrumbs from '../components/Breadcrumbs'
 import { useProject } from '../hooks/useProjects'
 
 const statusColor: Record<string, string> = {
@@ -54,6 +55,7 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: 'Home', to: '/' }, { label: 'Projects', to: '/projects' }, { label: project.name }]} />
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

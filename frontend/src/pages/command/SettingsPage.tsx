@@ -1,7 +1,11 @@
-import { useState } from 'react'
-import { Bell, Mail, MessageSquare, Smartphone, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Bell, Mail, MessageSquare, Smartphone, Save, Loader2 } from 'lucide-react'
+import { useUserSettings, useUpdateUserSettings } from '../../hooks/useSecurity'
 
 export function SettingsPage() {
+  const { data: apiSettings, isLoading, isError } = useUserSettings()
+  const updateSettings = useUpdateUserSettings()
+
   const [settings, setSettings] = useState({
     notifyHumanReview: true,
     notifyVVB: true,
@@ -17,8 +21,18 @@ export function SettingsPage() {
     autoAdvanceThreshold: 0.95,
   })
 
+  useEffect(() => {
+    if (apiSettings) {
+      setSettings(apiSettings)
+    }
+  }, [apiSettings])
+
   const toggle = (key: keyof typeof settings) => {
     setSettings((s) => ({ ...s, [key]: !s[key] }))
+  }
+
+  const handleSave = () => {
+    updateSettings.mutate(settings)
   }
 
   const toggleRow = (label: string, desc: string, key: keyof typeof settings) => (
@@ -35,6 +49,22 @@ export function SettingsPage() {
       </button>
     </div>
   )
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-3xl flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="mx-auto max-w-3xl card p-8 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">Failed to load settings</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -132,8 +162,17 @@ export function SettingsPage() {
       </div>
 
       <div className="flex justify-end">
-        <button className="btn-primary">
-          <Save className="h-4 w-4" /> Save Settings
+        <button
+          onClick={handleSave}
+          disabled={updateSettings.isPending}
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {updateSettings.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Save Settings
         </button>
       </div>
     </div>

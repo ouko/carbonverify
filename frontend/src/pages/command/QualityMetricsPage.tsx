@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import { TrendingUp, AlertTriangle, ThumbsUp, Ticket } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { useQualityMetrics } from '../../hooks/useCommandData'
+import { useQualityMetrics } from '../../hooks/useValidation'
 
 export function QualityMetricsPage() {
   const { data, isLoading, isError, error } = useQualityMetrics()
@@ -25,13 +25,14 @@ export function QualityMetricsPage() {
     )
   }
 
-  const metrics = data || {
+  const metrics = {
     accuracyOverTime: [],
     rejectionByVVB: [],
     rejectionByMethodology: [],
     npsTrend: [],
     supportVolume: [],
     calibrationData: [],
+    ...data,
   }
 
   const filteredCalibration = calibrationAgent === 'all'
@@ -51,10 +52,10 @@ export function QualityMetricsPage() {
       {/* Top Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: 'Calc Accuracy', value: '94.2%', sub: '+1.3% vs last month', icon: TrendingUp, color: 'text-primary-500', subColor: 'text-primary-600' },
-          { label: 'Rejection Rate', value: '8.4%', sub: '+0.5% vs last month', icon: AlertTriangle, color: 'text-amber-500', subColor: 'text-red-600' },
-          { label: 'NPS Score', value: '62', sub: '+4 vs last month', icon: ThumbsUp, color: 'text-blue-500', subColor: 'text-primary-600' },
-          { label: 'Support Tickets', value: '34', sub: '-12 vs last month', icon: Ticket, color: 'text-violet-500', subColor: 'text-primary-600' },
+          { label: 'Calc Accuracy', value: `${metrics.accuracy_percent ?? 0}%`, sub: '+1.3% vs last month', icon: TrendingUp, color: 'text-primary-500', subColor: 'text-primary-600' },
+          { label: 'Rejection Rate', value: `${metrics.rejection_rate_percent ?? 0}%`, sub: '+0.5% vs last month', icon: AlertTriangle, color: 'text-amber-500', subColor: 'text-red-600' },
+          { label: 'NPS Score', value: `${metrics.nps_score ?? 0}`, sub: '+4 vs last month', icon: ThumbsUp, color: 'text-blue-500', subColor: 'text-primary-600' },
+          { label: 'Support Tickets', value: `${metrics.total_rejections ?? 0}`, sub: '-12 vs last month', icon: Ticket, color: 'text-violet-500', subColor: 'text-primary-600' },
         ].map((stat) => (
           <div key={stat.label} className="card p-5">
             <div className="flex items-center gap-2 mb-2">

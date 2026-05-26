@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { ArrowLeft, Database, CheckCircle, AlertTriangle, XCircle, Clock, Calendar, Activity, FileJson } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Breadcrumbs from '../components/Breadcrumbs'
 import { useDataSource } from '../hooks/useDataSources'
 
 const statusColor: Record<string, string> = {
@@ -54,6 +55,7 @@ export default function DataSourceDetailPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: 'Home', to: '/' }, { label: 'Data Sources', to: '/data-sources' }, { label: displayName }]} />
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

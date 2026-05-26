@@ -76,6 +76,21 @@ async def update_calculation(
     return calc
 
 
+@router.delete("/{calc_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_calculation(
+    calc_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    result = await db.execute(select(CalculationRun).where(CalculationRun.id == calc_id))
+    calc = result.scalar_one_or_none()
+    if not calc:
+        raise HTTPException(status_code=404, detail="Calculation run not found")
+    await db.delete(calc)
+    await db.commit()
+    return None
+
+
 @router.post("/projects/{project_id}/calculate")
 async def run_project_calculation(
     project_id: uuid.UUID,

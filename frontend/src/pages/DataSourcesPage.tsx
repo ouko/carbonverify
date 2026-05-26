@@ -28,6 +28,7 @@ export default function DataSourcesPage() {
   const { data: projects } = useProjects()
   const { data: sources, isLoading, isError, error } = useDataSources()
   const createDataSource = useCreateDataSource()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const [form, setForm] = useState({
     project_id: '',
@@ -36,8 +37,17 @@ export default function DataSourcesPage() {
     validation_status: 'pending' as DataSource['validation_status'],
   })
 
+  const validate = () => {
+    const errors: Record<string, string> = {}
+    if (!form.project_id) errors.project_id = 'Project is required'
+    if (!form.schema_version) errors.schema_version = 'Schema version is required'
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validate()) return
     createDataSource.mutate({
       project_id: form.project_id,
       source_type: form.source_type,
@@ -46,6 +56,7 @@ export default function DataSourcesPage() {
     })
     setShowCreate(false)
     setForm({ project_id: '', source_type: 'mobile_survey', schema_version: 'v1.0', validation_status: 'pending' })
+    setFormErrors({})
   }
 
   const filtered = sources?.filter((s) =>
@@ -160,17 +171,18 @@ export default function DataSourcesPage() {
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
+                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project <span className="text-red-500">*</span></label>
                 <select
                   value={form.project_id}
-                  onChange={(e) => setForm({ ...form, project_id: e.target.value })}
-                  className="input-modern appearance-none cursor-pointer"
+                  onChange={(e) => { setForm({ ...form, project_id: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.project_id; return n }) }}
+                  className={`input-modern appearance-none cursor-pointer ${formErrors.project_id ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}
                 >
                   <option value="">Select a project</option>
                   {(projects || []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+                {formErrors.project_id && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.project_id}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Source Type</label>
@@ -187,16 +199,17 @@ export default function DataSourcesPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Schema Version</label>
+                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Schema Version <span className="text-red-500">*</span></label>
                 <input
                   value={form.schema_version}
-                  onChange={(e) => setForm({ ...form, schema_version: e.target.value })}
-                  className="input-modern"
+                  onChange={(e) => { setForm({ ...form, schema_version: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.schema_version; return n }) }}
+                  className={`input-modern ${formErrors.schema_version ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}
                 />
+                {formErrors.schema_version && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.schema_version}</p>}
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1 text-sm">Cancel</button>
-                <button type="submit" className="btn-primary flex-1 text-sm">Add Data Source</button>
+                <button type="submit" disabled={Object.keys(formErrors).length > 0} className="btn-primary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed">Add Data Source</button>
               </div>
             </form>
           </div>

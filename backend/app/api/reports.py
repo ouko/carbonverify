@@ -76,6 +76,21 @@ async def update_report(
     return report
 
 
+@router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_report(
+    report_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    result = await db.execute(select(Report).where(Report.id == report_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    await db.delete(report)
+    await db.commit()
+    return None
+
+
 @router.post("/{report_id}/generate")
 async def generate_report_endpoint(
     report_id: uuid.UUID,

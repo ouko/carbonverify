@@ -67,3 +67,18 @@ async def update_data_source(
     await db.commit()
     await db.refresh(ds)
     return ds
+
+
+@router.delete("/{ds_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_data_source(
+    ds_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    result = await db.execute(select(DataSource).where(DataSource.id == ds_id))
+    ds = result.scalar_one_or_none()
+    if not ds:
+        raise HTTPException(status_code=404, detail="Data source not found")
+    await db.delete(ds)
+    await db.commit()
+    return None

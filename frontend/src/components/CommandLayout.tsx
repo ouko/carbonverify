@@ -34,6 +34,7 @@ const navItems = [
 export default function CommandLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [searchText, setSearchText] = useState('')
   const location = useLocation()
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
@@ -88,9 +89,16 @@ export default function CommandLayout() {
             <input
               type="text"
               placeholder="Search projects..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
               className="ml-2 w-full bg-transparent text-sm text-surface-700 outline-none placeholder:text-surface-400 dark:text-surface-200"
             />
           </div>
+          {searchText && (
+            <p className="mt-1.5 px-1 text-xs text-surface-400 dark:text-surface-500">
+              Search: {searchText}
+            </p>
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 space-y-0.5">

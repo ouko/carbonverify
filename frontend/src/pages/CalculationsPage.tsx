@@ -28,6 +28,7 @@ export default function CalculationsPage() {
   const { data: projects } = useProjects()
   const { data: calculations, isLoading, isError, error } = useCalculations()
   const createCalculation = useCreateCalculation()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const [form, setForm] = useState({
     project_id: '',
@@ -39,8 +40,19 @@ export default function CalculationsPage() {
     status: 'draft' as CalculationRun['status'],
   })
 
+  const validate = () => {
+    const errors: Record<string, string> = {}
+    if (!form.project_id) errors.project_id = 'Project is required'
+    if (!form.monitoring_period_start) errors.monitoring_period_start = 'Period start is required'
+    if (!form.monitoring_period_end) errors.monitoring_period_end = 'Period end is required'
+    if (form.fNRB_value < 0 || form.fNRB_value > 1) errors.fNRB_value = 'fNRB value must be between 0 and 1'
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validate()) return
     createCalculation.mutate({
       project_id: form.project_id,
       monitoring_period_start: form.monitoring_period_start,
@@ -51,6 +63,7 @@ export default function CalculationsPage() {
     })
     setShowCreate(false)
     setForm({ project_id: '', monitoring_period_start: '2024-01-01', monitoring_period_end: '2024-03-31', fNRB_value: 0.4, emissions_reduction_tCO2e: 10000, confidence_score: 0.85, status: 'draft' })
+    setFormErrors({})
   }
 
   const filtered = calculations?.filter((c) =>
@@ -172,28 +185,32 @@ export default function CalculationsPage() {
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
-                <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="input-modern appearance-none cursor-pointer">
+                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project <span className="text-red-500">*</span></label>
+                <select value={form.project_id} onChange={(e) => { setForm({ ...form, project_id: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.project_id; return n }) }} className={`input-modern appearance-none cursor-pointer ${formErrors.project_id ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}>
                   <option value="">Select a project</option>
                   {(projects || []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+                {formErrors.project_id && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.project_id}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Period Start</label>
-                  <input type="date" value={form.monitoring_period_start} onChange={(e) => setForm({ ...form, monitoring_period_start: e.target.value })} className="input-modern" />
+                  <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Period Start <span className="text-red-500">*</span></label>
+                  <input type="date" value={form.monitoring_period_start} onChange={(e) => { setForm({ ...form, monitoring_period_start: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.monitoring_period_start; return n }) }} className={`input-modern ${formErrors.monitoring_period_start ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`} />
+                  {formErrors.monitoring_period_start && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.monitoring_period_start}</p>}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Period End</label>
-                  <input type="date" value={form.monitoring_period_end} onChange={(e) => setForm({ ...form, monitoring_period_end: e.target.value })} className="input-modern" />
+                  <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Period End <span className="text-red-500">*</span></label>
+                  <input type="date" value={form.monitoring_period_end} onChange={(e) => { setForm({ ...form, monitoring_period_end: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.monitoring_period_end; return n }) }} className={`input-modern ${formErrors.monitoring_period_end ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`} />
+                  {formErrors.monitoring_period_end && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.monitoring_period_end}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">fNRB Value</label>
-                  <input type="number" step="0.01" value={form.fNRB_value} onChange={(e) => setForm({ ...form, fNRB_value: parseFloat(e.target.value) })} className="input-modern" />
+                  <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">fNRB Value <span className="text-red-500">*</span></label>
+                  <input type="number" step="0.01" value={form.fNRB_value} onChange={(e) => { setForm({ ...form, fNRB_value: parseFloat(e.target.value) }); setFormErrors(prev => { const n = { ...prev }; delete n.fNRB_value; return n }) }} className={`input-modern ${formErrors.fNRB_value ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`} />
+                  {formErrors.fNRB_value && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.fNRB_value}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Emissions (tCO2e)</label>
@@ -202,7 +219,7 @@ export default function CalculationsPage() {
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1 text-sm">Cancel</button>
-                <button type="submit" className="btn-primary flex-1 text-sm">Run Calculation</button>
+                <button type="submit" disabled={Object.keys(formErrors).length > 0} className="btn-primary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed">Run Calculation</button>
               </div>
             </form>
           </div>

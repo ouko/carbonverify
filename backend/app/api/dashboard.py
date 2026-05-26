@@ -41,3 +41,42 @@ async def get_dashboard_stats(
         recent_calculations=recent_calculations or 0,
         total_emissions_reduced=total_emissions or 0.0,
     )
+
+
+@router.get("/emissions-trend")
+async def get_emissions_trend(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """Return monthly emissions reduction trend for the dashboard chart."""
+    from sqlalchemy import extract
+    from datetime import datetime
+
+    results = await db.execute(
+        select(
+            extract("month", CalculationRun.monitoring_period_end).label("month"),
+            func.coalesce(func.sum(CalculationRun.emissions_reduction_tCO2e), 0.0).label("total"),
+        )
+        .where(CalculationRun.status == "approved")
+        .group_by(extract("month", CalculationRun.monitoring_period_end))
+        .order_by(extract("month", CalculationRun.monitoring_period_end))
+    )
+
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    trend = []
+    for row in results.all():
+        month_idx = int(row.month) - 1 if row.month else 0
+        trend.append({"month": month_names[month_idx], "value": float(row.total or 0)})
+
+    # Fallback to demo data if no calculations exist yet
+    if not trend:
+        trend = [
+            {"month": "Jan", "value": 1200},
+            {"month": "Feb", "value": 1850},
+            {"month": "Mar", "value": 2400},
+            {"month": "Apr", "value": 2100},
+            {"month": "May", "value": 3200},
+            {"month": "Jun", "value": 3800},
+        ]
+
+    return {"trend": trend}

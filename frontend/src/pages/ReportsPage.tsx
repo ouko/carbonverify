@@ -23,6 +23,7 @@ export default function ReportsPage() {
   const { data: calculations } = useCalculations()
   const { data: reports, isLoading, isError, error } = useReports()
   const createReport = useCreateReport()
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const [form, setForm] = useState({
     project_id: '',
@@ -31,8 +32,17 @@ export default function ReportsPage() {
     status: 'draft' as Report['status'],
   })
 
+  const validate = () => {
+    const errors: Record<string, string> = {}
+    if (!form.project_id) errors.project_id = 'Project is required'
+    if (!form.calculation_run_id) errors.calculation_run_id = 'Calculation run is required'
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!validate()) return
     createReport.mutate({
       project_id: form.project_id,
       calculation_run_id: form.calculation_run_id,
@@ -42,6 +52,7 @@ export default function ReportsPage() {
     })
     setShowCreate(false)
     setForm({ project_id: '', calculation_run_id: '', template_type: 'GoldStandard_TPDDTEC', status: 'draft' })
+    setFormErrors({})
   }
 
   return (
@@ -139,22 +150,24 @@ export default function ReportsPage() {
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
-                <select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })} className="input-modern appearance-none cursor-pointer">
+                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project <span className="text-red-500">*</span></label>
+                <select value={form.project_id} onChange={(e) => { setForm({ ...form, project_id: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.project_id; return n }) }} className={`input-modern appearance-none cursor-pointer ${formErrors.project_id ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}>
                   <option value="">Select a project</option>
                   {(projects || []).map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+                {formErrors.project_id && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.project_id}</p>}
               </div>
               <div>
-                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Calculation Run</label>
-                <select value={form.calculation_run_id} onChange={(e) => setForm({ ...form, calculation_run_id: e.target.value })} className="input-modern appearance-none cursor-pointer">
+                <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Calculation Run <span className="text-red-500">*</span></label>
+                <select value={form.calculation_run_id} onChange={(e) => { setForm({ ...form, calculation_run_id: e.target.value }); setFormErrors(prev => { const n = { ...prev }; delete n.calculation_run_id; return n }) }} className={`input-modern appearance-none cursor-pointer ${formErrors.calculation_run_id ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}`}>
                   <option value="">Select a calculation</option>
                   {(calculations || []).map((c) => (
                     <option key={c.id} value={c.id}>{c.id} — {c.emissions_reduction_tCO2e?.toLocaleString()} tCO2e</option>
                   ))}
                 </select>
+                {formErrors.calculation_run_id && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{formErrors.calculation_run_id}</p>}
               </div>
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Template</label>
@@ -165,7 +178,7 @@ export default function ReportsPage() {
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1 text-sm">Cancel</button>
-                <button type="submit" className="btn-primary flex-1 text-sm">Generate Report</button>
+                <button type="submit" disabled={Object.keys(formErrors).length > 0} className="btn-primary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed">Generate Report</button>
               </div>
             </form>
           </div>

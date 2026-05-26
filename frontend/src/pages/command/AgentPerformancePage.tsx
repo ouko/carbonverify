@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import { Bot, AlertTriangle, Zap } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { useAgentPerformance } from '../../hooks/useCommandData'
+import { useAgentPerformance } from '../../hooks/useValidation'
 
 export function AgentPerformancePage() {
   const { data: agents, isLoading, isError, error } = useAgentPerformance()

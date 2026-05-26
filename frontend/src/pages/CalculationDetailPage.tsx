@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { ArrowLeft, Calculator, Calendar, Activity, BarChart3, Shield, Target } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Breadcrumbs from '../components/Breadcrumbs'
 import { useCalculation } from '../hooks/useCalculations'
 
 const statusBadge: Record<string, string> = {
@@ -45,6 +46,7 @@ export default function CalculationDetailPage() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: 'Home', to: '/' }, { label: 'Calculations', to: '/calculations' }, { label: calc.id }]} />
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

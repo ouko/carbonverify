@@ -4,7 +4,7 @@ import { useLeadsStats } from '../hooks/useLeads'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts'
 import StatCard from '../components/StatCard'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { useDashboardStats } from '../hooks/useDashboardStats'
+import { useDashboardStats, useEmissionsTrend } from '../hooks/useDashboardStats'
 
 const statusColors: Record<string, string> = {
   onboarding: '#94a3b8',
@@ -26,7 +26,7 @@ const statusLabels: Record<string, string> = {
   monitoring: 'Monitoring',
 }
 
-const emissionsTrend = [
+const fallbackEmissionsTrend = [
   { month: 'Jan', value: 1200 },
   { month: 'Feb', value: 1850 },
   { month: 'Mar', value: 2400 },
@@ -39,6 +39,9 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { data: stats, isLoading, isError, error } = useDashboardStats()
   const { data: leadStats } = useLeadsStats()
+  const { data: emissionsTrendData, isError: emissionsError } = useEmissionsTrend()
+
+  const emissionsTrend = emissionsError ? fallbackEmissionsTrend : (emissionsTrendData ?? fallbackEmissionsTrend)
 
   const chartData = stats
     ? Object.entries(stats.projects_by_status).map(([key, value]) => ({

@@ -76,3 +76,41 @@ export function useMFAConfirm() {
     },
   })
 }
+
+export interface UserSettings {
+  notifyHumanReview: boolean
+  notifyVVB: boolean
+  notifyAnomaly: boolean
+  notifyChurn: boolean
+  notifyDeadline: boolean
+  channelEmail: boolean
+  channelInApp: boolean
+  channelSMS: boolean
+  channelWhatsApp: boolean
+  digestMode: string
+  autoAssign: boolean
+  autoAdvanceThreshold: number
+}
+
+export function useUserSettings() {
+  return useQuery<UserSettings>({
+    queryKey: ['user', 'settings'],
+    queryFn: async () => {
+      const res = await api.get('/users/me/settings')
+      return res.data as UserSettings
+    },
+  })
+}
+
+export function useUpdateUserSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (settings: UserSettings) => {
+      const res = await api.put('/users/me/settings', settings)
+      return res.data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['user', 'settings'] })
+    },
+  })
+}
