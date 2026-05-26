@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - Celery tasks: `execute_validation_run`, `anchor_run_to_radix`, `cleanup_archived_runs`, `check_stalled_escalations`
   - Alembic migration `1e1e69dad168` creating 8 tables and 9 PostgreSQL enums
 
+### Fixed
+- **Login failure for existing users** — Users created before the `email_hash` migration could not log in because the login endpoint queried only by `email_hash`. Added a fallback scan of decrypted emails when hash lookup misses, plus a data migration (`ab7db18e2c68`) to backfill `email_hash` for all existing users. Frontend now shows actual API error messages instead of generic "Invalid email or password".
+
 ### Security
 - **Searchable encrypted fields** — Added `email_hash` (HMAC-SHA256) to the `User` model to enable exact-match lookups on encrypted emails without exposing plaintext. `compute_searchable_hash()` derives a deterministic keyed hash from the encryption key.
 - **Password complexity** — Registration now requires 8+ chars with at least one uppercase letter, one digit, and one special character (`@$!%*?&`)

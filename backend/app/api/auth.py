@@ -139,6 +139,18 @@ async def login(
     result = await db.execute(select(User).where(User.email_hash == email_hash))
     user = result.scalar_one_or_none()
 
+    # Fallback: if no user found by email_hash, scan for users with missing
+    # email_hash (e.g., created before the searchable-hash migration) and
+    # compare decrypted emails. This is a safety net for data-migration gaps.
+    if not user:
+        logger.warning("login_email_hash_miss", email_hash=email_hash)
+        all_users = await db.execute(select(User))
+        for candidate in all_users.scalars().all():
+            if candidate.email and candidate.email.lower() == payload.email.lower():
+                user = candidate
+                logger.info("login_fallback_match", user_id=str(user.id))
+                break
+
     audit = AuditLogger(db)
 
     if not user or not verify_password(payload.password, user.hashed_password):
