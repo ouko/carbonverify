@@ -4,7 +4,7 @@ import StatCard from '../components/StatCard';
 import { useFieldData } from '../hooks/useFieldData';
 
 export function FieldDashboardPage() {
-  const { stats, enumerators, loading } = useFieldData();
+  const { stats, enumerators, loading, isError } = useFieldData();
   const [filter, setFilter] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
@@ -34,14 +34,25 @@ export function FieldDashboardPage() {
           <p className="text-sm text-surface-400 dark:text-surface-500 mt-1">Monitor enumerators and field data collection</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => showToast('Enumerator management — coming in next release')} className="btn-primary text-sm">
+          <button onClick={() => showToast('Coming soon')} className="btn-primary text-sm">
             <Wrench className="w-3.5 h-3.5 mr-1" /> Manage Enumerators
           </button>
-          <button onClick={() => showToast('Survey builder — coming in next release')} className="btn-secondary text-sm">
+          <button onClick={() => showToast('Coming soon')} className="btn-secondary text-sm">
             Survey Builder
           </button>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {isError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-950/20 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">Failed to load field data</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Please refresh the page or try again later.</p>
+          </div>
+        </div>
+      )}
 
       {/* Alerts */}
       {alerts.length > 0 && (

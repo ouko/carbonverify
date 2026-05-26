@@ -1,76 +1,127 @@
-import { useState } from 'react'
-import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check } from 'lucide-react'
-
-interface Token {
-  id: string
-  project: string
-  tonnes: number
-  vintage: number
-  methodology: string
-  vvb: string
-  price: number | null
-  status: 'listed' | 'minted' | 'retired'
-  radixAddress: string
-}
-
-const INITIAL_TOKENS: Token[] = [
-  { id: 'T-001', project: 'Kenya Clean Cookstoves', tonnes: 5000, vintage: 2024, methodology: 'TPDDTEC v4', vvb: 'Verra', price: 13.00, status: 'listed', radixAddress: 'sim_token_abc123' },
-  { id: 'T-002', project: 'Ghana Biogas Program', tonnes: 10000, vintage: 2023, methodology: 'VM0050', vvb: 'Gold Standard', price: 19.50, status: 'listed', radixAddress: 'sim_token_def456' },
-  { id: 'T-003', project: 'Ethiopia LPG Adoption', tonnes: 2500, vintage: 2024, methodology: 'AMS-II.G', vvb: 'Verra', price: 10.25, status: 'minted', radixAddress: 'sim_token_ghi789' },
-  { id: 'T-004', project: 'Nepal Improved Charcoal', tonnes: 3000, vintage: 2023, methodology: 'TPDDTEC v4', vvb: 'Kenya National', price: null, status: 'retired', radixAddress: 'sim_token_jkl012' },
-]
-
-let tokenCounter = 5
+import { useState, useEffect, useCallback } from 'react'
+import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check, AlertTriangle } from 'lucide-react'
+import { useTokens, useMarketplace, useMintToken, useBuyToken, useRetireToken } from '../hooks/useTokenization'
+import { useCalculations } from '../hooks/useCalculations'
 
 export function TokenizationPage() {
   const [tab, setTab] = useState<'marketplace' | 'mint' | 'retire'>('marketplace')
-  const [tokens, setTokens] = useState<Token[]>(INITIAL_TOKENS)
-  const [selectedToken, setSelectedToken] = useState<Token | null>(null)
+  const [selectedToken, setSelectedToken] = useState<any | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [mintForm, setMintForm] = useState({ project: 'Kenya Clean Cookstoves', tonnes: '', vintage: '2024', methodology: 'TPDDTEC v4', vvb: 'Verra' })
-  const [retireForm, setRetireForm] = useState({ tokenId: 'T-003', tonnes: '', purpose: '', beneficiary: '', location: '' })
 
-  const showToast = (msg: string) => {
+  const [mintForm, setMintForm] = useState({
+    project: 'Kenya Clean Cookstoves',
+    tonnes: '',
+    vintage: '2024',
+    methodology: 'TPDDTEC v4',
+    vvb: 'Verra',
+    certificateId: '',
+    calculationRunId: '',
+  })
+
+  const [retireForm, setRetireForm] = useState({
+    tokenId: '',
+    tonnes: '',
+    purpose: '',
+    beneficiary: '',
+    location: '',
+  })
+
+  const { data: tokens, isLoading: tokensLoading, isError: tokensError } = useTokens()
+  const { data: listings, isLoading: listingsLoading, isError: listingsError } = useMarketplace()
+  const { data: calculations, isLoading: calcLoading, isError: calcError } = useCalculations()
+
+  const mintMutation = useMintToken()
+  const buyMutation = useBuyToken()
+  const retireMutation = useRetireToken()
+
+  const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (mintMutation.isError) {
+      showToast((mintMutation.error as Error)?.message || 'Failed to mint token')
+    }
+  }, [mintMutation.isError, mintMutation.error, showToast])
+
+  useEffect(() => {
+    if (buyMutation.isError) {
+      showToast((buyMutation.error as Error)?.message || 'Failed to buy token')
+    }
+  }, [buyMutation.isError, buyMutation.error, showToast])
+
+  useEffect(() => {
+    if (retireMutation.isError) {
+      showToast((retireMutation.error as Error)?.message || 'Failed to retire token')
+    }
+  }, [retireMutation.isError, retireMutation.error, showToast])
 
   const handleMint = (e: React.FormEvent) => {
     e.preventDefault()
-    const newToken: Token = {
-      id: `T-00${tokenCounter++}`,
-      project: mintForm.project,
-      tonnes: parseInt(mintForm.tonnes) || 0,
-      vintage: parseInt(mintForm.vintage) || 2024,
-      methodology: mintForm.methodology,
-      vvb: mintForm.vvb,
-      price: null,
-      status: 'minted',
-      radixAddress: `sim_token_${Math.random().toString(36).slice(2, 8)}`,
+    if (!mintForm.calculationRunId) {
+      showToast('Please select a calculation run')
+      return
     }
-    setTokens((prev) => [newToken, ...prev])
-    setMintForm({ project: 'Kenya Clean Cookstoves', tonnes: '', vintage: '2024', methodology: 'TPDDTEC v4', vvb: 'Verra' })
-    setTab('marketplace')
-    showToast(`Minted ${newToken.tonnes.toLocaleString()} tCO₂e token on Radix`)
+    mintMutation.mutate(
+      {
+        project: mintForm.project,
+        tonnes: parseInt(mintForm.tonnes) || 0,
+        vintage: parseInt(mintForm.vintage) || 2024,
+        methodology: mintForm.methodology,
+        vvb: mintForm.vvb,
+        certificate_id: mintForm.certificateId || undefined,
+        calculation_run_id: mintForm.calculationRunId,
+      },
+      {
+        onSuccess: (data) => {
+          setMintForm({
+            project: 'Kenya Clean Cookstoves',
+            tonnes: '',
+            vintage: '2024',
+            methodology: 'TPDDTEC v4',
+            vvb: 'Verra',
+            certificateId: '',
+            calculationRunId: '',
+          })
+          setTab('marketplace')
+          showToast(`Minted ${data.tonnes.toLocaleString()} tCO₂e token on Radix`)
+        },
+      }
+    )
   }
 
   const handleRetire = (e: React.FormEvent) => {
     e.preventDefault()
-    const token = tokens.find((t) => t.id === retireForm.tokenId)
-    if (!token) return
-    const retireTonnes = parseInt(retireForm.tonnes) || 0
-    if (retireTonnes >= token.tonnes) {
-      setTokens((prev) => prev.map((t) => t.id === token.id ? { ...t, status: 'retired' as const, tonnes: 0, price: null } : t))
-    } else {
-      setTokens((prev) => prev.map((t) => t.id === token.id ? { ...t, tonnes: t.tonnes - retireTonnes } : t))
+    if (!retireForm.tokenId) {
+      showToast('Please select a token to retire')
+      return
     }
-    setRetireForm({ tokenId: 'T-003', tonnes: '', purpose: '', beneficiary: '', location: '' })
-    setTab('marketplace')
-    showToast(`Retired ${retireTonnes.toLocaleString()} tCO₂e — permanent burn recorded on Radix`)
+    const retireTonnes = parseInt(retireForm.tonnes) || 0
+    retireMutation.mutate(
+      {
+        tokenId: retireForm.tokenId,
+        payload: {
+          tonnes: retireTonnes,
+          purpose: retireForm.purpose,
+          beneficiary: retireForm.beneficiary,
+          location: retireForm.location,
+        },
+      },
+      {
+        onSuccess: () => {
+          setRetireForm({ tokenId: '', tonnes: '', purpose: '', beneficiary: '', location: '' })
+          setTab('marketplace')
+          showToast(`Retired ${retireTonnes.toLocaleString()} tCO₂e — permanent burn recorded on Radix`)
+        },
+      }
+    )
   }
 
-  const handleBuy = (token: Token) => {
-    showToast(`Purchase request sent for ${token.project}`)
+  const handleBuy = (listingId: string, projectName: string) => {
+    buyMutation.mutate(listingId, {
+      onSuccess: () => showToast(`Purchase request sent for ${projectName}`),
+    })
   }
 
   const tabItems = [
@@ -79,15 +130,22 @@ export function TokenizationPage() {
     { key: 'retire' as const, label: 'Retire', icon: Flame },
   ]
 
-  const listedTokens = tokens.filter((t) => t.status === 'listed')
-  const retireOptions = tokens.filter((t) => t.status === 'minted' || (t.status === 'listed' && t.tonnes > 0))
+  const retireOptions = (tokens || []).filter(
+    (t) => t.status === 'minted' || (t.status === 'listed' && t.tonnes > 0)
+  )
+
+  const anyError = tokensError || listingsError || calcError
 
   return (
     <div className="space-y-6 relative">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-surface-900 text-white px-4 py-3 shadow-lg animate-slide-up">
-          <Check className="h-4 w-4 text-primary-400" />
+          {toast.includes('Failed') ? (
+            <AlertTriangle className="h-4 w-4 text-red-400" />
+          ) : (
+            <Check className="h-4 w-4 text-primary-400" />
+          )}
           <span className="text-sm">{toast}</span>
           <button onClick={() => setToast(null)} className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
         </div>
@@ -103,6 +161,17 @@ export function TokenizationPage() {
           <p className="text-sm text-surface-400 dark:text-surface-500">Mint and trade on Radix DLT</p>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {anyError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/30 dark:bg-red-950/20 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">Failed to load data</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Please refresh the page or try again later.</p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-xl bg-surface-100/80 dark:bg-surface-800/50 p-1">
@@ -124,42 +193,56 @@ export function TokenizationPage() {
 
       {tab === 'marketplace' && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {listedTokens.map((token) => (
-            <div key={token.id} className="card-hover p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-semibold text-surface-900 dark:text-surface-100">{token.project}</h3>
-                  <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">{token.vvb} verified · Vintage {token.vintage}</p>
-                </div>
-                <span className="badge badge-blue text-[10px]">{token.methodology}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
-                  <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{token.tonnes.toLocaleString()}</p>
-                  <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">tonnes CO₂e</p>
-                </div>
-                <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
-                  <p className="text-lg font-bold text-surface-900 dark:text-surface-100">${token.price}</p>
-                  <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">per tonne</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 mb-4">
-                <Shield className="h-3.5 w-3.5 text-primary-500" />
-                <span className="font-mono">{token.radixAddress.slice(0, 20)}...</span>
-                <button className="text-primary-600 hover:text-primary-500 dark:text-primary-400">
-                  <ExternalLink className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => handleBuy(token)} className="btn-primary flex-1 text-sm">Buy</button>
-                <button onClick={() => setSelectedToken(token)} className="btn-secondary text-sm">Details</button>
-              </div>
-            </div>
-          ))}
-          {listedTokens.length === 0 && (
+          {listingsLoading || tokensLoading ? (
             <div className="col-span-full card p-12 text-center">
-              <p className="text-sm text-surface-500 dark:text-surface-400">No tokens currently listed.</p>
+              <p className="text-sm text-surface-500 dark:text-surface-400">Loading marketplace...</p>
             </div>
+          ) : (
+            <>
+              {(listings || []).map((listing) => (
+                <div key={listing.id} className="card-hover p-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-surface-900 dark:text-surface-100">{listing.project}</h3>
+                      <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">{listing.vvb} verified · Vintage {listing.vintage}</p>
+                    </div>
+                    <span className="badge badge-blue text-[10px]">{listing.methodology}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
+                      <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{listing.tonnes.toLocaleString()}</p>
+                      <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">tonnes CO₂e</p>
+                    </div>
+                    <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
+                      <p className="text-lg font-bold text-surface-900 dark:text-surface-100">${listing.price}</p>
+                      <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">per tonne</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    <Shield className="h-3.5 w-3.5 text-primary-500" />
+                    <span className="font-mono">{listing.radixAddress.slice(0, 20)}...</span>
+                    <button className="text-primary-600 hover:text-primary-500 dark:text-primary-400">
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleBuy(listing.id, listing.project)}
+                      disabled={buyMutation.isPending}
+                      className="btn-primary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {buyMutation.isPending ? 'Processing...' : 'Buy'}
+                    </button>
+                    <button onClick={() => setSelectedToken(listing)} className="btn-secondary text-sm">Details</button>
+                  </div>
+                </div>
+              ))}
+              {(listings || []).length === 0 && !listingsLoading && (
+                <div className="col-span-full card p-12 text-center">
+                  <p className="text-sm text-surface-500 dark:text-surface-400">No tokens currently listed.</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -180,10 +263,20 @@ export function TokenizationPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Calculation Run</label>
-                <select className="input-modern">
-                  <option>Run #128 — June 2024</option>
-                  <option>Run #129 — March 2024</option>
+                <select
+                  className="input-modern"
+                  value={mintForm.calculationRunId}
+                  onChange={(e) => setMintForm({ ...mintForm, calculationRunId: e.target.value })}
+                  disabled={calcLoading}
+                >
+                  <option value="">{calcLoading ? 'Loading...' : 'Select a run'}</option>
+                  {(calculations || []).map((run) => (
+                    <option key={run.id} value={run.id}>
+                      Run {run.id.slice(-6)} — {run.monitoring_period_start} to {run.monitoring_period_end}
+                    </option>
+                  ))}
                 </select>
+                {calcError && <p className="text-xs text-red-600 mt-1">Failed to load calculations</p>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -208,10 +301,10 @@ export function TokenizationPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">VVB Certificate ID</label>
-              <input className="input-modern" placeholder="VCU-1234-5678" />
+              <input className="input-modern" placeholder="VCU-1234-5678" value={mintForm.certificateId} onChange={(e) => setMintForm({ ...mintForm, certificateId: e.target.value })} />
             </div>
-            <button type="submit" className="btn-primary w-full">
-              <Layers className="w-4 h-4" /> Mint Token on Radix
+            <button type="submit" disabled={mintMutation.isPending} className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed">
+              <Layers className="w-4 h-4" /> {mintMutation.isPending ? 'Minting...' : 'Mint Token on Radix'}
             </button>
           </div>
         </form>
@@ -223,11 +316,18 @@ export function TokenizationPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Token to Retire</label>
-              <select className="input-modern" value={retireForm.tokenId} onChange={(e) => setRetireForm({ ...retireForm, tokenId: e.target.value })}>
+              <select
+                className="input-modern"
+                value={retireForm.tokenId}
+                onChange={(e) => setRetireForm({ ...retireForm, tokenId: e.target.value })}
+                disabled={tokensLoading}
+              >
+                <option value="">{tokensLoading ? 'Loading...' : 'Select a token'}</option>
                 {retireOptions.map((t) => (
                   <option key={t.id} value={t.id}>{t.id} — {t.project} ({t.tonnes.toLocaleString()} tonnes)</option>
                 ))}
               </select>
+              {tokensError && <p className="text-xs text-red-600 mt-1">Failed to load tokens</p>}
             </div>
             <div>
               <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Tonnes to Retire</label>
@@ -253,8 +353,8 @@ export function TokenizationPage() {
                 Retirement is permanent. The token will be burned on the Radix ledger and cannot be reversed.
               </p>
             </div>
-            <button type="submit" className="w-full rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-500 active:scale-[0.98] transition-all shadow-lg shadow-red-600/20">
-              <Flame className="w-4 h-4 inline mr-1.5" /> Retire Token Permanently
+            <button type="submit" disabled={retireMutation.isPending} className="w-full rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-red-500 active:scale-[0.98] transition-all shadow-lg shadow-red-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Flame className="w-4 h-4 inline mr-1.5" /> {retireMutation.isPending ? 'Retiring...' : 'Retire Token Permanently'}
             </button>
           </div>
         </form>
@@ -274,7 +374,7 @@ export function TokenizationPage() {
             </div>
             <div className="space-y-3 text-sm">
               {[
-                { label: 'Token ID', value: selectedToken.id, mono: true },
+                { label: 'Token ID', value: selectedToken.token_id || selectedToken.id, mono: true },
                 { label: 'Project', value: selectedToken.project },
                 { label: 'Tonnes CO₂e', value: selectedToken.tonnes.toLocaleString() },
                 { label: 'Vintage', value: selectedToken.vintage },

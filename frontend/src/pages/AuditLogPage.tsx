@@ -1,14 +1,7 @@
 import { useState } from 'react'
 import { Search, Shield, CheckCircle, Clock, X } from 'lucide-react'
-
-const MOCK_AUDIT_LOGS = [
-  { id: '1', action: 'calculation_run', actor: 'CalculationAgent', actor_type: 'agent', target: 'Project 42', target_type: 'project', timestamp: '2024-06-15T10:30:00Z', input_hash: 'a1b2...', output_hash: 'c3d4...', radix_tx_ref: 'tx-sim-abc123', anchored: true },
-  { id: '2', action: 'report_approved', actor: 'John Operator', actor_type: 'user', target: 'Report R-2024-06', target_type: 'report', timestamp: '2024-06-15T11:00:00Z', input_hash: null, output_hash: 'e5f6...', radix_tx_ref: 'tx-sim-def456', anchored: true },
-  { id: '3', action: 'data_ingested', actor: 'IngestionAgent', actor_type: 'agent', target: 'File upload #128', target_type: 'data_source', timestamp: '2024-06-15T09:15:00Z', input_hash: 'g7h8...', output_hash: 'i9j0...', radix_tx_ref: null, anchored: false },
-  { id: '4', action: 'human_reviewed', actor: 'Sarah Admin', actor_type: 'user', target: 'Queue item #45', target_type: 'review_queue', timestamp: '2024-06-14T16:45:00Z', input_hash: null, output_hash: null, radix_tx_ref: null, anchored: false },
-  { id: '5', action: 'user_login', actor: 'john@carbonverify.io', actor_type: 'user', target: 'Account', target_type: 'user', timestamp: '2024-06-15T08:00:00Z', input_hash: null, output_hash: null, radix_tx_ref: null, anchored: false, mfa_used: true },
-  { id: '6', action: 'breach_reported', actor: 'Security System', actor_type: 'system', target: 'Breach #3', target_type: 'breach', timestamp: '2024-06-14T22:00:00Z', input_hash: null, output_hash: null, radix_tx_ref: null, anchored: false },
-]
+import { useAuditLogs } from '../hooks/useAuditLogs'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 const ACTION_COLORS: Record<string, string> = {
   calculation_run: 'badge-blue',
@@ -21,12 +14,13 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export function AuditLogPage() {
+  const { data: logs, isLoading, isError, error } = useAuditLogs()
   const [search, setSearch] = useState('')
   const [filterAction, setFilterAction] = useState('')
   const [selectedLog, setSelectedLog] = useState<any>(null)
   const [verifying, setVerifying] = useState<string | null>(null)
 
-  const filtered = MOCK_AUDIT_LOGS.filter((log) => {
+  const filtered = (logs || []).filter((log) => {
     const matchesSearch = !search || log.target.toLowerCase().includes(search.toLowerCase()) || log.actor.toLowerCase().includes(search.toLowerCase())
     const matchesAction = !filterAction || log.action === filterAction
     return matchesSearch && matchesAction
@@ -36,6 +30,43 @@ export function AuditLogPage() {
     setVerifying(logId)
     await new Promise((r) => setTimeout(r, 1000))
     setVerifying(null)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+            <Shield className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div>
+            <h2 className="page-title">Audit Trail</h2>
+            <p className="text-sm text-surface-400 dark:text-surface-500">Immutable blockchain-verified event log</p>
+          </div>
+        </div>
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+            <Shield className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+          </div>
+          <div>
+            <h2 className="page-title">Audit Trail</h2>
+            <p className="text-sm text-surface-400 dark:text-surface-500">Immutable blockchain-verified event log</p>
+          </div>
+        </div>
+        <div className="card p-8 text-center">
+          <p className="text-red-600 dark:text-red-400 font-medium">Failed to load audit logs</p>
+          <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -53,10 +84,10 @@ export function AuditLogPage() {
         </div>
         <div className="flex items-center gap-4 text-sm">
           <span className="flex items-center gap-1.5 text-surface-500 dark:text-surface-400">
-            <CheckCircle className="h-4 w-4 text-primary-500" /> {MOCK_AUDIT_LOGS.filter(l => l.anchored).length} anchored
+            <CheckCircle className="h-4 w-4 text-primary-500" /> {(logs || []).filter(l => l.anchored).length} anchored
           </span>
           <span className="flex items-center gap-1.5 text-surface-500 dark:text-surface-400">
-            <Clock className="h-4 w-4 text-surface-400" /> {MOCK_AUDIT_LOGS.filter(l => !l.anchored).length} pending
+            <Clock className="h-4 w-4 text-surface-400" /> {(logs || []).filter(l => !l.anchored).length} pending
           </span>
         </div>
       </div>
@@ -151,6 +182,13 @@ export function AuditLogPage() {
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
+                    No audit logs match your filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

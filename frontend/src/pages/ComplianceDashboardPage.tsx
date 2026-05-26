@@ -1,24 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Shield, FileText, AlertTriangle, CheckCircle, Clock,
   Users, Gavel, BookOpen, TrendingUp
 } from 'lucide-react'
-
-const MOCK_DSRS = [
-  { id: 'DSR-001', type: 'access', subject: 'HH-4521', status: 'received', days_remaining: 28, assigned_to: 'Alice' },
-  { id: 'DSR-002', type: 'erasure', subject: 'HH-3892', status: 'under_review', days_remaining: 15, assigned_to: 'Bob' },
-  { id: 'DSR-003', type: 'portability', subject: 'DEV-104', status: 'fulfilled', days_remaining: 0, assigned_to: null },
-]
-
-const MOCK_BREACHES = [
-  { id: 'B-001', title: 'Unauthorized photo access', severity: 'high', status: 'contained', hours_elapsed: 12, sla_ok: true },
-  { id: 'B-002', title: 'Enumerator credential leak', severity: 'medium', status: 'notified_regulator', hours_elapsed: 48, sla_ok: true },
-]
-
-const MOCK_CONFLICTS = [
-  { id: 'COI-001', user: 'Dr. Kimani', project: 'Project 12', type: 'financial', status: 'pending_review', disclosed: '2024-06-10' },
-  { id: 'COI-002', user: 'Jane Wanjiku', project: 'Project 7', type: 'employment', status: 'approved', disclosed: '2024-05-22' },
-]
+import { useDSRs, useBreaches, useConflicts } from '../hooks/useCompliance'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 const STATUS_COLORS: Record<string, string> = {
   received: 'badge-blue',
@@ -32,7 +19,21 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function ComplianceDashboardPage() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'dsr' | 'breaches' | 'conflicts' | 'methodology'>('dsr')
+
+  const { data: dsrs, isLoading: dsrsLoading, isError: dsrsError } = useDSRs()
+  const { data: breaches, isLoading: breachesLoading, isError: breachesError } = useBreaches()
+  const { data: conflicts, isLoading: conflictsLoading, isError: conflictsError } = useConflicts()
+
+  const isLoading = dsrsLoading || breachesLoading || conflictsLoading
+  const isError = dsrsError || breachesError || conflictsError
+
+  const openDSRs = (dsrs || []).filter(d => d.status !== 'fulfilled' && d.status !== 'rejected').length
+  const urgentDSRs = (dsrs || []).filter(d => d.days_remaining <= 15 && d.status !== 'fulfilled' && d.status !== 'rejected').length
+  const activeBreaches = (breaches || []).filter(b => b.status !== 'resolved').length
+  const slaOkBreaches = (breaches || []).filter(b => b.sla_ok).length
+  const pendingCOI = (conflicts || []).filter(c => c.status === 'pending_review').length
 
   const tabs = [
     { key: 'dsr' as const, label: 'Data Subject Requests', icon: FileText },
@@ -40,6 +41,47 @@ export function ComplianceDashboardPage() {
     { key: 'conflicts' as const, label: 'Conflict of Interest', icon: Gavel },
     { key: 'methodology' as const, label: 'Methodology Versions', icon: BookOpen },
   ]
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <h2 className="page-title">Compliance Center</h2>
+              <p className="text-xs text-surface-400 dark:text-surface-500">Kenya Data Protection Act · VVB Independence</p>
+            </div>
+          </div>
+        </div>
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <h2 className="page-title">Compliance Center</h2>
+              <p className="text-xs text-surface-400 dark:text-surface-500">Kenya Data Protection Act · VVB Independence</p>
+            </div>
+          </div>
+        </div>
+        <div className="card p-8 text-center">
+          <p className="text-red-600 dark:text-red-400 font-medium">Failed to load compliance data</p>
+          <p className="text-sm text-surface-500 mt-2">Please try again later.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -59,9 +101,9 @@ export function ComplianceDashboardPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: 'Open DSRs', value: '2', sub: '1 urgent (≤15 days)', icon: FileText, color: 'text-blue-500' },
-          { label: 'Active Breaches', value: '1', sub: 'Within 72h SLA', icon: AlertTriangle, color: 'text-red-500' },
-          { label: 'Pending COI', value: '1', sub: 'Awaiting review', icon: Users, color: 'text-violet-500' },
+          { label: 'Open DSRs', value: String(openDSRs), sub: `${urgentDSRs} urgent (≤15 days)`, icon: FileText, color: 'text-blue-500' },
+          { label: 'Active Breaches', value: String(activeBreaches), sub: `${slaOkBreaches} within 72h SLA`, icon: AlertTriangle, color: 'text-red-500' },
+          { label: 'Pending COI', value: String(pendingCOI), sub: 'Awaiting review', icon: Users, color: 'text-violet-500' },
           { label: 'Methodologies', value: '4', sub: 'All current', icon: BookOpen, color: 'text-primary-500' },
         ].map((stat) => (
           <div key={stat.label} className="card p-5">
@@ -100,7 +142,7 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Data Subject Requests</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {MOCK_DSRS.map((dsr) => (
+            {(dsrs || []).map((dsr) => (
               <div key={dsr.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -126,6 +168,11 @@ export function ComplianceDashboardPage() {
                 </div>
               </div>
             ))}
+            {(dsrs || []).length === 0 && (
+              <div className="px-6 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
+                No data subject requests found.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -137,7 +184,7 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Breach Notifications</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {MOCK_BREACHES.map((b) => (
+            {(breaches || []).map((b) => (
               <div key={b.id} className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -156,6 +203,11 @@ export function ComplianceDashboardPage() {
                 </p>
               </div>
             ))}
+            {(breaches || []).length === 0 && (
+              <div className="px-6 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
+                No breach notifications found.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -167,7 +219,7 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Conflict of Interest Disclosures</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {MOCK_CONFLICTS.map((coi) => (
+            {(conflicts || []).map((coi) => (
               <div key={coi.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -181,12 +233,20 @@ export function ComplianceDashboardPage() {
                   </p>
                 </div>
                 {coi.status === 'pending_review' && (
-                  <button className="btn-primary text-xs">
+                  <button
+                    onClick={() => navigate(`/compliance/conflicts/${coi.id}`)}
+                    className="btn-primary text-xs"
+                  >
                     Review
                   </button>
                 )}
               </div>
             ))}
+            {(conflicts || []).length === 0 && (
+              <div className="px-6 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
+                No conflict of interest disclosures found.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -216,7 +276,10 @@ export function ComplianceDashboardPage() {
                     v{m.version} · Effective {m.effective} · {m.changes}
                   </p>
                 </div>
-                <button className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors">
+                <button
+                  onClick={() => window.alert(`View rules for ${m.name} v${m.version}`)}
+                  className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors"
+                >
                   View Rules
                 </button>
               </div>
