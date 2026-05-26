@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter, FolderOpen } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useProjects } from '../hooks/useProjects'
 import type { ProjectStatus } from '../types'
 
@@ -93,12 +94,7 @@ export default function ProjectsPage() {
           <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
         </div>
       ) : isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="relative">
-            <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-            <div className="absolute inset-0 h-10 w-10 rounded-full border-[3px] border-transparent border-b-primary-300/30 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-          </div>
-        </div>
+        <LoadingSpinner />
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">

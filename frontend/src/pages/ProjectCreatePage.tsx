@@ -51,7 +51,7 @@ export default function ProjectCreatePage() {
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/projects')} className="btn-ghost p-2">
+        <button onClick={() => navigate('/projects')} aria-label="Go back" className="btn-ghost p-2">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>

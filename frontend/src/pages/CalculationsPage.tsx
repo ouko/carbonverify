@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calculator, Filter, FileBarChart, Plus, X } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useCalculations, useCreateCalculation } from '../hooks/useCalculations'
 import { useProjects } from '../hooks/useProjects'
 import type { CalculationRun } from '../types'
@@ -97,11 +98,7 @@ export default function CalculationsPage() {
           <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
         </div>
       ) : isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="relative">
-            <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-          </div>
-        </div>
+        <LoadingSpinner />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered?.map((calc) => (
@@ -169,7 +166,7 @@ export default function CalculationsPage() {
           <div className="w-full max-w-md rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-6 shadow-soft-lg">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-semibold text-surface-900 dark:text-surface-100">Run New Calculation</h3>
-              <button onClick={() => setShowCreate(false)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+              <button onClick={() => setShowCreate(false)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                 <X className="h-4 w-4" />
               </button>
             </div>

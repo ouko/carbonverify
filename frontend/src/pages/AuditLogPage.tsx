@@ -199,7 +199,7 @@ export function AuditLogPage() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Audit Entry Details</h3>
-            <button onClick={() => setSelectedLog(null)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+            <button onClick={() => setSelectedLog(null)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>

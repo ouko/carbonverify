@@ -3,6 +3,7 @@ import { FolderOpen, ClipboardList, Calculator, Leaf, TrendingUp, ArrowUpRight, 
 import { useLeadsStats } from '../hooks/useLeads'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts'
 import StatCard from '../components/StatCard'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 
 const statusColors: Record<string, string> = {
@@ -49,12 +50,7 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="relative">
-          <div className="h-10 w-10 rounded-full border-[3px] border-primary-200 border-t-primary-500 animate-spin" />
-          <div className="absolute inset-0 h-10 w-10 rounded-full border-[3px] border-transparent border-b-primary-300/30 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-        </div>
-      </div>
+      <LoadingSpinner />
     )
   }
 

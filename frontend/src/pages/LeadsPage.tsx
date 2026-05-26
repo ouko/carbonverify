@@ -4,6 +4,7 @@ import {
   Activity, Gauge, Clock, CheckCircle, BarChart3, RefreshCw, AlertTriangle, Wifi, WifiOff,
 } from 'lucide-react'
 import { useLeads, useUpdateLead, useLeadsStats, useScrapeLeads, useScraperHealth, useScraperHistory } from '../hooks/useLeads'
+import LoadingSpinner from '../components/LoadingSpinner'
 import type { Lead, LeadWorkflowStatus, LeadPriority } from '../types'
 
 const REGISTRY_LABELS: Record<string, string> = {
@@ -73,7 +74,7 @@ function LeadDetailModal({ lead, onClose }: { lead: Lead; onClose: () => void })
             <Target className="h-5 w-5 text-primary-500" />
             <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Lead Details</h3>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+          <button onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -458,11 +459,7 @@ export default function LeadsPage() {
           <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
         </div>
       ) : isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="relative">
-            <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-          </div>
-        </div>
+        <LoadingSpinner />
       ) : view === 'table' ? (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">

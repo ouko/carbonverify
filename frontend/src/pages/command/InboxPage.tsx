@@ -262,7 +262,7 @@ export function InboxPage() {
           <div className="px-5 py-4 border-b border-surface-200/60 dark:border-surface-800/40">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-100">Context</h3>
-              <button onClick={() => setSelectedItem(null)} className="p-1 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+              <button onClick={() => setSelectedItem(null)} aria-label="Close" className="p-1 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                 <XCircle className="h-4 w-4" />
               </button>
             </div>

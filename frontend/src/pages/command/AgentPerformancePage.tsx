@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts'
 import { Bot, AlertTriangle, Zap } from 'lucide-react'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import { useAgentPerformance } from '../../hooks/useCommandData'
 
 export function AgentPerformancePage() {
@@ -11,11 +12,7 @@ export function AgentPerformancePage() {
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
 
   if (isLoading) return (
-    <div className="flex h-64 items-center justify-center">
-      <div className="relative">
-        <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-      </div>
-    </div>
+    <LoadingSpinner />
   )
   if (isError) {
     return (

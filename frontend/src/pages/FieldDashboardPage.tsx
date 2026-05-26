@@ -25,7 +25,7 @@ export function FieldDashboardPage() {
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-surface-900 text-white px-4 py-3 shadow-lg animate-slide-up">
           <Wrench className="h-4 w-4 text-primary-400" />
           <span className="text-sm">{toast}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+          <button onClick={() => setToast(null)} aria-label="Close" className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

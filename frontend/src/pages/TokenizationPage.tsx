@@ -150,7 +150,7 @@ export function TokenizationPage() {
             <Check className="h-4 w-4 text-primary-400" />
           )}
           <span className="text-sm">{toast}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+          <button onClick={() => setToast(null)} aria-label="Close" className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
 
@@ -224,7 +224,7 @@ export function TokenizationPage() {
                   <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 mb-4">
                     <Shield className="h-3.5 w-3.5 text-primary-500" />
                     <span className="font-mono">{listing.radixAddress.slice(0, 20)}...</span>
-                    <button className="text-primary-600 hover:text-primary-500 dark:text-primary-400">
+                    <button aria-label="Open external link" className="text-primary-600 hover:text-primary-500 dark:text-primary-400">
                       <ExternalLink className="h-3 w-3" />
                     </button>
                   </div>
@@ -370,6 +370,7 @@ export function TokenizationPage() {
               <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Token Provenance</h3>
               <button
                 onClick={() => setSelectedToken(null)}
+                aria-label="Close"
                 className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
               >
                 <X className="h-4 w-4" />

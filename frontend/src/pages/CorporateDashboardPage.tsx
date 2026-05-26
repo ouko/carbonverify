@@ -4,6 +4,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { Building2, Leaf, FileText, Download, Eye, Shield, ChevronRight, Loader2 } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useCorporatePortfolio, useGenerateESGReport } from '../hooks/useCorporate'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981']
@@ -151,11 +152,7 @@ export function CorporateDashboardPage() {
       {activeTab === 'portfolio' && (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {isLoading ? (
-            <div className="card p-8 lg:col-span-2 flex items-center justify-center h-64">
-              <div className="relative">
-                <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-              </div>
-            </div>
+            <LoadingSpinner />
           ) : (
             <>
               <div className="card p-5">

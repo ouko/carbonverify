@@ -166,7 +166,7 @@ export function VVBPipelinePage() {
         <div className="fixed top-4 right-4 z-[60] flex items-center gap-2 rounded-xl bg-surface-900 text-white px-4 py-3 shadow-lg animate-slide-up">
           <CheckCircle className="h-4 w-4 text-primary-400" />
           <span className="text-sm">{toast}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+          <button onClick={() => setToast(null)} aria-label="Close" className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
 
@@ -248,7 +248,7 @@ export function VVBPipelinePage() {
                 <GitPullRequest className="h-5 w-5 text-primary-500" />
                 <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">{selectedCard.projectName}</h3>
               </div>
-              <button onClick={() => setSelectedCard(null)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+              <button onClick={() => setSelectedCard(null)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -317,7 +317,7 @@ export function VVBPipelinePage() {
           <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-6 shadow-soft-lg">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Draft VVB Response — {draftCard.projectName}</h3>
-              <button onClick={() => setDraftCard(null)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+              <button onClick={() => setDraftCard(null)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>

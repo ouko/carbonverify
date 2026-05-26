@@ -192,6 +192,7 @@ export function SecuritySettingsPage() {
             />
             <button
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -242,6 +243,7 @@ export function SecuritySettingsPage() {
           </div>
           <button
             onClick={() => setShowSessions(!showSessions)}
+            aria-label={showSessions ? 'Collapse sessions' : 'Expand sessions'}
             className="btn-ghost text-xs"
           >
             {showSessions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

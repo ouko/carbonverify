@@ -5,6 +5,7 @@ import {
   Cell,
 } from 'recharts'
 import { TrendingUp, AlertTriangle, ThumbsUp, Ticket } from 'lucide-react'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import { useQualityMetrics } from '../../hooks/useCommandData'
 
 export function QualityMetricsPage() {
@@ -12,11 +13,7 @@ export function QualityMetricsPage() {
   const [calibrationAgent, setCalibrationAgent] = useState('all')
 
   if (isLoading) return (
-    <div className="flex h-64 items-center justify-center">
-      <div className="relative">
-        <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-      </div>
-    </div>
+    <LoadingSpinner />
   )
 
   if (isError) {

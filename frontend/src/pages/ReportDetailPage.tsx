@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Calendar, Activity, Hash, AlertCircle } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useReport } from '../hooks/useReports'
 
 const statusColor: Record<string, string> = {
@@ -18,12 +19,7 @@ export default function ReportDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="relative">
-          <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-          <div className="absolute inset-0 h-10 w-10 rounded-full border-[3px] border-transparent border-b-primary-300/30 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-        </div>
-      </div>
+      <LoadingSpinner />
     )
   }
 
@@ -57,6 +53,7 @@ export default function ReportDetailPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate('/reports')}
+          aria-label="Go back"
           className="btn-ghost p-2"
         >
           <ArrowLeft className="h-5 w-5" />

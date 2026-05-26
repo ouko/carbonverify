@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { TrendingUp, ShoppingCart, Package, DollarSign, Calendar, MapPin, Leaf, Plus, X, Check, Loader2 } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
 import {
   useBrokerageListings,
   useBrokerageTransactions,
@@ -92,7 +93,7 @@ export function BrokeragePage() {
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-surface-900 text-white px-4 py-3 shadow-lg animate-slide-up">
           <Check className="h-4 w-4 text-primary-400" />
           <span className="text-sm">{toast}</span>
-          <button onClick={() => setToast(null)} className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+          <button onClick={() => setToast(null)} aria-label="Close" className="ml-2 text-surface-400 hover:text-white"><X className="h-3.5 w-3.5" /></button>
         </div>
       )}
 
@@ -133,11 +134,7 @@ export function BrokeragePage() {
               <p className="text-sm text-surface-500 mt-2">{(listingsErrorObj as any)?.response?.data?.detail || (listingsErrorObj as Error)?.message || 'Unknown error'}</p>
             </div>
           ) : listingsLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <div className="relative">
-                <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-              </div>
-            </div>
+            <LoadingSpinner />
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {(listings ?? []).map((listing) => (
@@ -209,11 +206,7 @@ export function BrokeragePage() {
               <p className="text-sm text-surface-500 mt-2">{(txErrorObj as any)?.response?.data?.detail || (txErrorObj as Error)?.message || 'Unknown error'}</p>
             </div>
           ) : txLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <div className="relative">
-                <div className="h-10 w-10 rounded-full border-[3px] border-surface-200 border-t-primary-500 animate-spin" />
-              </div>
-            </div>
+            <LoadingSpinner />
           ) : (
             <div className="card overflow-hidden">
               <div className="px-6 py-4 border-b border-surface-200/60 dark:border-surface-800/40">
