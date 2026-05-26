@@ -59,7 +59,7 @@ export function useFieldData() {
   const enumeratorsQuery = useQuery<Enumerator[]>({
     queryKey: ['enumerators'],
     queryFn: async () => {
-      const res = await api.get('/webhooks/enumerators')
+      const res = await api.get('/whatsapp/enumerators')
       return res.data as Enumerator[]
     },
   })
@@ -67,7 +67,7 @@ export function useFieldData() {
   const surveysQuery = useQuery<SurveyResponse[]>({
     queryKey: ['survey-responses'],
     queryFn: async () => {
-      const res = await api.get('/webhooks/survey-responses')
+      const res = await api.get('/whatsapp/survey-responses')
       return res.data as SurveyResponse[]
     },
   })
@@ -75,7 +75,7 @@ export function useFieldData() {
   const ticketsQuery = useQuery<SupportTicket[]>({
     queryKey: ['support-tickets'],
     queryFn: async () => {
-      const res = await api.get('/webhooks/support-tickets')
+      const res = await api.get('/whatsapp/support-tickets')
       return res.data as SupportTicket[]
     },
   })
