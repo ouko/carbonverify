@@ -60,6 +60,7 @@ export default function ProjectDetailPage() {
       <div className="flex items-center gap-3">
         <Link
           to="/projects"
+          aria-label="Go back"
           className="btn-ghost p-2"
         >
           <ArrowLeft className="h-5 w-5" />

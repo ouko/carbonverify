@@ -53,3 +53,6 @@ htmlcov/
 # Misc
 *.pem
 *.key
+
+# Kubernetes secrets
+infrastructure/k8s/base/secrets.yaml

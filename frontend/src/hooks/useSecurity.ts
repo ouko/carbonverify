@@ -92,12 +92,28 @@ export interface UserSettings {
   autoAdvanceThreshold: number
 }
 
+const DEFAULT_SETTINGS: UserSettings = {
+  notifyHumanReview: true,
+  notifyVVB: true,
+  notifyAnomaly: true,
+  notifyChurn: true,
+  notifyDeadline: true,
+  channelEmail: true,
+  channelInApp: true,
+  channelSMS: false,
+  channelWhatsApp: false,
+  digestMode: 'daily',
+  autoAssign: false,
+  autoAdvanceThreshold: 0.95,
+}
+
 export function useUserSettings() {
   return useQuery<UserSettings>({
     queryKey: ['user', 'settings'],
     queryFn: async () => {
       const res = await api.get('/users/me/settings')
-      return res.data as UserSettings
+      const settings = res.data?.settings || {}
+      return { ...DEFAULT_SETTINGS, ...settings } as UserSettings
     },
   })
 }

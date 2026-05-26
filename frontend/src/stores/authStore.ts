@@ -8,9 +8,12 @@ interface AuthState {
   accessToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  mfaRequired: boolean
+  mfaTempToken: string | null
   setAccessToken: (access: string) => void
   setUser: (user: User | null) => void
   login: (email: string, password: string) => Promise<void>
+  verifyMFA: (totpCode: string) => Promise<void>
   logout: () => Promise<void>
   initialize: () => void
 }
@@ -22,6 +25,8 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       isAuthenticated: false,
       isLoading: true,
+      mfaRequired: false,
+      mfaTempToken: null,
 
       setAccessToken: (access) => {
         set({ accessToken: access, isAuthenticated: true })
@@ -31,8 +36,22 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email, password) => {
         const res = await api.post('/auth/login', { email, password }, { withCredentials: true })
+        if (res.data.mfa_required) {
+          set({ mfaRequired: true, mfaTempToken: res.data.temp_token, isLoading: false })
+          return
+        }
         const { access_token } = res.data
-        set({ accessToken: access_token, isAuthenticated: true })
+        set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null })
+        const me = await api.get<User>('/users/me')
+        set({ user: me.data, isLoading: false })
+      },
+
+      verifyMFA: async (totpCode) => {
+        const { mfaTempToken } = get()
+        if (!mfaTempToken) throw new Error('No MFA temp token available')
+        const res = await api.post('/auth/mfa/verify', { temp_token: mfaTempToken, totp_code: totpCode }, { withCredentials: true })
+        const { access_token } = res.data
+        set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null })
         const me = await api.get<User>('/users/me')
         set({ user: me.data, isLoading: false })
       },
@@ -64,6 +83,8 @@ export const useAuthStore = create<AuthState>()(
       name: 'cv-auth',
       partialize: (state) => ({
         accessToken: state.accessToken,
+        mfaRequired: state.mfaRequired,
+        mfaTempToken: state.mfaTempToken,
       }),
     }
   )

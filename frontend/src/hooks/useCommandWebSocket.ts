@@ -1,7 +1,15 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useNotificationStore } from '../stores/notificationStore'
+import { useAuthStore } from '../stores/authStore'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/notifications'
+const BASE_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/notifications'
+
+function getWSUrl(): string {
+  const token = useAuthStore.getState().accessToken
+  if (!token) return BASE_WS_URL
+  const separator = BASE_WS_URL.includes('?') ? '&' : '?'
+  return `${BASE_WS_URL}${separator}token=${encodeURIComponent(token)}`
+}
 
 export function useCommandWebSocket() {
   const ws = useRef<WebSocket | null>(null)
@@ -12,10 +20,11 @@ export function useCommandWebSocket() {
     if (ws.current?.readyState === WebSocket.OPEN) return
 
     try {
+      const WS_URL = getWSUrl()
       ws.current = new WebSocket(WS_URL)
 
       ws.current.onopen = () => {
-        console.log('[WS] Command center connected')
+        // WebSocket connected
       }
 
       ws.current.onmessage = (event) => {
@@ -91,8 +100,8 @@ export function useCommandWebSocket() {
         reconnectTimer.current = window.setTimeout(connect, 5000)
       }
 
-      ws.current.onerror = (err) => {
-        console.error('[WS] Error', err)
+      ws.current.onerror = () => {
+        // WebSocket error handled by onclose reconnection
       }
     } catch {
       reconnectTimer.current = window.setTimeout(connect, 5000)

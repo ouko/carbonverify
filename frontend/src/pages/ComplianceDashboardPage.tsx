@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Shield, FileText, AlertTriangle, CheckCircle, Clock,
   Users, Gavel, BookOpen, TrendingUp
@@ -19,7 +18,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function ComplianceDashboardPage() {
-  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'dsr' | 'breaches' | 'conflicts' | 'methodology'>('dsr')
 
   const { data: dsrs, isLoading: dsrsLoading, isError: dsrsError } = useDSRs()
@@ -234,7 +232,7 @@ export function ComplianceDashboardPage() {
                 </div>
                 {coi.status === 'pending_review' && (
                   <button
-                    onClick={() => navigate(`/compliance/conflicts/${coi.id}`)}
+                    onClick={() => alert('Conflict of interest review workflow coming soon')}
                     className="btn-primary text-xs"
                   >
                     Review

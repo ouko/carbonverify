@@ -43,9 +43,9 @@ services:
 
   db:
     environment:
-      - POSTGRES_DB=carbonverify
-      - POSTGRES_USER=carbonverify
-      - POSTGRES_PASSWORD=carbonverify_secret
+      - POSTGRES_DB=${POSTGRES_DB:-carbonverify}
+      - POSTGRES_USER=${POSTGRES_USER:-carbonverify}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-carbonverify_secret}
     volumes:
       - postgres_data_staging:/var/lib/postgresql/data
     deploy:
@@ -54,6 +54,8 @@ services:
           memory: 1G
 
   redis:
+    volumes:
+      - redis_data_staging:/data
     deploy:
       resources:
         limits:
@@ -130,4 +132,5 @@ services:
 
 volumes:
   postgres_data_staging:
+  redis_data_staging:
   clamav_data_staging:

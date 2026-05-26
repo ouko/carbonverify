@@ -23,6 +23,7 @@ export default function ProjectCreatePage() {
     complexity_score: null as number | null,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [apiError, setApiError] = useState('')
 
   const validate = () => {
     const e: Record<string, string> = {}
@@ -40,9 +41,13 @@ export default function ProjectCreatePage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
+    setApiError('')
     createProject.mutate(form, {
       onSuccess: () => {
         navigate('/projects')
+      },
+      onError: (err: any) => {
+        setApiError(err?.response?.data?.detail || err?.message || 'Failed to create project')
       },
     })
   }
@@ -195,6 +200,12 @@ export default function ProjectCreatePage() {
             />
           </div>
         </div>
+
+        {apiError && (
+          <div className="rounded-xl bg-red-50 dark:bg-red-950/20 p-4 text-sm text-red-700 dark:text-red-300">
+            {apiError}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 pt-2">

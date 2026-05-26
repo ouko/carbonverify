@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Search, Shield, CheckCircle, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuditLogs } from '../hooks/useAuditLogs'
+import { api } from '../services/api'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
 const ACTION_COLORS: Record<string, string> = {
@@ -34,10 +35,19 @@ export function AuditLogPage() {
 
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
+  const [verifyResult, setVerifyResult] = useState<string | null>(null)
+
   const handleVerify = async (logId: string) => {
     setVerifying(logId)
-    await new Promise((r) => setTimeout(r, 1000))
-    setVerifying(null)
+    try {
+      const res = await api.post(`/audit/logs/${logId}/verify`)
+      setVerifyResult(res.data.verified ? 'Hash verified on Radix DLT' : (res.data.message || 'Verification completed'))
+    } catch {
+      setVerifyResult('Verification failed')
+    } finally {
+      setVerifying(null)
+      setTimeout(() => setVerifyResult(null), 3000)
+    }
   }
 
   if (isLoading) {
@@ -125,6 +135,7 @@ export function AuditLogPage() {
             <option value="human_reviewed">Human Reviewed</option>
             <option value="user_login">User Login</option>
             <option value="breach_reported">Breach Reported</option>
+            <option value="methodology_updated">Methodology Updated</option>
           </select>
           <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
             <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,11 +241,17 @@ export function AuditLogPage() {
       </>
 
       {/* Detail Panel */}
+      {verifyResult && (
+        <div className="rounded-xl bg-primary-50 dark:bg-primary-950/20 p-4 text-sm text-primary-700 dark:text-primary-300">
+          {verifyResult}
+        </div>
+      )}
+
       {selectedLog && (
         <div className="card p-6">
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Audit Entry Details</h3>
-            <button onClick={() => setSelectedLog(null)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+            <button onClick={() => setSelectedLog(null)} aria-label="Close detail panel" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
               <X className="h-4 w-4" />
             </button>
           </div>

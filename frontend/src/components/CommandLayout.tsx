@@ -67,7 +67,7 @@ export default function CommandLayout() {
               <span className="text-lg font-bold tracking-tight text-primary-600 dark:text-primary-400">Center</span>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
+          <button onClick={() => setSidebarOpen(false)} aria-label="Close sidebar" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -132,6 +132,7 @@ export default function CommandLayout() {
             <button
               onClick={toggle}
               className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+              aria-label="Toggle theme"
               title="Toggle theme"
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -150,7 +151,7 @@ export default function CommandLayout() {
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <header className="flex h-14 items-center justify-between border-b border-surface-200/60 dark:border-surface-800/40 bg-white/50 dark:bg-surface-950/50 backdrop-blur-sm px-4 lg:px-6">
           <div className="flex items-center">
-            <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
+            <button onClick={() => setSidebarOpen(true)} aria-label="Open sidebar" className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden transition-colors">
               <Menu className="h-5 w-5" />
             </button>
             <h1 className="text-base font-semibold text-surface-900 dark:text-surface-100 ml-2 lg:ml-0">{currentLabel}</h1>
@@ -158,6 +159,7 @@ export default function CommandLayout() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setNotificationsOpen(!notificationsOpen)}
+              aria-label="Toggle notifications"
               className="relative p-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
             >
               <Bell className="h-5 w-5" />

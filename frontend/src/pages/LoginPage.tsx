@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Leaf, Eye, EyeOff, ArrowRight, Shield } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import packageJson from '../../package.json'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -144,7 +145,7 @@ export default function LoginPage() {
         {/* Version badge */}
         <div className="text-center mt-4">
           <span className="text-[10px] text-surface-300 dark:text-surface-700 font-medium tracking-wider uppercase">
-            v1.2.0
+            v{packageJson.version}
           </span>
         </div>
       </div>

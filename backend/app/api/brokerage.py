@@ -207,6 +207,28 @@ async def run_global_matching(
 
 # ─── Transactions ─────────────────────────────────────────────────────────────
 
+@router.get("/transactions", response_model=List[TransactionOut])
+async def list_transactions(
+    buyer_id: Optional[uuid.UUID] = None,
+    seller_id: Optional[uuid.UUID] = None,
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List transactions (buyer or seller view)."""
+    from sqlalchemy import select, desc
+    from app.models import Transaction
+    stmt = select(Transaction).order_by(desc(Transaction.created_at))
+    if buyer_id:
+        stmt = stmt.where(Transaction.buyer_id == buyer_id)
+    if seller_id:
+        stmt = stmt.where(Transaction.seller_id == seller_id)
+    if status:
+        stmt = stmt.where(Transaction.status == status)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
 @router.post("/transactions", response_model=TransactionOut, status_code=201)
 async def create_transaction(
     payload: TransactionCreate,

@@ -98,6 +98,7 @@ export default function Layout() {
           </span>
           <button
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
             className="ml-auto p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden"
           >
             <X className="w-5 h-5" />
@@ -148,6 +149,7 @@ export default function Layout() {
             <button
               onClick={toggle}
               className="btn-ghost flex-1 justify-center text-xs py-2"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -155,6 +157,7 @@ export default function Layout() {
             <button
               onClick={logout}
               className="btn-ghost flex-1 justify-center text-xs py-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+              aria-label="Log out"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -168,6 +171,7 @@ export default function Layout() {
         <header className="flex items-center h-16 px-4 lg:px-8 border-b border-surface-200/60 dark:border-surface-800/40 bg-white/50 dark:bg-surface-950/50 backdrop-blur-sm">
           <button
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open sidebar"
             className="p-2 -ml-2 rounded-xl text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800 lg:hidden"
           >
             <Menu className="w-5 h-5" />

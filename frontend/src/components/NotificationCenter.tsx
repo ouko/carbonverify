@@ -25,7 +25,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
           <button onClick={clearAll} className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
             Clear
           </button>
-          <button onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button onClick={onClose} aria-label="Close notifications" className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">
             <X className="h-4 w-4" />
           </button>
         </div>

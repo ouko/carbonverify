@@ -32,7 +32,6 @@ api.interceptors.response.use(
 
     // Server errors — show a user-friendly message instead of blank screen
     if (status && status >= 500) {
-      console.error('Server error:', error.response?.data)
       // Reject with a structured error so UI can show toast/alert
       return Promise.reject({
         ...error,
