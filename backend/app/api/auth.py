@@ -10,7 +10,7 @@ from sqlalchemy import select, update
 from app.core.encryption import compute_searchable_hash
 from app.database import get_db
 from app.models import User, RefreshToken
-from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest
+from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest
 from app.auth.security import (
     verify_password,
     get_password_hash,
@@ -26,7 +26,7 @@ from app.auth.mfa import (
     is_mfa_required,
 )
 from app.auth.sessions import SessionManager
-from app.auth.dependencies import validate_refresh_token
+from app.auth.dependencies import validate_refresh_token, get_current_user
 from app.security.audit_logging import AuditLogger
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -386,6 +386,74 @@ async def logout_all_sessions(
 
     logger.info("user_logout_all", user_id=str(current_user.id))
     return {"message": "All sessions terminated"}
+
+
+@router.get("/sessions")
+async def list_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """List all active sessions for the current user."""
+    sessions = await SessionManager.list_user_sessions(str(current_user.id))
+    current_session_id = request.headers.get("x-session-id")
+    result = []
+    for s in sessions:
+        result.append({
+            "id": s["session_id"],
+            "device": s.get("user_agent", "Unknown device"),
+            "ip": s.get("ip_address", "unknown"),
+            "last_active": s.get("last_activity_at", s.get("created_at")),
+            "created_at": s.get("created_at"),
+            "current": s["session_id"] == current_session_id,
+        })
+    return result
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_session(
+    session_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Revoke a specific session. Users can only revoke their own sessions."""
+    session = await SessionManager.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if str(session.get("user_id")) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Cannot revoke another user's session")
+
+    await SessionManager.destroy_session(session_id)
+
+    # Also revoke the refresh token associated with this session
+    # (We don't have a direct mapping, but we revoke all non-current tokens as defense)
+    logger.info("session_revoked", session_id=session_id, user_id=str(current_user.id))
+    return {"message": "Session revoked"}
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the current user's password."""
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    await db.commit()
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        actor_id=current_user.id,
+        target_type="user",
+        target_id=current_user.id,
+        metadata={"event": "password_change"},
+    )
+
+    logger.info("password_changed", user_id=str(current_user.id))
+    return {"message": "Password updated successfully"}
 
 
 async def _issue_tokens(

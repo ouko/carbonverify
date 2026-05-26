@@ -1,31 +1,85 @@
 import { useState } from 'react'
 import { Shield, Smartphone, Key, Eye, EyeOff, CheckCircle, AlertTriangle, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
+import { useSessions, useChangePassword, useRevokeSession, useLogoutAll, useMFASetup, useMFAConfirm } from '../hooks/useSecurity'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 export function SecuritySettingsPage() {
+  const { data: sessions, isLoading: sessionsLoading, isError: sessionsError } = useSessions()
+  const changePassword = useChangePassword()
+  const revokeSession = useRevokeSession()
+  const logoutAll = useLogoutAll()
+  const mfaSetup = useMFASetup()
+  const mfaConfirm = useMFAConfirm()
+
   const [mfaEnabled, setMfaEnabled] = useState(false)
   const [mfaStep, setMfaStep] = useState<'setup' | 'confirm' | 'done'>('setup')
   const [qrCode, setQrCode] = useState('')
   const [secret, setSecret] = useState('')
   const [totpCode, setTotpCode] = useState('')
   const [showSessions, setShowSessions] = useState(false)
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
 
-  const mockSessions = [
-    { id: 'sess-1', device: 'Chrome on macOS', ip: '192.168.1.1', lastActive: '2 mins ago', current: true },
-    { id: 'sess-2', device: 'Safari on iPhone', ip: '10.0.0.5', lastActive: '3 hours ago', current: false },
-  ]
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState('')
 
   const handleSetupMFA = async () => {
-    setQrCode('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==')
-    setSecret('JBSWY3DPEHPK3PXP')
-    setMfaStep('confirm')
+    try {
+      const data = await mfaSetup.mutateAsync()
+      setQrCode(data.qr_code)
+      setSecret(data.secret)
+      setMfaStep('confirm')
+    } catch (err: any) {
+      // Error is handled by mutation state
+    }
   }
 
   const handleConfirmMFA = async () => {
-    if (totpCode.length === 6) {
+    if (totpCode.length !== 6) return
+    try {
+      await mfaConfirm.mutateAsync({ secret, totp_code: totpCode })
       setMfaEnabled(true)
       setMfaStep('done')
+    } catch (err: any) {
+      // Error is handled by mutation state
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setPwError('')
+    setPwSuccess('')
+    if (newPassword.length < 12) {
+      setPwError('Password must be at least 12 characters')
+      return
+    }
+    if (!/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setPwError('Password must include uppercase, number, and symbol')
+      return
+    }
+    try {
+      await changePassword.mutateAsync({ current_password: currentPassword, new_password: newPassword })
+      setPwSuccess('Password updated successfully')
+      setCurrentPassword('')
+      setNewPassword('')
+    } catch (err: any) {
+      setPwError(err?.response?.data?.detail || 'Failed to update password')
+    }
+  }
+
+  const handleRevoke = async (sessionId: string) => {
+    try {
+      await revokeSession.mutateAsync(sessionId)
+    } catch (err: any) {
+      // Error handled by mutation
+    }
+  }
+
+  const handleLogoutAll = async () => {
+    try {
+      await logoutAll.mutateAsync()
+    } catch (err: any) {
+      // Error handled by mutation
     }
   }
 
@@ -63,9 +117,12 @@ export function SecuritySettingsPage() {
             <p className="text-sm text-surface-500 dark:text-surface-400">
               Add an extra layer of security by requiring a code from your authenticator app.
             </p>
-            <button onClick={handleSetupMFA} className="btn-primary">
-              Set up MFA
+            <button onClick={handleSetupMFA} disabled={mfaSetup.isPending} className="btn-primary disabled:opacity-50">
+              {mfaSetup.isPending ? 'Setting up...' : 'Set up MFA'}
             </button>
+            {mfaSetup.isError && (
+              <p className="text-sm text-red-600 dark:text-red-400">Failed to set up MFA. Please try again.</p>
+            )}
           </div>
         ) : mfaStep === 'confirm' ? (
           <div className="space-y-5">
@@ -90,12 +147,15 @@ export function SecuritySettingsPage() {
               />
               <button
                 onClick={handleConfirmMFA}
-                disabled={totpCode.length !== 6}
+                disabled={totpCode.length !== 6 || mfaConfirm.isPending}
                 className="btn-primary whitespace-nowrap disabled:opacity-50"
               >
-                Verify
+                {mfaConfirm.isPending ? 'Verifying...' : 'Verify'}
               </button>
             </div>
+            {mfaConfirm.isError && (
+              <p className="text-sm text-red-600 dark:text-red-400">Invalid code. Please try again.</p>
+            )}
           </div>
         ) : null}
       </div>
@@ -112,10 +172,22 @@ export function SecuritySettingsPage() {
           </div>
         </div>
         <div className="space-y-4 max-w-md">
+          {pwSuccess && (
+            <div className="rounded-xl bg-green-50 dark:bg-green-950/20 p-3 text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" /> {pwSuccess}
+            </div>
+          )}
+          {pwError && (
+            <div className="rounded-xl bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" /> {pwError}
+            </div>
+          )}
           <div className="relative">
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder="Current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
               className="input-modern pr-11"
             />
             <button
@@ -128,26 +200,30 @@ export function SecuritySettingsPage() {
           <input
             type="password"
             placeholder="New password (min 12 chars)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
             className="input-modern"
           />
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className={`flex items-center gap-1 ${password.length >= 12 ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
+            <span className={`flex items-center gap-1 ${newPassword.length >= 12 ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
               <span className="w-1 h-1 rounded-full bg-current" /> 12+ chars
             </span>
-            <span className={`flex items-center gap-1 ${/[A-Z]/.test(password) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
+            <span className={`flex items-center gap-1 ${/[A-Z]/.test(newPassword) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
               <span className="w-1 h-1 rounded-full bg-current" /> Uppercase
             </span>
-            <span className={`flex items-center gap-1 ${/[0-9]/.test(password) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
+            <span className={`flex items-center gap-1 ${/[0-9]/.test(newPassword) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
               <span className="w-1 h-1 rounded-full bg-current" /> Number
             </span>
-            <span className={`flex items-center gap-1 ${/[^A-Za-z0-9]/.test(password) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
+            <span className={`flex items-center gap-1 ${/[^A-Za-z0-9]/.test(newPassword) ? 'text-primary-600 dark:text-primary-400' : 'text-surface-400 dark:text-surface-500'}`}>
               <span className="w-1 h-1 rounded-full bg-current" /> Symbol
             </span>
           </div>
-          <button className="btn-primary text-sm">
-            Update Password
+          <button
+            onClick={handleChangePassword}
+            disabled={changePassword.isPending || !currentPassword || !newPassword}
+            className="btn-primary text-sm disabled:opacity-50"
+          >
+            {changePassword.isPending ? 'Updating...' : 'Update Password'}
           </button>
         </div>
       </div>
@@ -174,7 +250,11 @@ export function SecuritySettingsPage() {
 
         {showSessions && (
           <div className="space-y-3">
-            {mockSessions.map((session) => (
+            {sessionsLoading && <LoadingSpinner />}
+            {sessionsError && (
+              <p className="text-sm text-red-600 dark:text-red-400 text-center">Failed to load sessions</p>
+            )}
+            {!sessionsLoading && !sessionsError && sessions?.map((session) => (
               <div
                 key={session.id}
                 className={`flex items-center justify-between rounded-xl border p-4 ${
@@ -188,19 +268,30 @@ export function SecuritySettingsPage() {
                     {session.device} {session.current && <span className="text-xs text-primary-600 dark:text-primary-400 font-medium ml-1">(Current)</span>}
                   </p>
                   <p className="text-xs text-surface-400 dark:text-surface-500">
-                    {session.ip} · {session.lastActive}
+                    {session.ip} · {new Date(session.last_active).toLocaleString()}
                   </p>
                 </div>
                 {!session.current && (
-                  <button className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
-                    Revoke
+                  <button
+                    onClick={() => handleRevoke(session.id)}
+                    disabled={revokeSession.isPending}
+                    className="text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
+                  >
+                    {revokeSession.isPending ? 'Revoking...' : 'Revoke'}
                   </button>
                 )}
               </div>
             ))}
-            <button className="flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 transition-colors">
-              <LogOut className="h-4 w-4" /> Log out all other sessions
-            </button>
+            {!sessionsLoading && !sessionsError && sessions && sessions.length > 1 && (
+              <button
+                onClick={handleLogoutAll}
+                disabled={logoutAll.isPending}
+                className="flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 transition-colors disabled:opacity-50"
+              >
+                <LogOut className="h-4 w-4" />
+                {logoutAll.isPending ? 'Logging out...' : 'Log out all other sessions'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -212,7 +303,7 @@ export function SecuritySettingsPage() {
           <div>
             <h3 className="font-semibold text-amber-800 dark:text-amber-300">Security Recommendations</h3>
             <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-700 dark:text-amber-400">
-              <li>Enable MFA if you haven't already</li>
+              <li>Enable MFA if you haven&apos;t already</li>
               <li>Use a unique password not shared with other services</li>
               <li>Review active sessions regularly and revoke unused ones</li>
               <li>Report suspicious activity immediately</li>

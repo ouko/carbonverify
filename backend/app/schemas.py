@@ -302,6 +302,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=12)
+
+
 # ─── Health ───────────────────────────────────────────────────────────────────
 
 class HealthCheck(BaseModel):
