@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ClipboardList, User, Inbox, CheckCircle, ArrowUpCircle, UserCheck, Check } from 'lucide-react'
-import { useReviewQueue, useUpdateReviewQueueItem } from '../hooks/useReviewQueue'
+import { ClipboardList, User, Inbox, CheckCircle, ArrowUpCircle, UserCheck, Check, Trash2 } from 'lucide-react'
+import { useReviewQueue, useUpdateReviewQueueItem, useDeleteReviewQueueItem } from '../hooks/useReviewQueue'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 const priorityColors: Record<number, string> = {
@@ -21,6 +21,7 @@ const statusBadge: Record<string, string> = {
 export default function ReviewQueuePage() {
   const { data: items, isLoading, isError, error } = useReviewQueue()
   const updateMutation = useUpdateReviewQueueItem()
+  const deleteMutation = useDeleteReviewQueueItem()
   const [actingId, setActingId] = useState<string | null>(null)
 
   const handleApprove = (id: string) => {
@@ -180,6 +181,19 @@ export default function ReviewQueuePage() {
                           <UserCheck className="h-4 w-4" />
                         </button>
                       )}
+                      <button
+                        title="Delete"
+                        aria-label="Delete"
+                        disabled={actingId === item.id}
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this?')) {
+                            deleteMutation.mutate(item.id)
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20 transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>

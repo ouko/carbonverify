@@ -33,3 +33,13 @@ export function useCreateDataSource() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['data-sources'] }),
   })
 }
+
+export function useDeleteDataSource() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/data-sources/${id}`)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['data-sources'] }),
+  })
+}

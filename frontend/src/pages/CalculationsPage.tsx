@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calculator, Filter, FileBarChart, Plus, X } from 'lucide-react'
+import { Calculator, Filter, FileBarChart, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useCalculations, useCreateCalculation } from '../hooks/useCalculations'
 import { useProjects } from '../hooks/useProjects'
@@ -29,6 +29,8 @@ export default function CalculationsPage() {
   const { data: calculations, isLoading, isError, error } = useCalculations()
   const createCalculation = useCreateCalculation()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(1)
+  const perPage = 9
 
   const [form, setForm] = useState({
     project_id: '',
@@ -69,6 +71,12 @@ export default function CalculationsPage() {
   const filtered = calculations?.filter((c) =>
     statusFilter === 'all' ? true : c.status === statusFilter
   )
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter])
+
+  const paginated = filtered?.slice((page - 1) * perPage, page * perPage)
 
   return (
     <div className="space-y-6">
@@ -113,64 +121,91 @@ export default function CalculationsPage() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered?.map((calc) => (
-            <div key={calc.id} className="card-hover p-5 group cursor-pointer" onClick={() => navigate(`/calculations/${calc.id}`)}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
-                    <Calculator className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-                  </div>
-                  <span className="font-semibold text-surface-900 dark:text-surface-100">Calculation</span>
-                </div>
-                <span className={`badge ${statusBadge[calc.status] || 'badge-slate'}`}>
-                  {(calc.status || '').replace('_', ' ')}
-                </span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Project</span>
-                  <span className="font-mono text-xs text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded">
-                    {calc.project_id.slice(0, 8)}...
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Period</span>
-                  <span className="text-surface-600 dark:text-surface-300 text-xs">
-                    {calc.monitoring_period_start} → {calc.monitoring_period_end}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Emissions Reduced</span>
-                  <span className="font-semibold text-primary-600 dark:text-primary-400">
-                    {calc.emissions_reduction_tCO2e?.toLocaleString() ?? 'N/A'} tCO2e
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Confidence</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-12 h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
-                      <div className="h-full rounded-full bg-primary-500" style={{ width: `${Math.round((calc.confidence_score || 0) * 100)}%` }} />
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {paginated?.map((calc) => (
+              <div key={calc.id} className="card-hover p-5 group cursor-pointer" onClick={() => navigate(`/calculations/${calc.id}`)}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+                      <Calculator className="w-5 h-5 text-primary-600 dark:text-primary-400" />
                     </div>
-                    <span className="text-xs text-surface-500 dark:text-surface-400 tabular-nums">
-                      {Math.round((calc.confidence_score || 0) * 100)}%
+                    <span className="font-semibold text-surface-900 dark:text-surface-100">Calculation</span>
+                  </div>
+                  <span className={`badge ${statusBadge[calc.status] || 'badge-slate'}`}>
+                    {(calc.status || '').replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Project</span>
+                    <span className="font-mono text-xs text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded">
+                      {calc.project_id.slice(0, 8)}...
                     </span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Period</span>
+                    <span className="text-surface-600 dark:text-surface-300 text-xs">
+                      {calc.monitoring_period_start} → {calc.monitoring_period_end}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Emissions Reduced</span>
+                    <span className="font-semibold text-primary-600 dark:text-primary-400">
+                      {calc.emissions_reduction_tCO2e?.toLocaleString() ?? 'N/A'} tCO2e
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Confidence</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-12 h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+                        <div className="h-full rounded-full bg-primary-500" style={{ width: `${Math.round((calc.confidence_score || 0) * 100)}%` }} />
+                      </div>
+                      <span className="text-xs text-surface-500 dark:text-surface-400 tabular-nums">
+                        {Math.round((calc.confidence_score || 0) * 100)}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {filtered?.length === 0 && (
-            <div className="col-span-full card p-12 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                  <FileBarChart className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+            ))}
+            {filtered?.length === 0 && (
+              <div className="col-span-full card p-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                    <FileBarChart className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                  </div>
+                  <p className="text-sm text-surface-500 dark:text-surface-400">No calculations found.</p>
                 </div>
-                <p className="text-sm text-surface-500 dark:text-surface-400">No calculations found.</p>
+              </div>
+            )}
+          </div>
+          {filtered && filtered.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page * perPage >= filtered.length}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Create Modal */}

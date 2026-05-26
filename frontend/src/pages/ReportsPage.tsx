@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Download, FileArchive, Plus, X } from 'lucide-react'
+import { FileText, Download, FileArchive, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useReports, useCreateReport } from '../hooks/useReports'
 import { useProjects } from '../hooks/useProjects'
@@ -24,6 +24,8 @@ export default function ReportsPage() {
   const { data: reports, isLoading, isError, error } = useReports()
   const createReport = useCreateReport()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(1)
+  const perPage = 9
 
   const [form, setForm] = useState({
     project_id: '',
@@ -55,6 +57,8 @@ export default function ReportsPage() {
     setFormErrors({})
   }
 
+  const paginated = reports?.slice((page - 1) * perPage, page * perPage)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -79,63 +83,90 @@ export default function ReportsPage() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {reports?.map((report) => (
-            <div key={report.id} className="card-hover p-5 group cursor-pointer" onClick={() => navigate(`/reports/${report.id}`)}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {paginated?.map((report) => (
+              <div key={report.id} className="card-hover p-5 group cursor-pointer" onClick={() => navigate(`/reports/${report.id}`)}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-950/30 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                    </div>
+                    <span className="font-semibold text-surface-900 dark:text-surface-100">Report</span>
                   </div>
-                  <span className="font-semibold text-surface-900 dark:text-surface-100">Report</span>
-                </div>
-                <span className={`badge ${statusBadge[report.status] || 'badge-slate'}`}>
-                  {(report.status || '').replace('_', ' ')}
-                </span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Template</span>
-                  <span className="text-surface-600 dark:text-surface-300 capitalize">{(report.template_type || '').replace('_', ' ')}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Project</span>
-                  <span className="font-mono text-xs text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded">
-                    {report.project_id.slice(0, 8)}...
+                  <span className={`badge ${statusBadge[report.status] || 'badge-slate'}`}>
+                    {(report.status || '').replace('_', ' ')}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-surface-400 dark:text-surface-500">Created</span>
-                  <span className="text-surface-600 dark:text-surface-300">
-                    {new Date(report.created_at).toLocaleDateString()}
-                  </span>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Template</span>
+                    <span className="text-surface-600 dark:text-surface-300 capitalize">{(report.template_type || '').replace('_', ' ')}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Project</span>
+                    <span className="font-mono text-xs text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-0.5 rounded">
+                      {report.project_id.slice(0, 8)}...
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-surface-400 dark:text-surface-500">Created</span>
+                    <span className="text-surface-600 dark:text-surface-300">
+                      {new Date(report.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                {report.final_pdf && !report.final_pdf.includes('example.com') ? (
+                  <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
+                    <a href={report.final_pdf} download className="btn-primary flex-1 text-xs" onClick={(e) => e.stopPropagation()}>
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </a>
+                  </div>
+                ) : (
+                  <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
+                    <span className="text-xs text-surface-400 dark:text-surface-500 italic flex-1 text-center">Not generated</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {reports?.length === 0 && (
+              <div className="col-span-full card p-12 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                    <FileArchive className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                  </div>
+                  <p className="text-sm text-surface-500 dark:text-surface-400">No reports found.</p>
                 </div>
               </div>
-              {report.final_pdf && !report.final_pdf.includes('example.com') ? (
-                <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
-                  <a href={report.final_pdf} download className="btn-primary flex-1 text-xs" onClick={(e) => e.stopPropagation()}>
-                    <Download className="w-3.5 h-3.5" />
-                    Download
-                  </a>
-                </div>
-              ) : (
-                <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
-                  <span className="text-xs text-surface-400 dark:text-surface-500 italic flex-1 text-center">Not generated</span>
-                </div>
-              )}
-            </div>
-          ))}
-          {reports?.length === 0 && (
-            <div className="col-span-full card p-12 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                  <FileArchive className="w-6 h-6 text-surface-400 dark:text-surface-500" />
-                </div>
-                <p className="text-sm text-surface-500 dark:text-surface-400">No reports found.</p>
+            )}
+          </div>
+          {reports && reports.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, reports.length)} of {reports.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page * perPage >= reports.length}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Create Modal */}

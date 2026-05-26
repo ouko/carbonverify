@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Search, Filter, FolderOpen } from 'lucide-react'
+import { Plus, Search, Filter, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useProjects } from '../hooks/useProjects'
 import type { ProjectStatus } from '../types'
@@ -31,12 +31,20 @@ export default function ProjectsPage() {
   const { data: projects, isLoading, isError, error } = useProjects()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<ProjectStatus | 'all'>('all')
+  const [page, setPage] = useState(1)
+  const perPage = 10
 
   const filtered = projects?.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
     const matchesFilter = filter === 'all' || p.status === filter
     return matchesSearch && matchesFilter
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, filter])
+
+  const paginated = filtered?.slice((page - 1) * perPage, page * perPage)
 
   return (
     <div className="space-y-6">
@@ -96,81 +104,108 @@ export default function ProjectsPage() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Methodology</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Crediting Period</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Confidence</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-                {filtered?.map((project) => (
-                  <tr
-                    key={project.id}
-                    className="group hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <Link
-                        to={`/projects/${project.id}`}
-                        className="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
-                      >
-                        {project.name}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 text-surface-600 dark:text-surface-300">
-                      {project.methodology}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`badge ${statusBadge[project.status as ProjectStatus] || 'badge-slate'}`}>
-                        {(project.status || 'unknown').replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-surface-600 dark:text-surface-300">
-                      <span className="text-surface-400 dark:text-surface-500">{project.crediting_period_start}</span>
-                      <span className="mx-1.5 text-surface-300 dark:text-surface-600">→</span>
-                      <span className="text-surface-400 dark:text-surface-500">{project.crediting_period_end}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary-500 transition-all"
-                            style={{ width: `${Math.round((project.confidence_threshold || 0) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-surface-500 dark:text-surface-400 tabular-nums">
-                          {Math.round((project.confidence_threshold || 0) * 100)}%
+        <>
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Methodology</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Crediting Period</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Confidence</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
+                  {paginated?.map((project) => (
+                    <tr
+                      key={project.id}
+                      className="group hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <Link
+                          to={`/projects/${project.id}`}
+                          className="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
+                        >
+                          {project.name}
+                        </Link>
+                      </td>
+                      <td className="px-6 py-4 text-surface-600 dark:text-surface-300">
+                        {project.methodology}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`badge ${statusBadge[project.status as ProjectStatus] || 'badge-slate'}`}>
+                          {(project.status || 'unknown').replace('_', ' ')}
                         </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filtered?.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                          <FolderOpen className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                      </td>
+                      <td className="px-6 py-4 text-surface-600 dark:text-surface-300">
+                        <span className="text-surface-400 dark:text-surface-500">{project.crediting_period_start}</span>
+                        <span className="mx-1.5 text-surface-300 dark:text-surface-600">→</span>
+                        <span className="text-surface-400 dark:text-surface-500">{project.crediting_period_end}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary-500 transition-all"
+                              style={{ width: `${Math.round((project.confidence_threshold || 0) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-surface-500 dark:text-surface-400 tabular-nums">
+                            {Math.round((project.confidence_threshold || 0) * 100)}%
+                          </span>
                         </div>
-                        <div className="text-sm text-surface-500 dark:text-surface-400">
-                          No projects found
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered?.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                            <FolderOpen className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                          </div>
+                          <div className="text-sm text-surface-500 dark:text-surface-400">
+                            No projects found
+                          </div>
+                          <div className="text-xs text-surface-400 dark:text-surface-500">
+                            Try adjusting your search or filter criteria
+                          </div>
                         </div>
-                        <div className="text-xs text-surface-400 dark:text-surface-500">
-                          Try adjusting your search or filter criteria
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+          {filtered && filtered.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page * perPage >= filtered.length}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

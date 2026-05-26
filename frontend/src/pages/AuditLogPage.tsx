@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Search, Shield, CheckCircle, Clock, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Shield, CheckCircle, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuditLogs } from '../hooks/useAuditLogs'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
@@ -19,12 +19,20 @@ export function AuditLogPage() {
   const [filterAction, setFilterAction] = useState('')
   const [selectedLog, setSelectedLog] = useState<any>(null)
   const [verifying, setVerifying] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const perPage = 10
 
   const filtered = (logs || []).filter((log) => {
     const matchesSearch = !search || log.target.toLowerCase().includes(search.toLowerCase()) || log.actor.toLowerCase().includes(search.toLowerCase())
     const matchesAction = !filterAction || log.action === filterAction
     return matchesSearch && matchesAction
   })
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterAction])
+
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
   const handleVerify = async (logId: string) => {
     setVerifying(logId)
@@ -127,72 +135,99 @@ export function AuditLogPage() {
       </div>
 
       {/* Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
-                <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Action</th>
-                <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Actor</th>
-                <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Target</th>
-                <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Time</th>
-                <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Hash</th>
-                <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Radix</th>
-                <th className="px-4 py-3.5"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-              {filtered.map((log) => (
-                <tr
-                  key={log.id}
-                  onClick={() => setSelectedLog(log)}
-                  className="cursor-pointer hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors"
-                >
-                  <td className="px-4 py-3">
-                    <span className={`badge text-[10px] ${ACTION_COLORS[log.action] || 'badge-slate'}`}>
-                      {(log.action || '').replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-surface-700 dark:text-surface-300">{log.actor}</td>
-                  <td className="px-4 py-3 text-surface-700 dark:text-surface-300">{log.target}</td>
-                  <td className="px-4 py-3 text-surface-500 dark:text-surface-400 text-xs">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-surface-500 dark:text-surface-400">
-                    {log.output_hash || log.input_hash || '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {log.anchored ? (
-                      <span className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400">
-                        <CheckCircle className="h-3.5 w-3.5" /> {log.radix_tx_ref?.slice(0, 12)}...
+      <>
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
+                  <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Action</th>
+                  <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Actor</th>
+                  <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Target</th>
+                  <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Time</th>
+                  <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Hash</th>
+                  <th className="px-4 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Radix</th>
+                  <th className="px-4 py-3.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
+                {paginated.map((log) => (
+                  <tr
+                    key={log.id}
+                    onClick={() => setSelectedLog(log)}
+                    className="cursor-pointer hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <span className={`badge text-[10px] ${ACTION_COLORS[log.action] || 'badge-slate'}`}>
+                        {(log.action || '').replace('_', ' ')}
                       </span>
-                    ) : (
-                      <span className="text-xs text-surface-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {log.anchored && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleVerify(log.id) }}
-                        className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors"
-                      >
-                        {verifying === log.id ? 'Verifying...' : 'Verify'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
-                    No audit logs match your filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="px-4 py-3 text-surface-700 dark:text-surface-300">{log.actor}</td>
+                    <td className="px-4 py-3 text-surface-700 dark:text-surface-300">{log.target}</td>
+                    <td className="px-4 py-3 text-surface-500 dark:text-surface-400 text-xs">
+                      {new Date(log.timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-surface-500 dark:text-surface-400">
+                      {log.output_hash || log.input_hash || '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {log.anchored ? (
+                        <span className="flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400">
+                          <CheckCircle className="h-3.5 w-3.5" /> {log.radix_tx_ref?.slice(0, 12)}...
+                        </span>
+                      ) : (
+                        <span className="text-xs text-surface-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {log.anchored && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleVerify(log.id) }}
+                          className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors"
+                        >
+                          {verifying === log.id ? 'Verifying...' : 'Verify'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
+                      No audit logs match your filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-surface-500 dark:text-surface-400">
+              Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page * perPage >= filtered.length}
+                className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </>
 
       {/* Detail Panel */}
       {selectedLog && (

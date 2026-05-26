@@ -32,3 +32,16 @@ export function useUpdateReviewQueueItem() {
     },
   })
 }
+
+export function useDeleteReviewQueueItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/review-queue/${id}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['review-queue'] })
+      qc.invalidateQueries({ queryKey: ['dashboard-stats'] })
+    },
+  })
+}

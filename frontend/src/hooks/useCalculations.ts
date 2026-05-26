@@ -33,3 +33,13 @@ export function useCreateCalculation() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['calculations'] }),
   })
 }
+
+export function useDeleteCalculation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/calculations/${id}`)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['calculations'] }),
+  })
+}

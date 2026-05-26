@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Database, Search, CheckCircle, AlertTriangle, XCircle, Clock, HardDrive, Plus, X } from 'lucide-react'
+import { Database, Search, CheckCircle, AlertTriangle, XCircle, Clock, HardDrive, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useDataSources, useCreateDataSource } from '../hooks/useDataSources'
 import { useProjects } from '../hooks/useProjects'
@@ -29,6 +29,8 @@ export default function DataSourcesPage() {
   const { data: sources, isLoading, isError, error } = useDataSources()
   const createDataSource = useCreateDataSource()
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [page, setPage] = useState(1)
+  const perPage = 10
 
   const [form, setForm] = useState({
     project_id: '',
@@ -62,6 +64,12 @@ export default function DataSourcesPage() {
   const filtered = sources?.filter((s) =>
     projectFilter ? s.project_id.includes(projectFilter) : true
   )
+
+  useEffect(() => {
+    setPage(1)
+  }, [projectFilter])
+
+  const paginated = filtered?.slice((page - 1) * perPage, page * perPage)
 
   return (
     <div className="space-y-6">
@@ -99,64 +107,91 @@ export default function DataSourcesPage() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Source Type</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Schema</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Project</th>
-                  <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-                {filtered?.map((source) => (
-                  <tr key={source.id} className="hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors cursor-pointer" onClick={() => navigate(`/data-sources/${source.id}`)}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                          <Database className="w-4 h-4 text-surface-500 dark:text-surface-400" />
+        <>
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Source Type</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Schema</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Project</th>
+                    <th className="px-6 py-3.5 font-semibold text-surface-500 dark:text-surface-400 text-xs uppercase tracking-wider">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
+                  {paginated?.map((source) => (
+                    <tr key={source.id} className="hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors cursor-pointer" onClick={() => navigate(`/data-sources/${source.id}`)}>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                            <Database className="w-4 h-4 text-surface-500 dark:text-surface-400" />
+                          </div>
+                          <span className="font-semibold text-surface-900 dark:text-surface-100 capitalize">
+                            {(source.source_type || '').replace('_', ' ')}
+                          </span>
                         </div>
-                        <span className="font-semibold text-surface-900 dark:text-surface-100 capitalize">
-                          {(source.source_type || '').replace('_', ' ')}
+                      </td>
+                      <td className="px-6 py-4 text-surface-600 dark:text-surface-300">{source.schema_version}</td>
+                      <td className="px-6 py-4">
+                        <span className={`badge inline-flex items-center gap-1.5 ${statusBadge[source.validation_status] || 'badge-slate'}`}>
+                          {statusIcons[source.validation_status]}
+                          {source.validation_status}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-surface-600 dark:text-surface-300">{source.schema_version}</td>
-                    <td className="px-6 py-4">
-                      <span className={`badge inline-flex items-center gap-1.5 ${statusBadge[source.validation_status] || 'badge-slate'}`}>
-                        {statusIcons[source.validation_status]}
-                        {source.validation_status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded-md">
-                        {source.project_id.slice(0, 8)}...
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-surface-500 dark:text-surface-400">
-                      {new Date(source.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-                {filtered?.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
-                          <HardDrive className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-xs text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded-md">
+                          {source.project_id.slice(0, 8)}...
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-surface-500 dark:text-surface-400">
+                        {new Date(source.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered?.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                            <HardDrive className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                          </div>
+                          <div className="text-sm text-surface-500 dark:text-surface-400">No data sources found.</div>
                         </div>
-                        <div className="text-sm text-surface-500 dark:text-surface-400">No data sources found.</div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+          {filtered && filtered.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page * perPage >= filtered.length}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create Modal */}

@@ -33,3 +33,13 @@ export function useCreateReport() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
   })
 }
+
+export function useDeleteReport() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/reports/${id}`)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['reports'] }),
+  })
+}
