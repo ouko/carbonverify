@@ -9,7 +9,7 @@ celery_app = Celery(
     "carbonverify",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.compliance_jobs"],
+    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.compliance_jobs", "app.validation_engine.tasks"],
 )
 
 celery_app.conf.update(
@@ -67,6 +67,14 @@ celery_app.conf.update(
         "check-lead-deadlines": {
             "task": "app.tasks.lead_jobs.check_lead_deadlines",
             "schedule": 86400.0,  # daily
+        },
+        "cleanup-archived-validation-runs": {
+            "task": "app.validation_engine.tasks.cleanup_archived_runs",
+            "schedule": 86400.0,  # daily
+        },
+        "check-stalled-escalations": {
+            "task": "app.validation_engine.tasks.check_stalled_escalations",
+            "schedule": 900.0,  # every 15 minutes
         },
     },
 )

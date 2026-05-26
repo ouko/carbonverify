@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Workflow Validation Engine** — Enterprise-grade autonomous QA system
+  - JSON-defined workflow graph schema with Pydantic validation (10 step types: HTTP, DB query, service call, external API, notification, DOM capture, decision gate, wait, parallel, subflow)
+  - State machine with 9 states and immutable transition audit trail (SHA-256 chained hashes)
+  - Cryptographic proof generation: per-step SHA-256 proofs assembled into a Merkle tree, anchored to Radix ledger
+  - Synthetic Actor Factory with 5 actor types, behavioral profiles, and identifiable markers
+  - Auto-remediation engine with 6 actions: retry, rollback, skip, escalate, patch, circuit break
+  - Human escalation gates with 4 levels, SLA deadlines, and auto-escalation Celery task
+  - REST API under `/validation/*` for workflows, runs, proofs, certificates, synthetic actors, and escalations
+  - Celery tasks: `execute_validation_run`, `anchor_run_to_radix`, `cleanup_archived_runs`, `check_stalled_escalations`
+  - Alembic migration `1e1e69dad168` creating 8 tables and 9 PostgreSQL enums
+
 ### Security
 - **Searchable encrypted fields** — Added `email_hash` (HMAC-SHA256) to the `User` model to enable exact-match lookups on encrypted emails without exposing plaintext. `compute_searchable_hash()` derives a deterministic keyed hash from the encryption key.
 - **Password complexity** — Registration now requires 8+ chars with at least one uppercase letter, one digit, and one special character (`@$!%*?&`)

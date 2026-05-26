@@ -37,7 +37,8 @@
 | Module | Capability |
 |--------|-----------|
 | **Data Ingestion** | Multi-format upload (Excel, CSV, PDF, Images, IoT webhooks) with magic-bytes detection and S3 storage |
-| **Validation Engine** | JSON Schema validation, GPS/temporal checks, cross-reference verification, confidence scoring (0–1) |
+| **Data Validation** | JSON Schema validation, GPS/temporal checks, cross-reference verification, confidence scoring (0–1) |
+| **Workflow Validation Engine** | Enterprise-grade autonomous QA with JSON-defined workflow graphs, cryptographic proof chains (Merkle trees), synthetic actor factory, auto-remediation, and human escalation gates |
 | **Calculation Engine** | fNRB spatial interpolation, IPCC Tier 1/2 emissions quantification, Monte Carlo uncertainty (10k iterations), leakage detection, methodology compliance scoring |
 | **Report Generator** | Jinja2 HTML templates → WeasyPrint PDF; auto-citations, cross-reference validation, quality gates |
 | **VVB Liaison** | Automated registry submission (Verra / Gold Standard), status polling, SLA tracking, auto-drafted clarification responses |

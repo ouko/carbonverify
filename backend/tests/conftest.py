@@ -42,16 +42,19 @@ class UUIDAsString(TypeDecorator):
 
 # Patch PostgreSQL-specific types for SQLite compatibility
 import app.models as models_module  # noqa: E402
-for attr_name in dir(models_module):
-    obj = getattr(models_module, attr_name)
-    if isinstance(obj, type) and hasattr(obj, '__tablename__'):
-        for col in obj.__table__.columns:
-            if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'JSONB':
-                col.type = JSON()
-            if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'ARRAY':
-                col.type = JSON()
-            if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'UUID':
-                col.type = UUIDAsString()
+import app.validation_engine.models as validation_models_module  # noqa: E402
+
+for models_mod in [models_module, validation_models_module]:
+    for attr_name in dir(models_mod):
+        obj = getattr(models_mod, attr_name)
+        if isinstance(obj, type) and hasattr(obj, '__tablename__'):
+            for col in obj.__table__.columns:
+                if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'JSONB':
+                    col.type = JSON()
+                if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'ARRAY':
+                    col.type = JSON()
+                if hasattr(col.type, '__visit_name__') and col.type.__visit_name__ == 'UUID':
+                    col.type = UUIDAsString()
 
 from app.main import app  # noqa: E402
 from app.database import Base, get_db  # noqa: E402

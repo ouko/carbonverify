@@ -267,3 +267,15 @@ class AuditTrailAnchor:
     async def verify(self, tx_ref: str, expected_data: Dict[str, Any]) -> bool:
         """Verify an anchored transaction."""
         return await self.client.verify_anchor(tx_ref, expected_data)
+
+
+# Global singleton instance
+_radix_client: Optional[RadixClient] = None
+
+
+def get_radix_client() -> RadixClient:
+    """Get or create the global RadixClient singleton."""
+    global _radix_client
+    if _radix_client is None:
+        _radix_client = RadixClient()
+    return _radix_client

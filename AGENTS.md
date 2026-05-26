@@ -55,6 +55,7 @@ carbonverify/
 │   │   │   └── lead_intelligence/  # Scrapers + scoring
 │   │   ├── reports/                # Jinja2 + WeasyPrint
 │   │   ├── tasks/                  # Celery tasks
+│   │   ├── validation_engine/      # Workflow Validation Engine (orchestrator, proofs, synthetic actors, remediation)
 │   │   └── vvb_liaison/            # Registry clients
 │   ├── alembic/                    # DB migrations
 │   └── tests/                      # pytest suite (225 tests)
@@ -172,6 +173,18 @@ email_hash = compute_searchable_hash(email)
 - Never query the encrypted column directly for equality.
 - `compute_searchable_hash()` uses the same `ENCRYPTION_KEY_HEX` as the Fernet layer.
 - Falls back to raw SHA-256 only if no key is configured (development).
+
+### Workflow Validation Engine
+
+The `app/validation_engine/` package provides an enterprise-grade autonomous QA system:
+
+- **State machine**: `PENDING → QUEUED → RUNNING → STEP_VALIDATING → PROOF_GENERATING → REMEDIATION_CHECKING → COMPLETED/FAILED → ARCHIVED`
+- **JSON-defined workflows**: Workflow graphs stored in `validation_workflows.workflow_graph` (PostgreSQL JSONB), validated by Pydantic schemas
+- **Proof generation**: Every step produces a SHA-256 hashed proof artifact. Proofs are assembled into a Merkle tree per run; the root is anchored to the Radix ledger within 5 minutes
+- **Synthetic actors**: `SyntheticActorFactory` creates identifiable test personas (user, admin, service, external_system, browser) with traceable markers injected into HTTP headers, DOM attributes, and phone numbers
+- **Auto-remediation**: Pattern-based failure recovery — retry with exponential backoff, rollback, skip, patch, circuit break, or escalate
+- **Human escalation gates**: `HumanEscalation` records with SLA deadlines, severity scoring, and 4 escalation levels (L1 operator → L2 engineer → L3 architect → Executive). Celery task `check_stalled_escalations` auto-escalates every 15 minutes
+- **API endpoints**: All under `/validation/*` — workflows, runs, steps, proofs, certificates, synthetic actors, escalations
 
 ### Celery Graceful Shutdown
 
