@@ -324,6 +324,8 @@ async def report_breach(
 @router.get("/breach")
 async def list_breaches(
     status: Optional[BreachStatusEnum] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(require_operator),
     db: AsyncSession = Depends(get_db),
 ):
@@ -331,6 +333,7 @@ async def list_breaches(
     stmt = select(BreachNotification).order_by(desc(BreachNotification.detected_at))
     if status:
         stmt = stmt.where(BreachNotification.status == status)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     breaches = result.scalars().all()
@@ -405,6 +408,8 @@ async def disclose_conflict(
 @router.get("/conflict-of-interest")
 async def list_conflicts(
     project_id: Optional[uuid.UUID] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -412,6 +417,7 @@ async def list_conflicts(
     stmt = select(ConflictOfInterest).order_by(desc(ConflictOfInterest.disclosed_at))
     if project_id:
         stmt = stmt.where(ConflictOfInterest.project_id == project_id)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     conflicts = result.scalars().all()
@@ -533,6 +539,8 @@ async def create_methodology_version(
 @router.get("/methodology")
 async def list_methodology_versions(
     methodology_name: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -540,6 +548,7 @@ async def list_methodology_versions(
     stmt = select(MethodologyVersion).order_by(desc(MethodologyVersion.effective_date))
     if methodology_name:
         stmt = stmt.where(MethodologyVersion.methodology_name == methodology_name)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     versions = result.scalars().all()

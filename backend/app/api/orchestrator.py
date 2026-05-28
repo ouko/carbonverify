@@ -137,6 +137,8 @@ async def list_orchestrator_review_queue(
     status: Optional[str] = None,
     assigned_to: Optional[uuid.UUID] = None,
     min_priority: int = Query(1, ge=1, le=5),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -146,7 +148,7 @@ async def list_orchestrator_review_queue(
         stmt = stmt.where(HumanReviewQueue.status == status)
     if assigned_to:
         stmt = stmt.where(HumanReviewQueue.assigned_to == assigned_to)
-    stmt = stmt.order_by(HumanReviewQueue.priority_score.desc().nullslast(), HumanReviewQueue.created_at.asc())
+    stmt = stmt.order_by(HumanReviewQueue.priority_score.desc().nullslast(), HumanReviewQueue.created_at.asc()).offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     items = result.scalars().all()

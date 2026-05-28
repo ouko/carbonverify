@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check, AlertTriangle } from 'lucide-react'
+import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTokens, useMarketplace, useMintToken, useBuyToken, useRetireToken } from '../hooks/useTokenization'
 import type { Token, MarketplaceListing } from '../hooks/useTokenization'
 import { useCalculations, useCalculation } from '../hooks/useCalculations'
@@ -70,6 +70,12 @@ export function TokenizationPage() {
   const [tab, setTab] = useState<'marketplace' | 'mint' | 'retire'>('marketplace')
   const [selectedToken, setSelectedToken] = useState<SelectableToken | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const perPage = 6
+
+  useEffect(() => {
+    setPage(1)
+  }, [tab])
 
   const [mintForm, setMintForm] = useState({
     project_id: '',
@@ -93,6 +99,11 @@ export function TokenizationPage() {
   const { data: listings, isLoading: listingsLoading, isError: listingsError } = useMarketplace()
   const { data: calculations, isLoading: calcLoading, isError: calcError } = useCalculations()
   const { data: projects } = useProjects()
+
+  const total = listings?.length ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = listings?.slice((currentPage - 1) * perPage, currentPage * perPage)
 
   const mintMutation = useMintToken()
   const buyMutation = useBuyToken()
@@ -267,7 +278,7 @@ export function TokenizationPage() {
             </div>
           ) : (
             <>
-              {(listings || []).map((listing) => (
+              {(paginated || []).map((listing) => (
                 <div key={listing.id} className="card-hover p-5">
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -311,13 +322,36 @@ export function TokenizationPage() {
                   </div>
                 </div>
               ))}
-              {(listings || []).length === 0 && !listingsLoading && (
+              {(paginated || []).length === 0 && !listingsLoading && (
                 <div className="col-span-full card p-12 text-center">
                   <p className="text-sm text-surface-500 dark:text-surface-400">No tokens currently listed.</p>
                 </div>
               )}
             </>
           )}
+        </div>
+      )}
+      {tab === 'marketplace' && total > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-surface-500 dark:text-surface-400">
+            Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, total)} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" /> Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 

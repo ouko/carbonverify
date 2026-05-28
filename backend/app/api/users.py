@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -41,10 +41,12 @@ async def me(current_user: User = Depends(get_current_user)):
 
 @router.get("/", response_model=List[UserOut])
 async def list_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    result = await db.execute(select(User))
+    result = await db.execute(select(User).offset(skip).limit(limit))
     return result.scalars().all()
 
 

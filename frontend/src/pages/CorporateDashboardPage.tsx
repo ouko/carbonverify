@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { Building2, Leaf, FileText, Download, Eye, Shield, ChevronRight, Loader2 } from 'lucide-react'
+import { Building2, Leaf, FileText, Download, Eye, Shield, ChevronRight, Loader2, ChevronLeft } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useCorporatePortfolio, useGenerateESGReport } from '../hooks/useCorporate'
 
@@ -12,9 +12,21 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981']
 export function CorporateDashboardPage() {
   const [activeTab, setActiveTab] = useState<'portfolio' | 'esg' | 'due-diligence'>('portfolio')
   const [toast, setToast] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const perPage = 8
 
   const { data: portfolio, isLoading, isError, error } = useCorporatePortfolio()
   const generateReport = useGenerateESGReport()
+
+  const projects = portfolio?.projects ?? []
+  const total = projects.length
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = projects.slice((currentPage - 1) * perPage, currentPage * perPage)
+
+  useEffect(() => {
+    setPage(1)
+  }, [activeTab])
 
   const [esgForm, setEsgForm] = useState({
     companyName: 'Acme Corporation',
@@ -214,7 +226,7 @@ export function CorporateDashboardPage() {
               <div className="card p-5 lg:col-span-2">
                 <h3 className="mb-4 text-sm font-semibold text-surface-900 dark:text-surface-100">Project Contributions</h3>
                 <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-                  {(portfolio?.projects ?? []).map((project) => (
+                  {paginated.map((project) => (
                     <div key={project.name} className="flex items-center justify-between py-3">
                       <div>
                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">{project.name}</p>
@@ -229,6 +241,29 @@ export function CorporateDashboardPage() {
                     </div>
                   ))}
                 </div>
+                {total > perPage && (
+                  <div className="flex items-center justify-between pt-4 border-t border-surface-200/60 dark:border-surface-800/40">
+                    <p className="text-xs text-surface-400 dark:text-surface-500">
+                      Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, total)} of {total}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="w-4 h-4" /> Prev
+                      </button>
+                      <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Next <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

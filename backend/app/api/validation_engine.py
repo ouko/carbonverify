@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -99,6 +99,8 @@ async def create_workflow(
 async def list_workflows(
     request: Request,
     active_only: bool = True,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -106,7 +108,7 @@ async def list_workflows(
     query = select(ValidationWorkflow)
     if active_only:
         query = query.where(ValidationWorkflow.active == True)
-    result = await db.execute(query.order_by(ValidationWorkflow.created_at.desc()))
+    result = await db.execute(query.order_by(ValidationWorkflow.created_at.desc()).offset(skip).limit(limit))
     workflows = result.scalars().all()
     return [
         WorkflowResponse(
@@ -237,8 +239,8 @@ async def list_runs(
     request: Request,
     workflow_id: Optional[str] = None,
     status: Optional[WorkflowRunStatus] = None,
-    limit: int = 50,
-    offset: int = 0,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -451,6 +453,8 @@ async def create_synthetic_actor(
 async def list_synthetic_actors(
     request: Request,
     actor_type: Optional[SyntheticActorType] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -458,7 +462,7 @@ async def list_synthetic_actors(
     from app.validation_engine.synthetic import SyntheticActorFactory
     factory = SyntheticActorFactory()
     actors = await factory.list_available_actors(db, actor_type)
-    return [_actor_to_response(a) for a in actors]
+    return [_actor_to_response(a) for a in actors][skip : skip + limit]
 
 
 @router.get("/synthetic-actors/{actor_id}", response_model=SyntheticActorResponse)
@@ -484,6 +488,8 @@ async def list_escalations(
     request: Request,
     status: Optional[EscalationStatus] = None,
     assigned_to_me: bool = False,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -493,7 +499,7 @@ async def list_escalations(
         query = query.where(HumanEscalation.status == status)
     if assigned_to_me:
         query = query.where(HumanEscalation.assigned_to == current_user.id)
-    query = query.order_by(HumanEscalation.created_at.desc())
+    query = query.order_by(HumanEscalation.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     escalations = result.scalars().all()
     return [_escalation_to_response(e) for e in escalations]

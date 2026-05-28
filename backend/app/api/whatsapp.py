@@ -77,6 +77,8 @@ async def whatsapp_webhook_receive(request: Request):
 async def list_enumerators(
     project_id: Optional[uuid.UUID] = None,
     active_only: bool = True,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: str = Depends(require_viewer),
 ):
@@ -86,7 +88,7 @@ async def list_enumerators(
         stmt = stmt.where(Enumerator.project_id == project_id)
     if active_only:
         stmt = stmt.where(Enumerator.active.is_(True))
-    stmt = stmt.order_by(Enumerator.data_quality_score.desc().nullslast())
+    stmt = stmt.order_by(Enumerator.data_quality_score.desc().nullslast()).offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     enumerators = result.scalars().all()
@@ -198,6 +200,8 @@ async def list_survey_responses(
     project_id: Optional[uuid.UUID] = None,
     enumerator_id: Optional[uuid.UUID] = None,
     validation_status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: str = Depends(require_viewer),
 ):
@@ -209,7 +213,7 @@ async def list_survey_responses(
         stmt = stmt.where(SurveyResponse.enumerator_id == enumerator_id)
     if validation_status:
         stmt = stmt.where(SurveyResponse.validation_status == validation_status)
-    stmt = stmt.order_by(SurveyResponse.created_at.desc())
+    stmt = stmt.order_by(SurveyResponse.created_at.desc()).offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     responses = result.scalars().all()
@@ -238,6 +242,8 @@ async def list_survey_responses(
 async def list_support_tickets(
     project_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: str = Depends(require_viewer),
 ):
@@ -247,7 +253,7 @@ async def list_support_tickets(
         stmt = stmt.where(SupportTicket.project_id == project_id)
     if status:
         stmt = stmt.where(SupportTicket.status == status)
-    stmt = stmt.order_by(SupportTicket.created_at.desc())
+    stmt = stmt.order_by(SupportTicket.created_at.desc()).offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     tickets = result.scalars().all()

@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -136,13 +136,15 @@ async def upload_file(
 async def list_project_uploads(
     project_id: uuid.UUID,
     status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
     stmt = select(FileUpload).where(FileUpload.project_id == project_id)
     if status:
         stmt = stmt.where(FileUpload.status == status)
-    stmt = stmt.order_by(FileUpload.created_at.desc())
+    stmt = stmt.order_by(FileUpload.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

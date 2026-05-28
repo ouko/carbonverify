@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ClipboardList, User, Inbox, CheckCircle, ArrowUpCircle, UserCheck, Check, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ClipboardList, User, Inbox, CheckCircle, ArrowUpCircle, UserCheck, Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useReviewQueue, useUpdateReviewQueueItem, useDeleteReviewQueueItem } from '../hooks/useReviewQueue'
 import LoadingSpinner from '../components/LoadingSpinner'
 
@@ -19,10 +19,21 @@ const statusBadge: Record<string, string> = {
 }
 
 export default function ReviewQueuePage() {
+  const [page, setPage] = useState(1)
+  const perPage = 10
   const { data: items, isLoading, isError, error } = useReviewQueue()
   const updateMutation = useUpdateReviewQueueItem()
   const deleteMutation = useDeleteReviewQueueItem()
   const [actingId, setActingId] = useState<string | null>(null)
+
+  const total = items?.length ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = items?.slice((currentPage - 1) * perPage, currentPage * perPage)
+
+  useEffect(() => {
+    setPage(1)
+  }, [items])
 
   const handleApprove = (id: string) => {
     setActingId(id)
@@ -103,7 +114,7 @@ export default function ReviewQueuePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-              {items?.map((item) => (
+              {paginated?.map((item) => (
                 <tr
                   key={item.id}
                   className="hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors"
@@ -198,7 +209,7 @@ export default function ReviewQueuePage() {
                   </td>
                 </tr>
               ))}
-              {items?.length === 0 && (
+              {paginated?.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
@@ -213,6 +224,29 @@ export default function ReviewQueuePage() {
             </tbody>
           </table>
         </div>
+        {total > 0 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t border-surface-200/60 dark:border-surface-800/40">
+            <p className="text-xs text-surface-400 dark:text-surface-500">
+              Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, total)} of {total}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

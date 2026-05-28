@@ -9,6 +9,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **Server-side pagination on all backend list endpoints** — Every `GET` endpoint returning collections now accepts `skip` and `limit` query parameters with sensible defaults (50–100) and max caps (200–500)
+  - Brokerage: `/listings`, `/transactions`
+  - Tokenization: `/tokens`, `/marketplace`
+  - WhatsApp/Field: `/enumerators`, `/survey-responses`, `/support-tickets`
+  - Validation Engine: `/escalations`, `/runs`, `/synthetic-actors`
+  - Compliance: `/breach`, `/conflict-of-interest`, `/methodology`
+  - Corporate: `/portfolio/holdings`
+  - Review Queue: `/review-queue/`
+  - Orchestrator: `/review-queue`
+  - Uploads: `/projects/{id}/uploads`
+  - Users: `/users/`
+- **Client-side pagination on all frontend list pages** — Consistent pagination controls (Prev/Next, "Showing X-Y of Z") following the Projects/DataSources pattern
+  - ReviewQueuePage (10 per page)
+  - BrokeragePage — Marketplace (6 per page), Transactions (10 per page)
+  - TokenizationPage — Marketplace (6 per page)
+  - CorporateDashboardPage — Project contributions (8 per page)
+  - LeadsPage — Table view (10 per page)
+  - ComplianceDashboardPage — Already had pagination for all sections
+  - FieldDashboardPage — Already had pagination for enumerators
+- **Frontend hooks updated** to pass `skip`/`limit` to backend APIs: `useReviewQueue`, `useBrokerageListings`, `useBrokerageTransactions`, `useTokens`, `useMarketplace`, `useBreaches`, `useConflicts`, `useMethodologyVersions`
+- **Dashboard stats query optimization** — Parallelized status count queries to reduce load time
+
+### Fixed
+- **Slow loading elements** — Root cause was unbounded backend list responses. Fixed by adding server-side pagination to all list endpoints and client-side pagination to all frontend tables.
+- **Axios timeout** — Increased from 10s to 30s to prevent timeouts on slower network connections
+- **CORS** — Added `192.168.1.97:5173` (network IP) to allowed origins for local dev across devices
+
+### Added
 - **Workflow Validation Engine** — Enterprise-grade autonomous QA system
   - JSON-defined workflow graph schema with Pydantic validation (10 step types: HTTP, DB query, service call, external API, notification, DOM capture, decision gate, wait, parallel, subflow)
   - State machine with 9 states and immutable transition audit trail (SHA-256 chained hashes)

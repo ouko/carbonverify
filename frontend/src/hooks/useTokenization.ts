@@ -102,21 +102,21 @@ function mapMarketplaceListing(item: BackendListing): MarketplaceListing {
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 
-export function useTokens() {
+export function useTokens(skip = 0, limit = 50) {
   return useQuery<Token[]>({
-    queryKey: ['tokens'],
+    queryKey: ['tokens', skip, limit],
     queryFn: async () => {
-      const res = await api.get<BackendToken[]>('/tokenization/tokens')
+      const res = await api.get<BackendToken[]>(`/tokenization/tokens?skip=${skip}&limit=${limit}`)
       return (res.data ?? []).map(mapToken)
     },
   })
 }
 
-export function useMarketplace() {
+export function useMarketplace(skip = 0, limit = 50) {
   return useQuery<MarketplaceListing[]>({
-    queryKey: ['marketplace'],
+    queryKey: ['marketplace', skip, limit],
     queryFn: async () => {
-      const res = await api.get<BackendListing[]>('/tokenization/marketplace')
+      const res = await api.get<BackendListing[]>(`/tokenization/marketplace?skip=${skip}&limit=${limit}`)
       return (res.data ?? []).map(mapMarketplaceListing)
     },
   })

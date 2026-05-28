@@ -90,6 +90,8 @@ async def fractionalize_token(
 async def list_tokens(
     project_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
     """List carbon credit tokens."""
@@ -98,6 +100,7 @@ async def list_tokens(
         stmt = stmt.where(CarbonCreditToken.project_id == project_id)
     if status:
         stmt = stmt.where(CarbonCreditToken.status == status)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -135,10 +138,13 @@ async def browse_marketplace(
     methodology: Optional[str] = None,
     min_price: Optional[float] = None,
     max_price: Optional[float] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
     """Browse token marketplace listings."""
     stmt = select(TokenListing).where(TokenListing.status == "active").order_by(desc(TokenListing.created_at))
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     listings = result.scalars().all()

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { TrendingUp, ShoppingCart, Package, DollarSign, Calendar, MapPin, Leaf, Plus, X, Check, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { TrendingUp, ShoppingCart, Package, DollarSign, Calendar, MapPin, Leaf, Plus, X, Check, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import {
   useBrokerageListings,
@@ -26,9 +26,28 @@ export function BrokeragePage() {
   const [listingForm, setListingForm] = useState<ListingFormState>({
     project_id: '', available: '', price: '', vintage: '', methodology: 'TPDDTEC_v4', delivery: '30', location: '',
   })
+  const [mpPage, setMpPage] = useState(1)
+  const [txPage, setTxPage] = useState(1)
+  const mpPerPage = 6
+  const txPerPage = 10
 
   const { data: listings, isLoading: listingsLoading, isError: listingsError, error: listingsErrorObj } = useBrokerageListings()
   const { data: transactions, isLoading: txLoading, isError: txError, error: txErrorObj } = useBrokerageTransactions()
+
+  const mpTotal = listings?.length ?? 0
+  const mpTotalPages = Math.max(1, Math.ceil(mpTotal / mpPerPage))
+  const mpCurrentPage = Math.min(mpPage, mpTotalPages)
+  const mpPaginated = listings?.slice((mpCurrentPage - 1) * mpPerPage, mpCurrentPage * mpPerPage)
+
+  const txTotal = transactions?.length ?? 0
+  const txTotalPages = Math.max(1, Math.ceil(txTotal / txPerPage))
+  const txCurrentPage = Math.min(txPage, txTotalPages)
+  const txPaginated = transactions?.slice((txCurrentPage - 1) * txPerPage, txCurrentPage * txPerPage)
+
+  useEffect(() => {
+    setMpPage(1)
+    setTxPage(1)
+  }, [listings, transactions])
   const { data: projects } = useProjects()
   const createListing = useCreateBrokerageListing()
   const createTransaction = useCreateBrokerageTransaction()
@@ -143,7 +162,7 @@ export function BrokeragePage() {
             <LoadingSpinner />
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {(listings ?? []).map((listing) => (
+              {(mpPaginated ?? []).map((listing) => (
                 <div key={listing.id} className="card-hover p-5">
                   <div className="flex items-start justify-between mb-4">
                     <div>
@@ -201,6 +220,29 @@ export function BrokeragePage() {
               ))}
             </div>
           )}
+          {mpTotal > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                Showing {(mpCurrentPage - 1) * mpPerPage + 1}-{Math.min(mpCurrentPage * mpPerPage, mpTotal)} of {mpTotal}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMpPage((p) => Math.max(1, p - 1))}
+                  disabled={mpCurrentPage === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Prev
+                </button>
+                <button
+                  onClick={() => setMpPage((p) => Math.min(mpTotalPages, p + 1))}
+                  disabled={mpCurrentPage === mpTotalPages}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -219,7 +261,7 @@ export function BrokeragePage() {
                 <h3 className="font-semibold text-surface-900 dark:text-surface-100">Transaction History</h3>
               </div>
               <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-                {(transactions ?? []).map((tx) => (
+                {(txPaginated ?? []).map((tx) => (
                   <div key={tx.id} className="flex items-center justify-between px-6 py-4">
                     <div>
                       <div className="flex items-center gap-2">
@@ -245,6 +287,29 @@ export function BrokeragePage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+          {txTotal > 0 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-surface-200/60 dark:border-surface-800/40">
+              <p className="text-xs text-surface-400 dark:text-surface-500">
+                Showing {(txCurrentPage - 1) * txPerPage + 1}-{Math.min(txCurrentPage * txPerPage, txTotal)} of {txTotal}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                  disabled={txCurrentPage === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Prev
+                </button>
+                <button
+                  onClick={() => setTxPage((p) => Math.min(txTotalPages, p + 1))}
+                  disabled={txCurrentPage === txTotalPages}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           )}

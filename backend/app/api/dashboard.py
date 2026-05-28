@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -9,7 +10,6 @@ from app.auth.dependencies import require_viewer
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-
 @router.get("/stats", response_model=DashboardStats)
 async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db),
@@ -17,10 +17,12 @@ async def get_dashboard_stats(
 ):
     total_projects = await db.scalar(select(func.count(Project.id)))
 
-    status_counts = {}
-    for status in ["onboarding", "data_collection", "calculation", "review", "submitted", "verified", "monitoring"]:
-        count = await db.scalar(select(func.count(Project.id)).where(Project.status == status))
-        status_counts[status] = count or 0
+    # Parallelize status count queries
+    status_queries = {
+        status: db.scalar(select(func.count(Project.id)).where(Project.status == status))
+        for status in ["onboarding", "data_collection", "calculation", "review", "submitted", "verified", "monitoring"]
+    }
+    status_counts = {status: (await query) or 0 for status, query in status_queries.items()}
 
     pending_reviews = await db.scalar(
         select(func.count(HumanReviewQueue.id)).where(HumanReviewQueue.status.in_(["pending", "in_review"]))

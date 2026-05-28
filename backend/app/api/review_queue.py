@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -16,6 +16,8 @@ router = APIRouter(prefix="/review-queue", tags=["review-queue"])
 async def list_queue_items(
     status: str = None,
     assigned_to: uuid.UUID = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -24,6 +26,7 @@ async def list_queue_items(
         stmt = stmt.where(HumanReviewQueue.status == status)
     if assigned_to:
         stmt = stmt.where(HumanReviewQueue.assigned_to == assigned_to)
+    stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

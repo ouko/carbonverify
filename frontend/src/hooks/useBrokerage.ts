@@ -116,21 +116,21 @@ function mapTransaction(item: BackendTransaction): BrokerageTransaction {
 
 // ─── Hooks ──────────────────────────────────────────────────────────────────
 
-export function useBrokerageListings() {
+export function useBrokerageListings(skip = 0, limit = 50) {
   return useQuery<BrokerageListing[]>({
-    queryKey: ['brokerage', 'listings'],
+    queryKey: ['brokerage', 'listings', skip, limit],
     queryFn: async () => {
-      const res = await api.get<BackendListing[]>('/brokerage/listings')
+      const res = await api.get<BackendListing[]>(`/brokerage/listings?skip=${skip}&limit=${limit}`)
       return (res.data ?? []).map(mapListing)
     },
   })
 }
 
-export function useBrokerageTransactions() {
+export function useBrokerageTransactions(skip = 0, limit = 50) {
   return useQuery<BrokerageTransaction[]>({
-    queryKey: ['brokerage', 'transactions'],
+    queryKey: ['brokerage', 'transactions', skip, limit],
     queryFn: async () => {
-      const res = await api.get<BackendTransaction[]>('/brokerage/transactions')
+      const res = await api.get<BackendTransaction[]>(`/brokerage/transactions?skip=${skip}&limit=${limit}`)
       return (res.data ?? []).map(mapTransaction)
     },
   })

@@ -77,6 +77,8 @@ async def list_listings(
     project_id: Optional[uuid.UUID] = None,
     methodology: Optional[str] = None,
     status: Optional[str] = "active",
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
     """Browse available credit listings."""
@@ -87,6 +89,7 @@ async def list_listings(
         stmt = stmt.where(BrokerageListing.methodology == methodology)
     if status:
         stmt = stmt.where(BrokerageListing.status == status)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -212,6 +215,8 @@ async def list_transactions(
     buyer_id: Optional[uuid.UUID] = None,
     seller_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -225,6 +230,7 @@ async def list_transactions(
         stmt = stmt.where(BrokerageTransaction.seller_id == seller_id)
     if status:
         stmt = stmt.where(BrokerageTransaction.status == status)
+    stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

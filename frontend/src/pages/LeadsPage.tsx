@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Target, Search, Filter, ExternalLink, X, ArrowRight, Phone, Mail, MapPin,
-  Activity, Gauge, Clock, CheckCircle, BarChart3, RefreshCw, AlertTriangle, Wifi, WifiOff,
+  Activity, Gauge, Clock, CheckCircle, BarChart3, RefreshCw, AlertTriangle, Wifi, WifiOff, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useLeads, useUpdateLead, useLeadsStats, useScrapeLeads, useScraperHealth, useScraperHistory } from '../hooks/useLeads'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -238,6 +238,8 @@ export default function LeadsPage() {
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [page, setPage] = useState(1)
+  const perPage = 10
 
   const filters: Record<string, string> = {}
   if (registryFilter !== 'all') filters.registry_source = registryFilter
@@ -246,6 +248,15 @@ export default function LeadsPage() {
   if (search) filters.search = search
 
   const { data: leads, isLoading, isError, error } = useLeads(filters)
+
+  const total = leads?.length ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = leads?.slice((currentPage - 1) * perPage, currentPage * perPage)
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, registryFilter, priorityFilter, statusFilter])
   const { data: stats } = useLeadsStats()
   const { data: health } = useScraperHealth()
   const { data: history } = useScraperHistory()
@@ -477,7 +488,7 @@ export default function LeadsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-                {leads?.map((lead) => (
+                {paginated?.map((lead) => (
                   <tr
                     key={lead.id}
                     onClick={() => setSelectedLead(lead)}
@@ -512,7 +523,7 @@ export default function LeadsPage() {
                     </td>
                   </tr>
                 ))}
-                {leads?.length === 0 && (
+                {paginated?.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center gap-3">
@@ -527,6 +538,29 @@ export default function LeadsPage() {
               </tbody>
             </table>
           </div>
+          {total > 0 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-surface-200/60 dark:border-surface-800/40">
+              <p className="text-xs text-surface-400 dark:text-surface-500">
+                Showing {(currentPage - 1) * perPage + 1}-{Math.min(currentPage * perPage, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Prev
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="btn-ghost text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-2">

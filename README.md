@@ -338,6 +338,8 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 
 ### API Endpoints (Core)
 
+> **Pagination:** All list endpoints support `skip` (offset) and `limit` (page size) query parameters. Defaults vary by endpoint (typically 50–100 items); maximum is 200–500. Example: `GET /api/v1/projects?skip=0&limit=50`.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/v1/auth/register` | Create account |
@@ -367,6 +369,7 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 - **Data Viz:** Recharts for dashboard metrics
 - **Styling:** Tailwind CSS with dark mode (class strategy)
 - **API Client:** Axios with automatic token refresh on 401
+- **Pagination:** All list pages use consistent client-side pagination (Prev/Next controls, "Showing X–Y of Z" text) with server-side `skip`/`limit` support on all backend list endpoints
 
 ### Pages — Main App (`Layout`)
 

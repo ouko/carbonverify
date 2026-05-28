@@ -7,7 +7,7 @@ Portfolio management, ESG reporting, and due diligence access.
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -37,6 +37,8 @@ async def get_portfolio(
 
 @router.get("/portfolio/holdings", response_model=List[PortfolioHoldingOut])
 async def get_holdings(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -49,7 +51,10 @@ async def get_holdings(
         return []
 
     holdings_result = await db.execute(
-        select(PortfolioHolding).where(PortfolioHolding.portfolio_id == portfolio.id)
+        select(PortfolioHolding)
+        .where(PortfolioHolding.portfolio_id == portfolio.id)
+        .offset(skip)
+        .limit(limit)
     )
     return holdings_result.scalars().all()
 

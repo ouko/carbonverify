@@ -38,11 +38,11 @@ export function useDSRs() {
   })
 }
 
-export function useBreaches() {
+export function useBreaches(skip = 0, limit = 50) {
   return useQuery<Breach[]>({
-    queryKey: ['compliance', 'breach'],
+    queryKey: ['compliance', 'breach', skip, limit],
     queryFn: async () => {
-      const res = await api.get('/compliance/breach')
+      const res = await api.get(`/compliance/breach?skip=${skip}&limit=${limit}`)
       return res.data as Breach[]
     },
   })
@@ -59,21 +59,21 @@ export interface MethodologyVersion {
   created_at: string
 }
 
-export function useConflicts() {
+export function useConflicts(skip = 0, limit = 50) {
   return useQuery<ConflictOfInterest[]>({
-    queryKey: ['compliance', 'conflict-of-interest'],
+    queryKey: ['compliance', 'conflict-of-interest', skip, limit],
     queryFn: async () => {
-      const res = await api.get('/compliance/conflict-of-interest')
+      const res = await api.get(`/compliance/conflict-of-interest?skip=${skip}&limit=${limit}`)
       return res.data as ConflictOfInterest[]
     },
   })
 }
 
-export function useMethodologyVersions() {
+export function useMethodologyVersions(skip = 0, limit = 50) {
   return useQuery<MethodologyVersion[]>({
-    queryKey: ['compliance', 'methodology'],
+    queryKey: ['compliance', 'methodology', skip, limit],
     queryFn: async () => {
-      const res = await api.get('/compliance/methodology')
+      const res = await api.get(`/compliance/methodology?skip=${skip}&limit=${limit}`)
       return res.data as MethodologyVersion[]
     },
   })
