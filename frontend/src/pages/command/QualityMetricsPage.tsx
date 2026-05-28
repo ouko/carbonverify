@@ -52,10 +52,10 @@ export function QualityMetricsPage() {
       {/* Top Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: 'Calc Accuracy', value: `${metrics.accuracy_percent ?? 0}%`, sub: '+1.3% vs last month', icon: TrendingUp, color: 'text-primary-500', subColor: 'text-primary-600' },
-          { label: 'Rejection Rate', value: `${metrics.rejection_rate_percent ?? 0}%`, sub: '+0.5% vs last month', icon: AlertTriangle, color: 'text-amber-500', subColor: 'text-red-600' },
-          { label: 'NPS Score', value: `${metrics.nps_score ?? 0}`, sub: '+4 vs last month', icon: ThumbsUp, color: 'text-blue-500', subColor: 'text-primary-600' },
-          { label: 'Support Tickets', value: `${metrics.total_rejections ?? 0}`, sub: '-12 vs last month', icon: Ticket, color: 'text-violet-500', subColor: 'text-primary-600' },
+          { label: 'Calc Accuracy', value: `${metrics.accuracy_percent ?? 0}%`, icon: TrendingUp, color: 'text-primary-500' },
+          { label: 'Rejection Rate', value: `${metrics.rejection_rate_percent ?? 0}%`, icon: AlertTriangle, color: 'text-amber-500' },
+          { label: 'NPS Score', value: `${metrics.nps_score ?? 0}`, icon: ThumbsUp, color: 'text-blue-500' },
+          { label: 'Support Tickets', value: `${metrics.total_rejections ?? 0}`, icon: Ticket, color: 'text-violet-500' },
         ].map((stat) => (
           <div key={stat.label} className="card p-5">
             <div className="flex items-center gap-2 mb-2">
@@ -63,7 +63,6 @@ export function QualityMetricsPage() {
               <span className="text-xs text-surface-400 dark:text-surface-500">{stat.label}</span>
             </div>
             <p className="text-2xl font-bold text-surface-900 dark:text-surface-100">{stat.value}</p>
-            <p className={`text-xs mt-1 ${stat.subColor}`}>{stat.sub}</p>
           </div>
         ))}
       </div>

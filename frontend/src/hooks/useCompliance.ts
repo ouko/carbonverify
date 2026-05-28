@@ -48,12 +48,33 @@ export function useBreaches() {
   })
 }
 
+export interface MethodologyVersion {
+  id: string
+  name: string
+  version: string
+  effective_date: string
+  is_current: boolean
+  change_summary: string
+  approved_by: string | null
+  created_at: string
+}
+
 export function useConflicts() {
   return useQuery<ConflictOfInterest[]>({
     queryKey: ['compliance', 'conflict-of-interest'],
     queryFn: async () => {
       const res = await api.get('/compliance/conflict-of-interest')
       return res.data as ConflictOfInterest[]
+    },
+  })
+}
+
+export function useMethodologyVersions() {
+  return useQuery<MethodologyVersion[]>({
+    queryKey: ['compliance', 'methodology'],
+    queryFn: async () => {
+      const res = await api.get('/compliance/methodology')
+      return res.data as MethodologyVersion[]
     },
   })
 }

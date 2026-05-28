@@ -318,18 +318,22 @@ export function InboxPage() {
             </div>
 
             <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2">Recent Activity</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2">Activity Log</p>
               <div className="space-y-2">
-                {[
-                  { text: 'Calculation completed — 2h ago', color: 'bg-primary-500' },
-                  { text: 'Methodology score 68% — flagged', color: 'bg-amber-500' },
-                  { text: 'Data sources uploaded — 1d ago', color: 'bg-blue-500' },
-                ].map((a) => (
-                  <div key={a.text} className="flex items-center gap-2 text-xs">
-                    <div className={`h-1.5 w-1.5 rounded-full ${a.color}`} />
-                    <span className="text-surface-600 dark:text-surface-300">{a.text}</span>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary-500" />
+                  <span className="text-surface-600 dark:text-surface-300">Item created — {new Date(selectedItem.createdAt).toLocaleString()}</span>
+                </div>
+                {selectedItem.resolvedAt && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    <span className="text-surface-600 dark:text-surface-300">Resolved — {new Date(selectedItem.resolvedAt).toLocaleString()}</span>
                   </div>
-                ))}
+                )}
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <span className="text-surface-600 dark:text-surface-300">Current status: {selectedItem.status}</span>
+                </div>
               </div>
             </div>
 

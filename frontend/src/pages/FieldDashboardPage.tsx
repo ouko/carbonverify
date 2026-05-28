@@ -1,7 +1,15 @@
 import { useState } from 'react';
-import { Users, FileText, Camera, Cloud, MessageCircle, Search, AlertTriangle, Activity, Wrench, X } from 'lucide-react';
+import { Users, FileText, Camera, Cloud, MessageCircle, Search, AlertTriangle, Activity, Wrench, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { useFieldData } from '../hooks/useFieldData';
+
+function usePagination<T>(items: T[], perPage = 8) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(items.length / perPage));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = items.slice((currentPage - 1) * perPage, currentPage * perPage);
+  return { page: currentPage, setPage, totalPages, paginated };
+}
 
 export function FieldDashboardPage() {
   const { stats, enumerators, loading, isError } = useFieldData();
@@ -17,6 +25,7 @@ export function FieldDashboardPage() {
     e.name.toLowerCase().includes(filter.toLowerCase())
   );
 
+  const enumPagination = usePagination(filtered, 8);
   const alerts = filtered.filter((e) => e.rejectionRate > 15 || e.qualityScore < 80);
 
   return (
@@ -91,7 +100,7 @@ export function FieldDashboardPage() {
                 type="text"
                 placeholder="Search..."
                 value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                onChange={(e) => { setFilter(e.target.value); enumPagination.setPage(1); }}
                 className="input-modern pl-9 py-2 text-sm"
               />
             </div>
@@ -113,10 +122,10 @@ export function FieldDashboardPage() {
             <tbody className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
               {loading ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-surface-400">Loading...</td></tr>
-              ) : filtered.length === 0 ? (
+              ) : enumPagination.paginated.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-surface-400">No enumerators found</td></tr>
               ) : (
-                filtered.map((e: any) => (
+                enumPagination.paginated.map((e: any) => (
                   <tr key={e.id} className="hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors">
                     <td className="px-6 py-4 font-semibold text-surface-900 dark:text-surface-100">{e.name}</td>
                     <td className="px-6 py-4 text-surface-500 dark:text-surface-400">{e.phone}</td>
@@ -137,6 +146,31 @@ export function FieldDashboardPage() {
             </tbody>
           </table>
         </div>
+        {enumPagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t border-surface-200/60 dark:border-surface-800/40">
+            <p className="text-xs text-surface-400 dark:text-surface-500">
+              Page {enumPagination.page} of {enumPagination.totalPages} · {filtered.length} total
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => enumPagination.setPage(Math.max(1, enumPagination.page - 1))}
+                disabled={enumPagination.page === 1}
+                className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-40 transition-colors"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => enumPagination.setPage(Math.min(enumPagination.totalPages, enumPagination.page + 1))}
+                disabled={enumPagination.page === enumPagination.totalPages}
+                className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-40 transition-colors"
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* WhatsApp Bot Status */}

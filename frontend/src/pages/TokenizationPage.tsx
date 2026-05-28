@@ -2,10 +2,69 @@ import { useState, useEffect, useCallback } from 'react'
 import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check, AlertTriangle } from 'lucide-react'
 import { useTokens, useMarketplace, useMintToken, useBuyToken, useRetireToken } from '../hooks/useTokenization'
 import type { Token, MarketplaceListing } from '../hooks/useTokenization'
-import { useCalculations } from '../hooks/useCalculations'
+import { useCalculations, useCalculation } from '../hooks/useCalculations'
 import { useProjects } from '../hooks/useProjects'
 
 type SelectableToken = Token | MarketplaceListing
+
+function ProvenanceModal({ token, onClose }: { token: SelectableToken; onClose: () => void }) {
+  const isToken = !('token_id' in token)
+  const calcId = isToken ? (token as Token).calculationRunId : null
+  const { data: calc } = useCalculation(calcId || '')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/40 backdrop-blur-sm p-4">
+      <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-6 shadow-soft-lg">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Token Provenance</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-3 text-sm">
+          {[
+            { label: 'Token ID', value: ('token_id' in token ? token.token_id : token.id), mono: true },
+            { label: 'Project', value: token.project },
+            { label: 'Tonnes CO₂e', value: token.tonnes.toLocaleString() },
+            { label: 'Vintage', value: token.vintage },
+            { label: 'Methodology', value: token.methodology },
+            { label: 'VVB', value: token.vvb },
+            { label: 'Radix Address', value: token.radixAddress ?? '—', mono: true, small: true },
+          ].map((field) => (
+            <div key={field.label} className="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800/50 last:border-0">
+              <span className="text-surface-400 dark:text-surface-500">{field.label}</span>
+              <span className={field.mono ? 'font-mono text-xs' : 'font-medium text-surface-900 dark:text-surface-100'}>
+                {field.value}
+              </span>
+            </div>
+          ))}
+          <div className="mt-3 rounded-xl bg-surface-50 dark:bg-surface-800/50 p-4">
+            <p className="text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">MRV Data</p>
+            {calc ? (
+              <p className="text-xs text-surface-500 dark:text-surface-400">
+                fNRB: {calc.fNRB_value ?? 'N/A'} · Emissions reduction: {calc.emissions_reduction_tCO2e?.toLocaleString() ?? 'N/A'} tCO₂e · Uncertainty: ±{calc.uncertainty_95CI ? Math.round(calc.uncertainty_95CI * 100) : 'N/A'}%
+              </p>
+            ) : (
+              <p className="text-xs text-surface-400 dark:text-surface-500">
+                {calcId ? 'Loading calculation data...' : 'No calculation run linked to this token.'}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-5 w-full btn-secondary"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export function TokenizationPage() {
   const [tab, setTab] = useState<'marketplace' | 'mint' | 'retire'>('marketplace')
@@ -376,48 +435,7 @@ export function TokenizationPage() {
       )}
 
       {selectedToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/40 backdrop-blur-sm p-4">
-          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-6 shadow-soft-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Token Provenance</h3>
-              <button
-                onClick={() => setSelectedToken(null)}
-                aria-label="Close"
-                className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm">
-              {[
-                { label: 'Token ID', value: ('token_id' in selectedToken ? selectedToken.token_id : selectedToken.id), mono: true },
-                { label: 'Project', value: selectedToken.project },
-                { label: 'Tonnes CO₂e', value: selectedToken.tonnes.toLocaleString() },
-                { label: 'Vintage', value: selectedToken.vintage },
-                { label: 'Methodology', value: selectedToken.methodology },
-                { label: 'VVB', value: selectedToken.vvb },
-                { label: 'Radix Address', value: selectedToken.radixAddress ?? '—', mono: true, small: true },
-              ].map((field) => (
-                <div key={field.label} className="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800/50 last:border-0">
-                  <span className="text-surface-400 dark:text-surface-500">{field.label}</span>
-                  <span className={field.mono ? 'font-mono text-xs' : 'font-medium text-surface-900 dark:text-surface-100'}>
-                    {field.value}
-                  </span>
-                </div>
-              ))}
-              <div className="mt-3 rounded-xl bg-surface-50 dark:bg-surface-800/50 p-4">
-                <p className="text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">MRV Data</p>
-                <p className="text-xs text-surface-400 dark:text-surface-500">fNRB: 0.42 · Emissions reduction: 12,450 tCO₂e · Uncertainty: ±8%</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedToken(null)}
-              className="mt-5 w-full btn-secondary"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <ProvenanceModal token={selectedToken} onClose={() => setSelectedToken(null)} />
       )}
     </div>
   )

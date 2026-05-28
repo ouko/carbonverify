@@ -21,7 +21,9 @@ describe('LoginPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(useAuthStore as any).mockReturnValue({ login: mockLogin })
+    ;(useAuthStore as any).mockImplementation((selector: any) =>
+      selector ? selector({ login: mockLogin }) : { login: mockLogin }
+    )
   })
 
   it('renders login form with email and password inputs', () => {
@@ -47,7 +49,7 @@ describe('LoginPage', () => {
     fireEvent.submit(form)
 
     await waitFor(() => {
-      expect(screen.getByText(/invalid email or password/i)).toBeInTheDocument()
+      expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument()
     })
   })
 

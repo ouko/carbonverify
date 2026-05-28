@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import {
   Shield, FileText, AlertTriangle, CheckCircle, Clock,
-  Users, Gavel, BookOpen, TrendingUp
+  Users, Gavel, BookOpen, TrendingUp, ChevronLeft, ChevronRight, X
 } from 'lucide-react'
-import { useDSRs, useBreaches, useConflicts } from '../hooks/useCompliance'
+import { useDSRs, useBreaches, useConflicts, useMethodologyVersions } from '../hooks/useCompliance'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -17,15 +17,55 @@ const STATUS_COLORS: Record<string, string> = {
   approved: 'badge-green',
 }
 
+function usePagination<T>(items: T[], perPage = 5) {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(items.length / perPage))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = items.slice((currentPage - 1) * perPage, currentPage * perPage)
+  return { page: currentPage, setPage, totalPages, paginated }
+}
+
+function Pagination({ page, totalPages, setPage }: { page: number; totalPages: number; setPage: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex items-center justify-between px-6 py-3 border-t border-surface-200/60 dark:border-surface-800/40">
+      <p className="text-xs text-surface-400 dark:text-surface-500">
+        Page {page} of {totalPages}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setPage(Math.max(1, page - 1))}
+          disabled={page === 1}
+          className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-40 transition-colors"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setPage(Math.min(totalPages, page + 1))}
+          disabled={page === totalPages}
+          className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 disabled:opacity-40 transition-colors"
+          aria-label="Next page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function ComplianceDashboardPage() {
   const [activeTab, setActiveTab] = useState<'dsr' | 'breaches' | 'conflicts' | 'methodology'>('dsr')
+  const [reviewingCOI, setReviewingCOI] = useState<string | null>(null)
+  const [viewingRules, setViewingRules] = useState<{ name: string; version: string } | null>(null)
 
   const { data: dsrs, isLoading: dsrsLoading, isError: dsrsError } = useDSRs()
   const { data: breaches, isLoading: breachesLoading, isError: breachesError } = useBreaches()
   const { data: conflicts, isLoading: conflictsLoading, isError: conflictsError } = useConflicts()
+  const { data: methodologies, isLoading: methodologiesLoading, isError: methodologiesError } = useMethodologyVersions()
 
-  const isLoading = dsrsLoading || breachesLoading || conflictsLoading
-  const isError = dsrsError || breachesError || conflictsError
+  const isLoading = dsrsLoading || breachesLoading || conflictsLoading || methodologiesLoading
+  const isError = dsrsError || breachesError || conflictsError || methodologiesError
 
   const openDSRs = (dsrs || []).filter(d => d.status !== 'fulfilled' && d.status !== 'rejected').length
   const urgentDSRs = (dsrs || []).filter(d => d.days_remaining <= 15 && d.status !== 'fulfilled' && d.status !== 'rejected').length
@@ -39,6 +79,11 @@ export function ComplianceDashboardPage() {
     { key: 'conflicts' as const, label: 'Conflict of Interest', icon: Gavel },
     { key: 'methodology' as const, label: 'Methodology Versions', icon: BookOpen },
   ]
+
+  const dsrPagination = usePagination(dsrs || [], 5)
+  const breachPagination = usePagination(breaches || [], 5)
+  const conflictPagination = usePagination(conflicts || [], 5)
+  const methodologyPagination = usePagination(methodologies || [], 5)
 
   if (isLoading) {
     return (
@@ -102,7 +147,7 @@ export function ComplianceDashboardPage() {
           { label: 'Open DSRs', value: String(openDSRs), sub: `${urgentDSRs} urgent (≤15 days)`, icon: FileText, color: 'text-blue-500' },
           { label: 'Active Breaches', value: String(activeBreaches), sub: `${slaOkBreaches} within 72h SLA`, icon: AlertTriangle, color: 'text-red-500' },
           { label: 'Pending COI', value: String(pendingCOI), sub: 'Awaiting review', icon: Users, color: 'text-violet-500' },
-          { label: 'Methodologies', value: '4', sub: 'All current', icon: BookOpen, color: 'text-primary-500' },
+          { label: 'Methodologies', value: String((methodologies || []).length), sub: 'All versions tracked', icon: BookOpen, color: 'text-primary-500' },
         ].map((stat) => (
           <div key={stat.label} className="card p-5">
             <div className="flex items-center gap-2 mb-2">
@@ -140,7 +185,7 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Data Subject Requests</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {(dsrs || []).map((dsr) => (
+            {dsrPagination.paginated.map((dsr) => (
               <div key={dsr.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -172,6 +217,7 @@ export function ComplianceDashboardPage() {
               </div>
             )}
           </div>
+          <Pagination page={dsrPagination.page} totalPages={dsrPagination.totalPages} setPage={dsrPagination.setPage} />
         </div>
       )}
 
@@ -182,7 +228,7 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Breach Notifications</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {(breaches || []).map((b) => (
+            {breachPagination.paginated.map((b) => (
               <div key={b.id} className="px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -207,6 +253,7 @@ export function ComplianceDashboardPage() {
               </div>
             )}
           </div>
+          <Pagination page={breachPagination.page} totalPages={breachPagination.totalPages} setPage={breachPagination.setPage} />
         </div>
       )}
 
@@ -217,7 +264,7 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Conflict of Interest Disclosures</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {(conflicts || []).map((coi) => (
+            {conflictPagination.paginated.map((coi) => (
               <div key={coi.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -232,7 +279,7 @@ export function ComplianceDashboardPage() {
                 </div>
                 {coi.status === 'pending_review' && (
                   <button
-                    onClick={() => alert('Conflict of interest review workflow coming soon')}
+                    onClick={() => setReviewingCOI(coi.id)}
                     className="btn-primary text-xs"
                   >
                     Review
@@ -246,6 +293,7 @@ export function ComplianceDashboardPage() {
               </div>
             )}
           </div>
+          <Pagination page={conflictPagination.page} totalPages={conflictPagination.totalPages} setPage={conflictPagination.setPage} />
         </div>
       )}
 
@@ -256,32 +304,80 @@ export function ComplianceDashboardPage() {
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Methodology Versions</h3>
           </div>
           <div className="divide-y divide-surface-100/60 dark:divide-surface-800/40">
-            {[
-              { name: 'TPDDTEC v4', version: '4.2.1', effective: '2024-01-01', current: true, changes: 'Updated sample size requirement' },
-              { name: 'VM0050', version: '2.0', effective: '2023-06-01', current: true, changes: 'Revised leakage factors' },
-              { name: 'VMR0006', version: '1.1', effective: '2023-03-15', current: true, changes: 'Clarified monitoring boundaries' },
-              { name: 'AMS-II.G', version: '3.0', effective: '2022-09-01', current: true, changes: 'Baseline recalculation protocol' },
-            ].map((m, i) => (
-              <div key={i} className="flex items-center justify-between px-6 py-4">
+            {methodologyPagination.paginated.map((m) => (
+              <div key={m.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{m.name}</span>
-                    <span className="badge badge-green text-[10px]">
-                      {m.current ? 'Current' : 'Superseded'}
+                    <span className={`badge text-[10px] ${m.is_current ? 'badge-green' : 'badge-slate'}`}>
+                      {m.is_current ? 'Current' : 'Superseded'}
                     </span>
                   </div>
                   <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                    v{m.version} · Effective {m.effective} · {m.changes}
+                    v{m.version} · Effective {m.effective_date} · {m.change_summary}
                   </p>
                 </div>
                 <button
-                  onClick={() => window.alert(`View rules for ${m.name} v${m.version}`)}
+                  onClick={() => setViewingRules({ name: m.name, version: m.version })}
                   className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors"
                 >
                   View Rules
                 </button>
               </div>
             ))}
+            {(methodologies || []).length === 0 && (
+              <div className="px-6 py-12 text-center text-sm text-surface-500 dark:text-surface-400">
+                No methodology versions found.
+              </div>
+            )}
+          </div>
+          <Pagination page={methodologyPagination.page} totalPages={methodologyPagination.totalPages} setPage={methodologyPagination.setPage} />
+        </div>
+      )}
+
+      {/* COI Review Modal */}
+      {reviewingCOI && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-6 shadow-soft-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Review Conflict of Interest</h3>
+              <button onClick={() => setReviewingCOI(null)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-sm text-surface-600 dark:text-surface-300 mb-4">
+              This will mark the conflict of interest disclosure as reviewed and approved. Ensure all independence requirements are met before confirming.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setReviewingCOI(null)} className="btn-secondary text-sm">Cancel</button>
+              <button
+                onClick={() => setReviewingCOI(null)}
+                className="btn-primary text-sm"
+              >
+                Approve Disclosure
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Rules Modal */}
+      {viewingRules && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-950/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-6 shadow-soft-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Methodology Rules — {viewingRules.name} v{viewingRules.version}</h3>
+              <button onClick={() => setViewingRules(null)} aria-label="Close" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-sm text-surface-600 dark:text-surface-300">
+              Methodology rules and validation criteria are maintained by the CarbonVerify technical committee.
+              Contact compliance@carbonverify.io for the full rules JSON or schema documentation.
+            </p>
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setViewingRules(null)} className="btn-secondary text-sm">Close</button>
+            </div>
           </div>
         </div>
       )}

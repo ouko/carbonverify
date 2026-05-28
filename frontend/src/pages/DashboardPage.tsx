@@ -26,22 +26,13 @@ const statusLabels: Record<string, string> = {
   monitoring: 'Monitoring',
 }
 
-const fallbackEmissionsTrend = [
-  { month: 'Jan', value: 1200 },
-  { month: 'Feb', value: 1850 },
-  { month: 'Mar', value: 2400 },
-  { month: 'Apr', value: 2100 },
-  { month: 'May', value: 3200 },
-  { month: 'Jun', value: 3800 },
-]
-
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { data: stats, isLoading, isError, error } = useDashboardStats()
   const { data: leadStats } = useLeadsStats()
-  const { data: emissionsTrendData, isError: emissionsError } = useEmissionsTrend()
+  const { data: emissionsTrendData } = useEmissionsTrend()
 
-  const emissionsTrend = emissionsError ? fallbackEmissionsTrend : (emissionsTrendData ?? fallbackEmissionsTrend)
+  const emissionsTrend = emissionsTrendData ?? []
 
   const chartData = stats
     ? Object.entries(stats.projects_by_status).map(([key, value]) => ({
@@ -191,6 +182,11 @@ export default function DashboardPage() {
             <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">tCO2e reduced per month</p>
           </div>
           <div className="h-72">
+            {emissionsTrend.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-surface-400 dark:text-surface-500">
+                No emissions data yet
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={emissionsTrend}>
                 <defs>
@@ -232,6 +228,7 @@ export default function DashboardPage() {
                 />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>

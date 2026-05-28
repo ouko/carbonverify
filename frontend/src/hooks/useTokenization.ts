@@ -11,6 +11,7 @@ export interface Token {
   price: number | null
   status: 'listed' | 'minted' | 'retired' | 'sold' | 'fractional'
   radixAddress: string | null
+  calculationRunId: string | null
 }
 
 export interface MarketplaceListing {
@@ -81,6 +82,7 @@ function mapToken(item: BackendToken): Token {
     price: null,
     status: item.status as Token['status'],
     radixAddress: item.radix_token_address ?? null,
+    calculationRunId: item.calculation_run_id ?? null,
   }
 }
 
