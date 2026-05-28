@@ -3,6 +3,7 @@ import { Coins, Flame, ShoppingBag, Layers, Shield, ExternalLink, X, Check, Aler
 import { useTokens, useMarketplace, useMintToken, useBuyToken, useRetireToken } from '../hooks/useTokenization'
 import type { Token, MarketplaceListing } from '../hooks/useTokenization'
 import { useCalculations } from '../hooks/useCalculations'
+import { useProjects } from '../hooks/useProjects'
 
 type SelectableToken = Token | MarketplaceListing
 
@@ -12,10 +13,10 @@ export function TokenizationPage() {
   const [toast, setToast] = useState<string | null>(null)
 
   const [mintForm, setMintForm] = useState({
-    project: 'Kenya Clean Cookstoves',
+    project_id: '',
     tonnes: '',
     vintage: '2024',
-    methodology: 'TPDDTEC v4',
+    methodology: 'TPDDTEC_v4',
     vvb: 'Verra',
     certificateId: '',
     calculationRunId: '',
@@ -32,6 +33,7 @@ export function TokenizationPage() {
   const { data: tokens, isLoading: tokensLoading, isError: tokensError } = useTokens()
   const { data: listings, isLoading: listingsLoading, isError: listingsError } = useMarketplace()
   const { data: calculations, isLoading: calcLoading, isError: calcError } = useCalculations()
+  const { data: projects } = useProjects()
 
   const mintMutation = useMintToken()
   const buyMutation = useBuyToken()
@@ -62,33 +64,37 @@ export function TokenizationPage() {
 
   const handleMint = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!mintForm.project_id) {
+      showToast('Please select a project')
+      return
+    }
     if (!mintForm.calculationRunId) {
       showToast('Please select a calculation run')
       return
     }
     mintMutation.mutate(
       {
-        project: mintForm.project,
-        tonnes: parseInt(mintForm.tonnes) || 0,
-        vintage: parseInt(mintForm.vintage) || 2024,
+        project_id: mintForm.project_id,
+        tonnes_co2e: parseFloat(mintForm.tonnes) || 0,
+        vintage_year: parseInt(mintForm.vintage) || 2024,
         methodology: mintForm.methodology,
-        vvb: mintForm.vvb,
-        certificate_id: mintForm.certificateId || undefined,
+        vvb_registry: mintForm.vvb,
+        vvb_certificate_id: mintForm.certificateId || undefined,
         calculation_run_id: mintForm.calculationRunId,
       },
       {
         onSuccess: (data) => {
           setMintForm({
-            project: 'Kenya Clean Cookstoves',
+            project_id: '',
             tonnes: '',
             vintage: '2024',
-            methodology: 'TPDDTEC v4',
+            methodology: 'TPDDTEC_v4',
             vvb: 'Verra',
             certificateId: '',
             calculationRunId: '',
           })
           setTab('marketplace')
-          showToast(`Minted ${data.tonnes.toLocaleString()} tCO₂e token on Radix`)
+          showToast(`Minted ${(data.tonnes ?? 0).toLocaleString()} tCO₂e token on Radix`)
         },
       }
     )
@@ -223,14 +229,16 @@ export function TokenizationPage() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 mb-4">
                     <Shield className="h-3.5 w-3.5 text-primary-500" />
-                    <span className="font-mono">{listing.radixAddress.slice(0, 20)}...</span>
-                    <button
-                      aria-label="Open external link"
-                      onClick={() => window.open(`https://radixscan.io/account/${listing.radixAddress}`, '_blank')}
-                      className="text-primary-600 hover:text-primary-500 dark:text-primary-400"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                    </button>
+                    <span className="font-mono">{(listing.radixAddress ?? '—').slice(0, 20)}...</span>
+                    {listing.radixAddress && (
+                      <button
+                        aria-label="Open external link"
+                        onClick={() => window.open(`https://radixscan.io/account/${listing.radixAddress}`, '_blank')}
+                        className="text-primary-600 hover:text-primary-500 dark:text-primary-400"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -261,11 +269,11 @@ export function TokenizationPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
-                <select className="input-modern" value={mintForm.project} onChange={(e) => setMintForm({ ...mintForm, project: e.target.value })}>
-                  <option>Kenya Clean Cookstoves</option>
-                  <option>Ghana Biogas Program</option>
-                  <option>Ethiopia LPG Adoption</option>
-                  <option>Nepal Improved Charcoal</option>
+                <select className="input-modern" value={mintForm.project_id} onChange={(e) => setMintForm({ ...mintForm, project_id: e.target.value })}>
+                  <option value="">Select a project…</option>
+                  {(projects ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -279,7 +287,7 @@ export function TokenizationPage() {
                   <option value="">{calcLoading ? 'Loading...' : 'Select a run'}</option>
                   {(calculations || []).map((run) => (
                     <option key={run.id} value={run.id}>
-                      Run {run.id.slice(-6)} — {run.monitoring_period_start} to {run.monitoring_period_end}
+                      Run {run.id.slice(-6)} — {run.monitoring_period_start ?? '—'} to {run.monitoring_period_end ?? '—'}
                     </option>
                   ))}
                 </select>
@@ -388,7 +396,7 @@ export function TokenizationPage() {
                 { label: 'Vintage', value: selectedToken.vintage },
                 { label: 'Methodology', value: selectedToken.methodology },
                 { label: 'VVB', value: selectedToken.vvb },
-                { label: 'Radix Address', value: selectedToken.radixAddress, mono: true, small: true },
+                { label: 'Radix Address', value: selectedToken.radixAddress ?? '—', mono: true, small: true },
               ].map((field) => (
                 <div key={field.label} className="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800/50 last:border-0">
                   <span className="text-surface-400 dark:text-surface-500">{field.label}</span>

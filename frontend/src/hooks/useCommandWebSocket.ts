@@ -2,13 +2,19 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useAuthStore } from '../stores/authStore'
 
-const BASE_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/notifications'
+function getBaseWSUrl(): string {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL
+  // In dev, connect through the Vite proxy (same origin) to avoid CORS issues
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/ws/notifications`
+}
 
 function getWSUrl(): string {
   const token = useAuthStore.getState().accessToken
-  if (!token) return BASE_WS_URL
-  const separator = BASE_WS_URL.includes('?') ? '&' : '?'
-  return `${BASE_WS_URL}${separator}token=${encodeURIComponent(token)}`
+  const base = getBaseWSUrl()
+  if (!token) return base
+  const separator = base.includes('?') ? '&' : '?'
+  return `${base}${separator}token=${encodeURIComponent(token)}`
 }
 
 export function useCommandWebSocket() {

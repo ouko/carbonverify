@@ -8,9 +8,10 @@ import {
   useCreateBrokerageTransaction,
   useMatchListing,
 } from '../hooks/useBrokerage'
+import { useProjects } from '../hooks/useProjects'
 
 interface ListingFormState {
-  project: string
+  project_id: string
   available: string
   price: string
   vintage: string
@@ -23,11 +24,12 @@ export function BrokeragePage() {
   const [tab, setTab] = useState<'marketplace' | 'transactions' | 'list'>('marketplace')
   const [toast, setToast] = useState<string | null>(null)
   const [listingForm, setListingForm] = useState<ListingFormState>({
-    project: '', available: '', price: '', vintage: '', methodology: 'TPDDTEC_v4', delivery: '30', location: '',
+    project_id: '', available: '', price: '', vintage: '', methodology: 'TPDDTEC_v4', delivery: '30', location: '',
   })
 
   const { data: listings, isLoading: listingsLoading, isError: listingsError, error: listingsErrorObj } = useBrokerageListings()
   const { data: transactions, isLoading: txLoading, isError: txError, error: txErrorObj } = useBrokerageTransactions()
+  const { data: projects } = useProjects()
   const createListing = useCreateBrokerageListing()
   const createTransaction = useCreateBrokerageTransaction()
   const matchListing = useMatchListing()
@@ -39,18 +41,22 @@ export function BrokeragePage() {
 
   const handleCreateListing = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!listingForm.project_id) {
+      showToast('Please select a project')
+      return
+    }
     try {
       await createListing.mutateAsync({
-        project: listingForm.project || 'New Project',
+        project_id: listingForm.project_id,
         methodology: listingForm.methodology,
-        vintage: parseInt(listingForm.vintage) || 2024,
-        available: parseInt(listingForm.available) || 0,
-        price: parseFloat(listingForm.price) || 0,
+        vintage_year: parseInt(listingForm.vintage) || 2024,
+        available_credits: parseFloat(listingForm.available) || 0,
+        price_per_credit_usd: parseFloat(listingForm.price) || 0,
         location: listingForm.location || 'Unknown',
-        delivery: parseInt(listingForm.delivery) || 30,
-        coBenefits: ['health'],
+        delivery_timeline_days: parseInt(listingForm.delivery) || 30,
+        co_benefits: ['health'],
       })
-      setListingForm({ project: '', available: '', price: '', vintage: '', methodology: 'TPDDTEC_v4', delivery: '30', location: '' })
+      setListingForm({ project_id: '', available: '', price: '', vintage: '', methodology: 'TPDDTEC_v4', delivery: '30', location: '' })
       setTab('marketplace')
       showToast('Listing created successfully!')
     } catch (err: any) {
@@ -62,8 +68,8 @@ export function BrokeragePage() {
     try {
       await createTransaction.mutateAsync({
         listing_id: listing.id,
-        credits: listing.available,
-        type: 'spot',
+        credits_amount: listing.available,
+        trade_type: 'spot',
       })
       showToast(`Purchase confirmed for ${listing.project}`)
     } catch (err: any) {
@@ -157,7 +163,7 @@ export function BrokeragePage() {
                       <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">per tonne</p>
                     </div>
                     <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
-                      <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{listing.available.toLocaleString()}</p>
+                      <p className="text-lg font-bold text-surface-900 dark:text-surface-100">{(listing.available ?? 0).toLocaleString()}</p>
                       <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">available</p>
                     </div>
                     <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3 text-center">
@@ -166,7 +172,7 @@ export function BrokeragePage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {listing.coBenefits.map((cb) => (
+                    {(listing.coBenefits ?? []).map((cb) => (
                       <span key={cb} className="inline-flex items-center gap-1 rounded-full bg-primary-50 dark:bg-primary-950/30 px-2.5 py-1 text-[10px] font-medium text-primary-700 dark:text-primary-300 capitalize">
                         <Leaf className="h-3 w-3" />
                         {cb}
@@ -230,11 +236,11 @@ export function BrokeragePage() {
                         </span>
                       </div>
                       <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                        {tx.credits.toLocaleString()} credits @ ${tx.price} · Total: ${tx.total.toLocaleString()}
+                        {(tx.credits ?? 0).toLocaleString()} credits @ ${tx.price ?? 0} · Total: ${(tx.total ?? 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-surface-400 dark:text-surface-500">Commission: ${tx.commission.toFixed(2)}</p>
+                      <p className="text-xs text-surface-400 dark:text-surface-500">Commission: ${(tx.commission ?? 0).toFixed(2)}</p>
                       <p className="text-[10px] text-surface-300 dark:text-surface-600">{tx.date}</p>
                     </div>
                   </div>
@@ -256,7 +262,17 @@ export function BrokeragePage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Project</label>
-              <input value={listingForm.project} onChange={(e) => setListingForm({ ...listingForm, project: e.target.value })} className="input-modern" placeholder="Project name" required />
+              <select
+                value={listingForm.project_id}
+                onChange={(e) => setListingForm({ ...listingForm, project_id: e.target.value })}
+                className="input-modern"
+                required
+              >
+                <option value="">Select a project…</option>
+                {(projects ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Methodology</label>

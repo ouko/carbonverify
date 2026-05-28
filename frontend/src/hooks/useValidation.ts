@@ -76,7 +76,21 @@ export function useEscalations() {
     queryKey: ['escalations'],
     queryFn: async () => {
       const res = await api.get('/validation/escalations')
-      return res.data as Escalation[]
+      const data = res.data
+      if (!Array.isArray(data)) return []
+      return data.map((item: any) => ({
+        id: item.id ?? '',
+        escalation_reason: item.escalation_reason ?? '',
+        severity_score: typeof item.severity_score === 'number' ? item.severity_score : 0,
+        level: item.level ?? 'low',
+        status: item.status ?? 'pending',
+        human_decision: item.human_decision ?? null,
+        human_notes: item.human_notes ?? null,
+        sla_deadline: item.sla_deadline ?? null,
+        acknowledged_at: item.acknowledged_at ?? null,
+        resolved_at: item.resolved_at ?? null,
+        created_at: item.created_at ?? new Date().toISOString(),
+      })) as Escalation[]
     },
   })
 }

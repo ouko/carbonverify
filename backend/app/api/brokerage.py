@@ -217,14 +217,14 @@ async def list_transactions(
 ):
     """List transactions (buyer or seller view)."""
     from sqlalchemy import select, desc
-    from app.models import Transaction
-    stmt = select(Transaction).order_by(desc(Transaction.created_at))
+    from app.models import BrokerageTransaction
+    stmt = select(BrokerageTransaction).order_by(desc(BrokerageTransaction.created_at))
     if buyer_id:
-        stmt = stmt.where(Transaction.buyer_id == buyer_id)
+        stmt = stmt.where(BrokerageTransaction.buyer_id == buyer_id)
     if seller_id:
-        stmt = stmt.where(Transaction.seller_id == seller_id)
+        stmt = stmt.where(BrokerageTransaction.seller_id == seller_id)
     if status:
-        stmt = stmt.where(Transaction.status == status)
+        stmt = stmt.where(BrokerageTransaction.status == status)
     result = await db.execute(stmt)
     return result.scalars().all()
 

@@ -37,12 +37,58 @@ export interface DueDiligenceResponse {
   documents: { label: string; url: string }[]
 }
 
+// ─── Backend shape ───────────────────────────────────────────────────────────
+
+interface BackendPortfolio {
+  portfolio_id: string
+  total_credits_held: number
+  total_credits_retired: number
+  portfolio_value_usd: number
+  vintage_distribution: Record<string, number>
+  methodology_breakdown: Record<string, number>
+  project_contributions: {
+    project_id: string | null
+    project_name: string | null
+    tonnes_held: number
+    tonnes_retired: number
+    vintage: number
+    methodology: string
+    vvb_registry: string
+  }[]
+  holdings_count: number
+  retirements_count: number
+}
+
+function mapPortfolio(data: BackendPortfolio): PortfolioItem {
+  return {
+    totalHeld: data.total_credits_held ?? 0,
+    totalRetired: data.total_credits_retired ?? 0,
+    totalValue: data.portfolio_value_usd ?? 0,
+    vintageDistribution: Object.entries(data.vintage_distribution ?? {}).map(
+      ([year, tonnes]) => ({ year: Number(year), tonnes: Number(tonnes) })
+    ),
+    methodologyBreakdown: Object.entries(data.methodology_breakdown ?? {}).map(
+      ([name, value]) => ({ name, value: Number(value) })
+    ),
+    projects: (data.project_contributions ?? []).map((p) => ({
+      name: p.project_name ?? 'Unknown Project',
+      tonnes: p.tonnes_held ?? 0,
+      retired: p.tonnes_retired ?? 0,
+      vintage: p.vintage ?? 0,
+      methodology: p.methodology ?? '',
+      vvb: p.vvb_registry ?? '',
+    })),
+  }
+}
+
+// ─── Hooks ──────────────────────────────────────────────────────────────────
+
 export function useCorporatePortfolio() {
   return useQuery<PortfolioItem>({
     queryKey: ['corporate', 'portfolio'],
     queryFn: async () => {
-      const res = await api.get('/corporate/portfolio')
-      return res.data as PortfolioItem
+      const res = await api.get<BackendPortfolio>('/corporate/portfolio')
+      return mapPortfolio(res.data)
     },
   })
 }

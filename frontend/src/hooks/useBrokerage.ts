@@ -28,20 +28,20 @@ export interface BrokerageTransaction {
 }
 
 export interface CreateListingPayload {
-  project: string
+  project_id: string
+  available_credits: number
+  price_per_credit_usd: number
+  vintage_year: number
   methodology: string
-  vintage: number
-  available: number
-  price: number
   location: string
-  delivery: number
-  coBenefits?: string[]
+  delivery_timeline_days: number
+  co_benefits?: string[]
 }
 
 export interface CreateTransactionPayload {
   listing_id: string
-  credits: number
-  type: 'spot' | 'forward' | 'escrow'
+  credits_amount: number
+  trade_type: 'spot' | 'forward' | 'escrow'
 }
 
 export interface MatchResponse {
@@ -50,12 +50,78 @@ export interface MatchResponse {
   message: string
 }
 
+// ─── Backend response shapes (snake_case) ───────────────────────────────────
+
+interface BackendListing {
+  id: string
+  project_id: string
+  seller_id: string
+  available_credits: number
+  price_per_credit_usd: number
+  vintage_year: number
+  methodology: string
+  co_benefits: string[]
+  delivery_timeline_days: number
+  location: string | null
+  status: string
+  minimum_purchase: number
+  created_at: string
+}
+
+interface BackendTransaction {
+  id: string
+  listing_id: string
+  buyer_id: string
+  seller_id: string
+  trade_type: string
+  credits_amount: number
+  price_per_credit_usd: number
+  total_value_usd: number
+  commission_rate: number
+  commission_usd: number
+  status: string
+  delivery_date: string | null
+  created_at: string
+}
+
+function mapListing(item: BackendListing): BrokerageListing {
+  return {
+    id: item.id,
+    project: item.project_id ?? 'Unknown Project',
+    methodology: item.methodology ?? '',
+    vintage: item.vintage_year ?? 0,
+    available: item.available_credits ?? 0,
+    price: item.price_per_credit_usd ?? 0,
+    location: item.location ?? '',
+    delivery: item.delivery_timeline_days ?? 30,
+    coBenefits: item.co_benefits ?? [],
+    seller: item.seller_id ?? 'Unknown Seller',
+  }
+}
+
+function mapTransaction(item: BackendTransaction): BrokerageTransaction {
+  return {
+    id: item.id,
+    type: item.trade_type as BrokerageTransaction['type'],
+    listing: item.listing_id ?? '',
+    credits: item.credits_amount ?? 0,
+    price: item.price_per_credit_usd ?? 0,
+    total: item.total_value_usd ?? 0,
+    commission: item.commission_usd ?? 0,
+    status: item.status ?? 'pending',
+    date: item.created_at ?? '',
+    delivery: item.delivery_date ?? undefined,
+  }
+}
+
+// ─── Hooks ──────────────────────────────────────────────────────────────────
+
 export function useBrokerageListings() {
   return useQuery<BrokerageListing[]>({
     queryKey: ['brokerage', 'listings'],
     queryFn: async () => {
-      const res = await api.get('/brokerage/listings')
-      return res.data as BrokerageListing[]
+      const res = await api.get<BackendListing[]>('/brokerage/listings')
+      return (res.data ?? []).map(mapListing)
     },
   })
 }
@@ -64,8 +130,8 @@ export function useBrokerageTransactions() {
   return useQuery<BrokerageTransaction[]>({
     queryKey: ['brokerage', 'transactions'],
     queryFn: async () => {
-      const res = await api.get('/brokerage/transactions')
-      return res.data as BrokerageTransaction[]
+      const res = await api.get<BackendTransaction[]>('/brokerage/transactions')
+      return (res.data ?? []).map(mapTransaction)
     },
   })
 }
@@ -74,8 +140,8 @@ export function useCreateBrokerageListing() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: CreateListingPayload) => {
-      const res = await api.post('/brokerage/listings', payload)
-      return res.data as BrokerageListing
+      const res = await api.post<BackendListing>('/brokerage/listings', payload)
+      return mapListing(res.data)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['brokerage', 'listings'] }),
   })
@@ -85,8 +151,8 @@ export function useCreateBrokerageTransaction() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: CreateTransactionPayload) => {
-      const res = await api.post('/brokerage/transactions', payload)
-      return res.data as BrokerageTransaction
+      const res = await api.post<BackendTransaction>('/brokerage/transactions', payload)
+      return mapTransaction(res.data)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['brokerage', 'transactions'] })
@@ -99,8 +165,8 @@ export function useMatchListing() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (listingId: string) => {
-      const res = await api.post(`/brokerage/match/listing/${listingId}`)
-      return res.data as MatchResponse
+      const res = await api.post<MatchResponse>(`/brokerage/match/listing/${listingId}`)
+      return res.data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['brokerage', 'listings'] }),
   })
@@ -110,8 +176,8 @@ export function useRunGlobalMatch() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const res = await api.post('/brokerage/match/run-global')
-      return res.data as MatchResponse
+      const res = await api.post<MatchResponse>('/brokerage/match/run-global')
+      return res.data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['brokerage', 'listings'] }),
   })

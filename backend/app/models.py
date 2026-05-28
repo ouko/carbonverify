@@ -501,7 +501,7 @@ class Enumerator(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    phone_number: Mapped[str] = mapped_column(EncryptedString(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
     language_preference: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     data_quality_score: Mapped[Optional[float]] = mapped_column(Float, default=1.0)
@@ -516,7 +516,7 @@ class WhatsAppConversation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
-    phone_number: Mapped[str] = mapped_column(EncryptedString(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
     flow_type: Mapped[ConversationFlowEnum] = mapped_column(
         Enum(ConversationFlowEnum, name="conversation_flow"), default=ConversationFlowEnum.idle, nullable=False
     )
@@ -562,7 +562,7 @@ class SupportTicket(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
-    phone_number: Mapped[str] = mapped_column(EncryptedString(50), nullable=False)
+    phone_number: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
     issue_type: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     context_json: Mapped[dict] = mapped_column(JSONB, default=dict)
@@ -708,7 +708,7 @@ class DataSubjectRequest(Base):
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 
 
@@ -834,7 +834,7 @@ class BrokerageListing(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     project: Mapped["Project"] = relationship("Project")
@@ -919,7 +919,7 @@ class BrokerageTransaction(Base):
     metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     listing: Mapped["BrokerageListing"] = relationship("BrokerageListing")
@@ -1013,7 +1013,7 @@ class TokenListing(Base):
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")
@@ -1053,7 +1053,7 @@ class CorporatePortfolio(Base):
     esg_report_config: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     user: Mapped["User"] = relationship("User")

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Shield, CheckCircle, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuditLogs, type AuditLog } from '../hooks/useAuditLogs'
 import { api } from '../services/api'
@@ -36,6 +36,7 @@ export function AuditLogPage() {
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
   const [verifyResult, setVerifyResult] = useState<string | null>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
 
   const handleVerify = async (logId: string) => {
     setVerifying(logId)
@@ -48,6 +49,11 @@ export function AuditLogPage() {
       setVerifying(null)
       setTimeout(() => setVerifyResult(null), 3000)
     }
+  }
+
+  const openDetail = (log: AuditLog) => {
+    setSelectedLog(log)
+    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
   }
 
   if (isLoading) {
@@ -165,8 +171,8 @@ export function AuditLogPage() {
                 {paginated.map((log) => (
                   <tr
                     key={log.id}
-                    onClick={() => setSelectedLog(log)}
-                    className="cursor-pointer hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors"
+                    onClick={() => openDetail(log)}
+                    className={`cursor-pointer transition-colors ${selectedLog?.id === log.id ? 'bg-primary-50 dark:bg-primary-950/20' : 'hover:bg-surface-50/50 dark:hover:bg-surface-800/30'}`}
                   >
                     <td className="px-4 py-3">
                       <span className={`badge text-[10px] ${ACTION_COLORS[log.action] || 'badge-slate'}`}>
@@ -191,10 +197,16 @@ export function AuditLogPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openDetail(log) }}
+                        className="text-xs font-medium text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200 transition-colors"
+                      >
+                        View
+                      </button>
                       {log.anchored && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleVerify(log.id) }}
-                          className="text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors"
+                          className="ml-2 text-xs font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400 transition-colors"
                         >
                           {verifying === log.id ? 'Verifying...' : 'Verify'}
                         </button>
@@ -248,7 +260,7 @@ export function AuditLogPage() {
       )}
 
       {selectedLog && (
-        <div className="card p-6">
+        <div ref={detailRef} className="card p-6 ring-1 ring-primary-200 dark:ring-primary-900/30">
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-semibold text-surface-900 dark:text-surface-100">Audit Entry Details</h3>
             <button onClick={() => setSelectedLog(null)} aria-label="Close detail panel" className="p-1.5 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
