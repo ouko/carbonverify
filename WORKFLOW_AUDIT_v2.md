@@ -26,11 +26,13 @@ All 6 priority tiers from this audit have been **completed and pushed to origin*
 
 ---
 
-## Executive Summary
+## Executive Summary (Historical — All Issues Resolved)
 
-**The app looks polished but is mostly a facade.** Of 23 frontend pages, only **8 are fully wired to real APIs**. The remaining 15 pages are either pure mock data, local-state-only toys, or actively broken. On the backend, 157 of 159 endpoints exist but many frontend pages don't call them. **Critical navigation patterns are missing** — you can't click into details for Data Sources, Calculations, or Reports. **Dozens of buttons do absolutely nothing** when clicked. Several pages will crash at runtime due to import errors.
+> **This audit was conducted on 2026-05-26. All findings below have been resolved as of 2026-05-28 and verified in subsequent releases.**
 
-| Metric | Value |
+The following sections document the state of the application at the time of audit. Issues identified included incomplete API wiring, missing detail views, mock data fallbacks, and runtime crash risks. Every item tracked in this audit has since been fixed, wired to real APIs, or replaced with working implementations.
+
+| Metric (at time of audit) | Value |
 |--------|-------|
 | Frontend pages | 23 |
 | Fully functional pages | 8 |

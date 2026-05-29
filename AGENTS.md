@@ -263,7 +263,4 @@ S3_BUCKET=my-bucket ./scripts/backup-db.sh
 - **Gold Standard live scraping**: Their public API now requires authentication (`"Can only accept requests of type: authenticated"`). Demo fallback provides realistic projects.
 - **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
 - **Vite chunk size**: ✅ Resolved. Code-splitting + manual vendor chunks reduced main entry chunk to ~29KB.
-- **Verra live scraping**: Blocked by Cloudflare. Demo fallback provides realistic Kenya VCS projects.
-- **Gold Standard live scraping**: Their public API now requires authentication. Demo fallback provides realistic projects.
-- **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
 - **React Router v6 → v7**: Future flags enabled in `main.tsx` to suppress console warnings.

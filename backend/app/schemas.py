@@ -73,7 +73,7 @@ class UserUpdateByAdmin(BaseModel):
 class UserOut(UserBase, ORMBase):
     id: uuid.UUID
     is_active: bool
-    permissions: list
+    permissions: dict
     created_at: datetime
 
 

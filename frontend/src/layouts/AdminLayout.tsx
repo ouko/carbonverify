@@ -21,7 +21,6 @@ const adminNavItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/users', icon: Users, label: 'Users' },
   { to: '/admin/sessions', icon: Activity, label: 'Sessions' },
-  { to: '/admin/audit', icon: Shield, label: 'Audit Logs' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ]
 

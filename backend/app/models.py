@@ -224,7 +224,7 @@ class User(Base):
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
-    permissions: Mapped[list] = mapped_column(JSONB, default=list)  # explicit granular permissions
+    permissions: Mapped[dict] = mapped_column(JSONB, default=dict)  # explicit granular permissions {granted: [], revoked: []}
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -611,6 +611,8 @@ class AuditActionEnum(str, PyEnum):
     methodology_updated = "methodology_updated"
     user_login = "user_login"
     user_logout = "user_logout"
+    user_created = "user_created"
+    user_updated = "user_updated"
     mfa_enabled = "mfa_enabled"
     mfa_disabled = "mfa_disabled"
     data_exported = "data_exported"
