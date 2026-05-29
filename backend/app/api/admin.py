@@ -94,7 +94,7 @@ async def get_admin_stats(
         r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         async for key in r.scan_iter(match="session:*"):
             total_sessions += 1
-        await r.close()
+        await r.aclose()
     except Exception as e:
         logger.warning("failed_to_count_sessions", error=str(e))
 
