@@ -50,7 +50,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Role</label>
-            <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as User['role'] })}>
               <option value="viewer">Viewer</option>
               <option value="developer">Developer</option>
               <option value="operator">Operator</option>
@@ -110,7 +110,7 @@ function EditUserDrawer({ user, onClose }: { user: User; onClose: () => void }) 
           </div>
           <div>
             <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1.5">Role</label>
-            <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as User['role'] })}>
               <option value="viewer">Viewer</option>
               <option value="developer">Developer</option>
               <option value="operator">Operator</option>

@@ -44,9 +44,9 @@ export function CorporateDashboardPage() {
     try {
       const res = await generateReport.mutateAsync({
         company_name: esgForm.companyName,
-        reporting_scope: esgForm.reportingScope,
-        period_start: esgForm.periodStart,
-        period_end: esgForm.periodEnd,
+        reporting_period_start: esgForm.periodStart,
+        reporting_period_end: esgForm.periodEnd,
+        scope: esgForm.reportingScope,
       })
       showToast(`ESG Report generated: ${res.report_id}`)
     } catch (err: any) {
@@ -55,11 +55,11 @@ export function CorporateDashboardPage() {
   }
 
   const handleDownloadPDF = () => {
-    const pdfUrl = generateReport.data?.pdf_url
-    if (pdfUrl) {
-      window.open(pdfUrl, '_blank')
+    const reportId = generateReport.data?.report_id
+    if (reportId) {
+      showToast(`Report ${reportId} generated. Download from ESG Reports section.`)
     } else {
-      showToast('No PDF available yet. Generate a report first.')
+      showToast('No report available yet. Generate a report first.')
     }
   }
 

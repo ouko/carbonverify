@@ -3,7 +3,6 @@ import { useState } from 'react'
 import {
   LayoutDashboard,
   Users,
-  Shield,
   Activity,
   Settings,
   Menu,

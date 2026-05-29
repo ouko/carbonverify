@@ -99,7 +99,7 @@ export function BrokeragePage() {
   const handleMatch = async (listingId: string, projectName: string) => {
     try {
       const data = await matchListing.mutateAsync(listingId)
-      showToast(data.message || `Matching engine searching buyers for ${projectName}`)
+      showToast(`Found ${data.matches?.length || 0} buyer matches for ${projectName}`)
     } catch (err: any) {
       showToast(err?.response?.data?.detail || err?.message || 'Matching failed')
     }
