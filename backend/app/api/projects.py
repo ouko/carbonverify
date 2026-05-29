@@ -5,7 +5,8 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import Project, User
+from app.models import Project, User, AuditActionEnum
+from app.security.audit_logging import AuditLogger
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut
 from app.auth.dependencies import require_operator, require_viewer
 
@@ -27,12 +28,19 @@ async def list_projects(
 async def create_project(
     payload: ProjectCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     project = Project(**payload.model_dump())
     db.add(project)
     await db.commit()
     await db.refresh(project)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_created,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project.id,
+    )
     return project
 
 
@@ -54,7 +62,7 @@ async def update_project(
     project_id: uuid.UUID,
     payload: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
@@ -66,6 +74,13 @@ async def update_project(
 
     await db.commit()
     await db.refresh(project)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project.id,
+    )
     return project
 
 
@@ -73,7 +88,7 @@ async def update_project(
 async def delete_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
@@ -81,3 +96,12 @@ async def delete_project(
         raise HTTPException(status_code=404, detail="Project not found")
     await db.delete(project)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project.id,
+        metadata={"event": "project_deleted"},
+    )
+    return None

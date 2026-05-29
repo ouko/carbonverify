@@ -5,8 +5,9 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import Report, Project, CalculationRun, User
+from app.models import Report, Project, CalculationRun, User, AuditActionEnum
 from app.schemas import ReportCreate, ReportUpdate, ReportOut
+from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer
 from app.reports.quality_gates import run_quality_gates
 from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
@@ -39,12 +40,19 @@ async def list_reports(
 async def create_report(
     payload: ReportCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     report = Report(**payload.model_dump())
     db.add(report)
     await db.commit()
     await db.refresh(report)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.report_generated,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report.id,
+    )
     return report
 
 
@@ -66,7 +74,7 @@ async def update_report(
     report_id: uuid.UUID,
     payload: ReportUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(Report).where(Report.id == report_id))
     report = result.scalar_one_or_none()
@@ -76,6 +84,13 @@ async def update_report(
         setattr(report, field, value)
     await db.commit()
     await db.refresh(report)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report.id,
+    )
     return report
 
 
@@ -83,7 +98,7 @@ async def update_report(
 async def delete_report(
     report_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(Report).where(Report.id == report_id))
     report = result.scalar_one_or_none()
@@ -91,6 +106,14 @@ async def delete_report(
         raise HTTPException(status_code=404, detail="Report not found")
     await db.delete(report)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report.id,
+        metadata={"event": "report_deleted"},
+    )
     return None
 
 
@@ -122,6 +145,14 @@ async def generate_report_endpoint(
 
     logger.info("report_generation_queued", report_id=str(report_id), user_id=str(current_user.id))
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.report_generated,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report_id,
+    )
+
     return {
         "report_id": report_id,
         "status": "queued",
@@ -133,7 +164,7 @@ async def generate_report_endpoint(
 async def run_report_quality_check(
     report_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """Run automated quality gates on report draft content."""
     result = await db.execute(select(Report).where(Report.id == report_id))
@@ -162,6 +193,14 @@ async def run_report_quality_check(
         report.draft_content = {}
     report.draft_content["quality_gates"] = quality_result
     await db.commit()
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report_id,
+    )
 
     return {
         "report_id": report_id,
@@ -216,6 +255,14 @@ async def submit_report_to_registry(
 
     await db.commit()
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.vvb_submitted,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report_id,
+    )
+
     return {
         "report_id": report_id,
         "registry": registry,
@@ -228,7 +275,7 @@ async def draft_clarification(
     report_id: uuid.UUID,
     query_text: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """Auto-draft a response to a VVB technical query."""
     result = await db.execute(select(Report).where(Report.id == report_id))
@@ -274,6 +321,14 @@ async def draft_clarification(
         project_data=project_data,
         calculation_data=calc_data,
         methodology=report.template_type.value,
+    )
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.vvb_responded,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report_id,
     )
 
     return {

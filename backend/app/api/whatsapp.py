@@ -59,6 +59,20 @@ async def whatsapp_webhook_verify(
 @router.post("/whatsapp")
 async def whatsapp_webhook_receive(request: Request):
     """Receive incoming messages from Meta WhatsApp webhook."""
+    body = await request.body()
+
+    # Validate X-Hub-Signature-256 if app secret is configured
+    if _settings.WHATSAPP_APP_SECRET:
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        expected = "sha256=" + __import__("hmac").new(
+            _settings.WHATSAPP_APP_SECRET.encode(),
+            body,
+            __import__("hashlib").sha256,
+        ).hexdigest()
+        if not __import__("hmac").compare_digest(expected, signature):
+            logger.warning("whatsapp_invalid_signature", signature=signature)
+            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+
     try:
         payload = await request.json()
         logger.debug("whatsapp_webhook_payload", payload=payload)

@@ -16,12 +16,14 @@ from app.models import (
     Project,
     QueueStatusEnum,
     User,
+    AuditActionEnum,
 )
 from app.auth.dependencies import require_operator, require_viewer
 from app.orchestrator.orchestrator import KimiClawOrchestrator
 from app.orchestrator.events import EventLogger
 from app.services.kimi_api import get_kimi_client
 from app.core.logging import get_logger
+from app.security.audit_logging import AuditLogger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
@@ -55,6 +57,15 @@ async def trigger_project_state(
         project_id=str(project_id),
         trigger=payload.trigger,
         user_id=str(current_user.id),
+    )
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project_id,
+        metadata={"event": "orchestrator_trigger", "trigger": payload.trigger},
     )
     return result
 
@@ -212,6 +223,15 @@ async def resolve_review_item(
         decision=payload.decision,
         user_id=str(current_user.id),
     )
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="review_queue",
+        target_id=item_id,
+        metadata={"decision": payload.decision},
+    )
     return result
 
 
@@ -231,6 +251,15 @@ async def assign_review_item(
     item.status = QueueStatusEnum.in_review
     await db.commit()
     await db.refresh(item)
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="review_queue",
+        target_id=item.id,
+        metadata={"event": "self_assigned"},
+    )
 
     return {
         "id": str(item.id),
@@ -384,5 +413,14 @@ async def run_agent_directly(
         project_id=str(project_id),
         agent_type=agent_type,
         user_id=str(current_user.id),
+    )
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project_id,
+        metadata={"event": "agent_run_manual", "agent_type": agent_type},
     )
     return result.to_dict()

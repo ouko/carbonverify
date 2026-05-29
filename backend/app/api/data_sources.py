@@ -5,7 +5,8 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import DataSource, User
+from app.models import DataSource, User, AuditActionEnum
+from app.security.audit_logging import AuditLogger
 from app.schemas import DataSourceCreate, DataSourceUpdate, DataSourceOut
 from app.auth.dependencies import require_operator, require_viewer
 
@@ -32,12 +33,19 @@ async def list_data_sources(
 async def create_data_source(
     payload: DataSourceCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     ds = DataSource(**payload.model_dump())
     db.add(ds)
     await db.commit()
     await db.refresh(ds)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.data_ingested,
+        actor_id=current_user.id,
+        target_type="data_source",
+        target_id=ds.id,
+    )
     return ds
 
 
@@ -59,7 +67,7 @@ async def update_data_source(
     ds_id: uuid.UUID,
     payload: DataSourceUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(DataSource).where(DataSource.id == ds_id))
     ds = result.scalar_one_or_none()
@@ -69,6 +77,13 @@ async def update_data_source(
         setattr(ds, field, value)
     await db.commit()
     await db.refresh(ds)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="data_source",
+        target_id=ds.id,
+    )
     return ds
 
 
@@ -76,7 +91,7 @@ async def update_data_source(
 async def delete_data_source(
     ds_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(DataSource).where(DataSource.id == ds_id))
     ds = result.scalar_one_or_none()
@@ -84,4 +99,12 @@ async def delete_data_source(
         raise HTTPException(status_code=404, detail="Data source not found")
     await db.delete(ds)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="data_source",
+        target_id=ds.id,
+        metadata={"event": "data_source_deleted"},
+    )
     return None

@@ -15,26 +15,34 @@ async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
-    total_projects = await db.scalar(select(func.count(Project.id)))
-
-    # Parallelize status count queries
-    status_queries = {
-        status: db.scalar(select(func.count(Project.id)).where(Project.status == status))
+    # Batch all independent scalar queries with asyncio.gather
+    total_projects_coro = db.scalar(select(func.count(Project.id)))
+    status_coros = [
+        db.scalar(select(func.count(Project.id)).where(Project.status == status))
         for status in ["onboarding", "data_collection", "calculation", "review", "submitted", "verified", "monitoring"]
-    }
-    status_counts = {status: (await query) or 0 for status, query in status_queries.items()}
-
-    pending_reviews = await db.scalar(
+    ]
+    pending_reviews_coro = db.scalar(
         select(func.count(HumanReviewQueue.id)).where(HumanReviewQueue.status.in_(["pending", "in_review"]))
     )
-
-    recent_calculations = await db.scalar(select(func.count(CalculationRun.id)))
-
-    total_emissions = await db.scalar(
+    recent_calculations_coro = db.scalar(select(func.count(CalculationRun.id)))
+    total_emissions_coro = db.scalar(
         select(func.coalesce(func.sum(CalculationRun.emissions_reduction_tCO2e), 0.0)).where(
             CalculationRun.status == "approved"
         )
     )
+
+    statuses, pending_reviews, recent_calculations, total_emissions = await asyncio.gather(
+        asyncio.gather(*status_coros),
+        pending_reviews_coro,
+        recent_calculations_coro,
+        total_emissions_coro,
+    )
+
+    total_projects = await total_projects_coro
+    status_counts = dict(zip(
+        ["onboarding", "data_collection", "calculation", "review", "submitted", "verified", "monitoring"],
+        [s or 0 for s in statuses],
+    ))
 
     return DashboardStats(
         total_projects=total_projects or 0,

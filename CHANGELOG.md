@@ -10,19 +10,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 - **Protected `/metrics` endpoint** — Now requires admin authentication (was publicly accessible)
-- **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, and invite accept (previously unprotected from brute-force)
+- **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, invite accept, and file uploads (previously unprotected from brute-force)
 - **Removed login fallback full-table scan** — Legacy email-hash miss no longer loads entire users table; instead queries only active legacy records with `LIMIT 50` and auto-heals missing hashes
 - **Added auth requirements to sensitive read endpoints** — `/compliance/consent/{subject_id}`, `/compliance/methodology/current/{name}`, `/tokenization/tokens`, `/tokenization/tokens/{id}`, `/tokenization/marketplace`, `/tokenization/retirements` now require authentication
 - **Frontend URL protocol validation** — All `href` attributes rendering API-provided URLs now validate `startsWith('http')` to prevent `javascript:` XSS vectors (`LeadsPage`, `ReportsPage`, `ReportDetailPage`)
 - **Request size limit hardening** — Malformed `Content-Length` header no longer crashes with `ValueError`; returns 400 instead
+- **WhatsApp webhook signature validation** — `POST /whatsapp` now validates `X-Hub-Signature-256` against `WHATSAPP_APP_SECRET` when configured (previously accepted any POST body)
+- **SQL wildcard sanitization** — `users.py` and `leads.py` search filters now escape `%` and `_` wildcards and cap input length at 100 chars to prevent wildcard injection
+- **Password policy aligned** — All password schemas (`UserCreate`, `UserCreateByAdmin`, `PasswordChangeRequest`) now consistently require minimum 12 characters (was 8 for registration, 12 for password changes)
+- **Hardcoded S3 bucket removed** — Upload endpoint now reads `S3_BUCKET_NAME` from config instead of hardcoded string
 
 ### Performance
 - **Redis connection pooling** — `health.py` and `admin.py` now reuse the global pooled connection via `app.auth.sessions._get_redis()` instead of creating/closing a new connection per request
 - **Batched COUNT queries in admin stats** — `GET /admin/stats` now uses `asyncio.gather()` to parallelize role counts and status breakdowns (was ~10 sequential round-trips)
+- **Batched COUNT queries in dashboard stats** — `GET /dashboard/stats` now fully parallelizes all scalar queries with `asyncio.gather()` (was sequential)
 - **Event-loop-aware Redis pool** — `_get_redis()` detects event-loop changes and recreates the pool, eliminating the pre-existing `RuntimeError: Event loop is closed` flaky test failures
+- **N+1 query elimination in VVB liaison** — `GET /vvb/follow-up-drafts` now batch-loads all projects and calculation runs with `IN` queries instead of per-report round-trips
+- **N+1 query elimination in lead scraping** — `POST /leads/scrape` now batch-loads existing leads by `external_id` with a single `IN` query per source instead of one query per raw lead
 
 ### Added
 - **Invite acceptance page** — New `/register?invite={token}` route with `InviteAcceptPage` component for users to create accounts from invite links
+- **Database index on `refresh_tokens.token_hash`** — Speeds up every token refresh validation (previously full table scan)
+- **Comprehensive audit logging** — All state-changing endpoints across 8 modules now write to `audit_logs`:
+  - `projects.py`: create, update, delete
+  - `data_sources.py`: create, update, delete
+  - `calculations.py`: create, update, delete, run calculation, approve
+  - `reports.py`: create, update, delete, generate, quality-check, submit-to-registry, draft clarification
+  - `review_queue.py`: create, update, delete
+  - `leads.py`: create, update, delete, score, scrape
+  - `orchestrator.py`: trigger, resolve review, assign review, run agent
+  - `vvb_liaison.py`: poll registry, draft response
 - **Server-side pagination on all backend list endpoints** — Every `GET` endpoint returning collections now accepts `skip` and `limit` query parameters with sensible defaults (50–100) and max caps (200–500)
   - Brokerage: `/listings`, `/transactions`
   - Tokenization: `/tokens`, `/marketplace`

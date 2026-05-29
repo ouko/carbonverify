@@ -1,9 +1,11 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.models import Project, FileUpload, FileUploadStatusEnum, User
@@ -15,17 +17,22 @@ from app.services.provenance import build_full_provenance
 from app.tasks.jobs import process_uploaded_file
 from app.services.clamav_scanner import get_scanner, ScanStatus
 from app.core.logging import get_logger
+from app.config import get_settings
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/uploads", tags=["uploads"])
+limiter = Limiter(key_func=get_remote_address)
+settings = get_settings()
 
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv", ".pdf", ".jpg", ".jpeg", ".png", ".webp"}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 
+@limiter.limit("30/minute")
 @router.post("/projects/{project_id}/upload", response_model=FileUploadResponse)
 async def upload_file(
     project_id: uuid.UUID,
+    request: Request,
     file: UploadFile = File(...),
     source_type: str = Form("document"),
     db: AsyncSession = Depends(get_db),
@@ -94,7 +101,7 @@ async def upload_file(
         detected_type=detected_type,
         mime_type=mime_type,
         s3_key=s3_key,
-        s3_bucket="carbonverify-uploads",  # Use config in production
+        s3_bucket=settings.S3_BUCKET_NAME or "carbonverify-uploads",
         file_size_bytes=len(file_bytes),
         file_hash_sha256=file_hash,
         status=FileUploadStatusEnum.uploaded,

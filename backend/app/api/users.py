@@ -94,7 +94,9 @@ async def list_users(
     if is_active is not None:
         stmt = stmt.where(User.is_active == is_active)
     if search:
-        stmt = stmt.where(User.name.ilike(f"%{search}%") | User.email.ilike(f"%{search}%"))
+        # Defensive: limit search length, sanitize wildcards
+        search_clean = search[:100].replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(User.name.ilike(f"%{search_clean}%") | User.email.ilike(f"%{search_clean}%"))
     stmt = stmt.order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()

@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     # IoT Webhook
     IOT_WEBHOOK_API_KEY: str = ""
     WHATSAPP_VERIFY_TOKEN: str = ""
+    WHATSAPP_APP_SECRET: str = ""
 
     # Lead Intelligence Engine
     LEAD_SCRAPER_MODE: str = "demo"  # "demo" or "live"

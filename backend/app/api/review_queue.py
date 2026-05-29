@@ -5,7 +5,8 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import HumanReviewQueue, User
+from app.models import HumanReviewQueue, User, AuditActionEnum
+from app.security.audit_logging import AuditLogger
 from app.schemas import HumanReviewQueueCreate, HumanReviewQueueUpdate, HumanReviewQueueOut
 from app.auth.dependencies import require_operator, require_viewer
 
@@ -35,12 +36,19 @@ async def list_queue_items(
 async def create_queue_item(
     payload: HumanReviewQueueCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     item = HumanReviewQueue(**payload.model_dump())
     db.add(item)
     await db.commit()
     await db.refresh(item)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="review_queue",
+        target_id=item.id,
+    )
     return item
 
 
@@ -62,7 +70,7 @@ async def update_queue_item(
     item_id: uuid.UUID,
     payload: HumanReviewQueueUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(HumanReviewQueue).where(HumanReviewQueue.id == item_id))
     item = result.scalar_one_or_none()
@@ -72,6 +80,13 @@ async def update_queue_item(
         setattr(item, field, value)
     await db.commit()
     await db.refresh(item)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="review_queue",
+        target_id=item.id,
+    )
     return item
 
 
@@ -79,7 +94,7 @@ async def update_queue_item(
 async def delete_queue_item(
     item_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(HumanReviewQueue).where(HumanReviewQueue.id == item_id))
     item = result.scalar_one_or_none()
@@ -87,4 +102,12 @@ async def delete_queue_item(
         raise HTTPException(status_code=404, detail="Queue item not found")
     await db.delete(item)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="review_queue",
+        target_id=item.id,
+        metadata={"event": "review_item_deleted"},
+    )
     return None

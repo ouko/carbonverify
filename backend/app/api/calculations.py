@@ -5,8 +5,9 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import CalculationRun, Project, User
+from app.models import CalculationRun, Project, User, AuditActionEnum
 from app.schemas import CalculationRunCreate, CalculationRunUpdate, CalculationRunOut
+from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer
 from app.calculations.fnrb_calculator import calculate_fnrb
 from app.calculations.emissions_quantifier import quantify_emissions
@@ -39,12 +40,19 @@ async def list_calculations(
 async def create_calculation(
     payload: CalculationRunCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     calc = CalculationRun(**payload.model_dump())
     db.add(calc)
     await db.commit()
     await db.refresh(calc)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.calculation_run,
+        actor_id=current_user.id,
+        target_type="calculation_run",
+        target_id=calc.id,
+    )
     return calc
 
 
@@ -66,7 +74,7 @@ async def update_calculation(
     calc_id: uuid.UUID,
     payload: CalculationRunUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(CalculationRun).where(CalculationRun.id == calc_id))
     calc = result.scalar_one_or_none()
@@ -76,6 +84,13 @@ async def update_calculation(
         setattr(calc, field, value)
     await db.commit()
     await db.refresh(calc)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="calculation_run",
+        target_id=calc.id,
+    )
     return calc
 
 
@@ -83,7 +98,7 @@ async def update_calculation(
 async def delete_calculation(
     calc_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(CalculationRun).where(CalculationRun.id == calc_id))
     calc = result.scalar_one_or_none()
@@ -91,6 +106,14 @@ async def delete_calculation(
         raise HTTPException(status_code=404, detail="Calculation run not found")
     await db.delete(calc)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="calculation_run",
+        target_id=calc.id,
+        metadata={"event": "calculation_deleted"},
+    )
     return None
 
 
@@ -202,6 +225,14 @@ async def run_project_calculation(
     await db.commit()
     await db.refresh(calc_run)
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.calculation_run,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project_id,
+    )
+
     logger.info(
         "calculation_completed",
         calc_id=str(calc_run.id),
@@ -276,6 +307,14 @@ async def approve_calculation(
     calc.approved_by = current_user.id
     await db.commit()
     await db.refresh(calc)
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.report_approved,
+        actor_id=current_user.id,
+        target_type="calculation_run",
+        target_id=calc.id,
+    )
 
     logger.info("calculation_approved", calc_id=str(calc_id), approved_by=str(current_user.id))
 

@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.database import get_db
-from app.models import Lead, User, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun
+from app.models import Lead, User, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun, AuditActionEnum
 from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadStats, LeadScrapeRequest
+from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer, require_admin
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 from app.services.lead_intelligence.factory import get_scraper, list_scrapers, health_check_all
@@ -39,7 +40,8 @@ async def list_leads(
     if registry_source:
         stmt = stmt.where(Lead.registry_source == registry_source)
     if country:
-        stmt = stmt.where(Lead.country.ilike(f"%{country}%"))
+        country_clean = country[:100].replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(Lead.country.ilike(f"%{country_clean}%"))
     if priority:
         stmt = stmt.where(Lead.priority == priority)
     if lead_status:
@@ -49,7 +51,8 @@ async def list_leads(
     if min_stuck_score is not None:
         stmt = stmt.where(Lead.stuck_score >= min_stuck_score)
     if search:
-        stmt = stmt.where(Lead.project_name.ilike(f"%{search}%"))
+        search_clean = search[:100].replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(Lead.project_name.ilike(f"%{search_clean}%"))
 
     stmt = stmt.order_by(Lead.stuck_score.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
@@ -60,7 +63,7 @@ async def list_leads(
 async def create_lead(
     payload: LeadCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     lead = Lead(**payload.model_dump())
     lead.scraped_at = datetime.now(timezone.utc)
@@ -68,6 +71,13 @@ async def create_lead(
     db.add(lead)
     await db.commit()
     await db.refresh(lead)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_created,
+        actor_id=current_user.id,
+        target_type="lead",
+        target_id=lead.id,
+    )
     return lead
 
 
@@ -123,7 +133,7 @@ async def update_lead(
     lead_id: uuid.UUID,
     payload: LeadUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(Lead).where(Lead.id == lead_id))
     lead = result.scalar_one_or_none()
@@ -136,6 +146,13 @@ async def update_lead(
     lead.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(lead)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="lead",
+        target_id=lead.id,
+    )
     return lead
 
 
@@ -143,7 +160,7 @@ async def update_lead(
 async def delete_lead(
     lead_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     result = await db.execute(select(Lead).where(Lead.id == lead_id))
     lead = result.scalar_one_or_none()
@@ -151,13 +168,21 @@ async def delete_lead(
         raise HTTPException(status_code=404, detail="Lead not found")
     await db.delete(lead)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="lead",
+        target_id=lead.id,
+        metadata={"event": "lead_deleted"},
+    )
 
 
 @router.post("/{lead_id}/score", response_model=LeadOut)
 async def score_single_lead(
     lead_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     result = await db.execute(select(Lead).where(Lead.id == lead_id))
     lead = result.scalar_one_or_none()
@@ -177,6 +202,14 @@ async def score_single_lead(
 
     await db.commit()
     await db.refresh(lead)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=current_user.id,
+        target_type="lead",
+        target_id=lead.id,
+        metadata={"event": "lead_scored"},
+    )
     return lead
 
 
@@ -203,7 +236,7 @@ async def _scrape_one(source: str, country: str) -> tuple[str, list[dict], str |
 async def trigger_scrape(
     payload: LeadScrapeRequest,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     sources = [payload.registry_source] if payload.registry_source else list_scrapers()
     country = payload.country or "Kenya"
@@ -221,18 +254,24 @@ async def trigger_scrape(
         source_created = 0
         source_updated = 0
 
+        # Batch-load existing leads to avoid N+1 queries per raw lead
+        external_ids = [raw["external_id"] for raw in raw_leads if "external_id" in raw]
+        existing_leads = {}
+        if external_ids:
+            existing_result = await db.execute(
+                select(Lead).where(
+                    Lead.registry_source == source,
+                    Lead.external_id.in_(external_ids),
+                )
+            )
+            for lead in existing_result.scalars().all():
+                existing_leads[lead.external_id] = lead
+
         for raw in raw_leads:
             meta = raw.pop("_scrape_meta", {})
             data_source = meta.get("data_source", "demo")
 
-            # Upsert by (registry_source, external_id)
-            existing = await db.execute(
-                select(Lead).where(
-                    Lead.registry_source == source,
-                    Lead.external_id == raw["external_id"],
-                )
-            )
-            lead = existing.scalar_one_or_none()
+            lead = existing_leads.get(raw.get("external_id"))
 
             # Compute score
             from datetime import date as dt_date
@@ -321,6 +360,14 @@ async def trigger_scrape(
 
     await db.commit()
     logger.info("scrape_completed", created=total_created, updated=total_updated, sources=sources, per_source=per_source)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.data_ingested,
+        actor_id=current_user.id,
+        target_type="lead",
+        target_id=None,
+        metadata={"event": "lead_scrape", "sources": sources},
+    )
     return {
         "created": total_created,
         "updated": total_updated,

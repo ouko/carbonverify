@@ -99,40 +99,56 @@ async def get_follow_up_drafts(
     result = await db.execute(select(Report).where(Report.status == "submitted"))
     reports = result.scalars().all()
 
-    drafts = []
+    # Filter to pending reports first
+    pending_reports = []
     for report in reports:
         submitted_at = report.draft_content.get("submitted_at") if report.draft_content else None
         if not submitted_at:
             continue
-
         submitted_date = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
         days_pending = (datetime.now(timezone.utc) - submitted_date).days
-
         if days_pending >= 14:
-            proj_result = await db.execute(select(Project).where(Project.id == report.project_id))
-            project = proj_result.scalar_one_or_none()
+            pending_reports.append((report, days_pending))
 
-            calc_result = await db.execute(select(CalculationRun).where(CalculationRun.id == report.calculation_run_id))
-            calc_run = calc_result.scalar_one_or_none()
+    # Batch-load projects and calculation runs to avoid N+1
+    project_ids = {r.project_id for r, _ in pending_reports if r.project_id}
+    calc_ids = {r.calculation_run_id for r, _ in pending_reports if r.calculation_run_id}
 
-            email = generate_follow_up_email(
-                project_name=project.name if project else "Unknown",
-                registry_name="Verra" if "VM" in report.template_type.value else "Gold Standard",
-                report_id=str(report.id),
-                current_status="Under Review",
-                days_pending=days_pending,
-                emissions_reduction=calc_run.emissions_reduction_tCO2e if calc_run else 0,
-                monitoring_period_start=str(calc_run.monitoring_period_start) if calc_run else "N/A",
-                monitoring_period_end=str(calc_run.monitoring_period_end) if calc_run else "N/A",
-                methodology=report.template_type.value,
-                compliance_score=calc_run.methodology_compliance_score if calc_run else 0,
-            )
+    projects = {}
+    if project_ids:
+        proj_result = await db.execute(select(Project).where(Project.id.in_(project_ids)))
+        for p in proj_result.scalars().all():
+            projects[p.id] = p
 
-            drafts.append({
-                "report_id": str(report.id),
-                "project_name": project.name if project else "Unknown",
-                "days_pending": days_pending,
-                "email_draft": email,
-            })
+    calc_runs = {}
+    if calc_ids:
+        calc_result = await db.execute(select(CalculationRun).where(CalculationRun.id.in_(calc_ids)))
+        for c in calc_result.scalars().all():
+            calc_runs[c.id] = c
+
+    drafts = []
+    for report, days_pending in pending_reports:
+        project = projects.get(report.project_id)
+        calc_run = calc_runs.get(report.calculation_run_id)
+
+        email = generate_follow_up_email(
+            project_name=project.name if project else "Unknown",
+            registry_name="Verra" if "VM" in report.template_type.value else "Gold Standard",
+            report_id=str(report.id),
+            current_status="Under Review",
+            days_pending=days_pending,
+            emissions_reduction=calc_run.emissions_reduction_tCO2e if calc_run else 0,
+            monitoring_period_start=str(calc_run.monitoring_period_start) if calc_run else "N/A",
+            monitoring_period_end=str(calc_run.monitoring_period_end) if calc_run else "N/A",
+            methodology=report.template_type.value,
+            compliance_score=calc_run.methodology_compliance_score if calc_run else 0,
+        )
+
+        drafts.append({
+            "report_id": str(report.id),
+            "project_name": project.name if project else "Unknown",
+            "days_pending": days_pending,
+            "email_draft": email,
+        })
 
     return {"drafts": drafts}
