@@ -110,6 +110,7 @@ class UserInviteOut(BaseModel):
 class InviteAcceptRequest(BaseModel):
     token: str
     password: str = Field(..., min_length=8)
+    name: Optional[str] = None
 
     @field_validator("password")
     @classmethod

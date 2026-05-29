@@ -6,7 +6,7 @@ import asyncio
 import inspect
 asyncio.iscoroutinefunction = inspect.iscoroutinefunction
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -21,6 +21,7 @@ from app.config import get_settings
 from app.core.logging import get_logger
 from app.core.request_id import RequestIDMiddleware
 from app.database import engine
+from app.auth.dependencies import get_current_user, require_admin
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.projects import router as projects_router
@@ -100,7 +101,14 @@ async def request_size_limit(request: Request, call_next):
     content_length = request.headers.get("content-length")
     if content_length:
         max_size = 50 * 1024 * 1024 if request.url.path.startswith("/uploads") else 10 * 1024 * 1024
-        if int(content_length) > max_size:
+        try:
+            length = int(content_length)
+        except ValueError:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid Content-Length header"},
+            )
+        if length > max_size:
             return JSONResponse(
                 status_code=413,
                 content={"detail": "Request entity too large"},
@@ -168,8 +176,8 @@ app.include_router(admin_router)
 
 
 @app.get("/metrics")
-async def metrics():
-    """Prometheus metrics endpoint."""
+async def metrics(_: None = Depends(require_admin)):
+    """Prometheus metrics endpoint — admin only."""
     return PlainTextResponse(
         content=generate_latest(REGISTRY),
         media_type=CONTENT_TYPE_LATEST,

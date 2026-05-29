@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -14,8 +14,8 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 
 @router.get("/", response_model=List[ProjectOut])
 async def list_projects(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):

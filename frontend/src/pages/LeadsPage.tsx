@@ -169,7 +169,7 @@ function LeadDetailModal({ lead, onClose }: { lead: Lead; onClose: () => void })
           </div>
 
           {/* Registry link */}
-          {lead.registry_url && (
+          {lead.registry_url && lead.registry_url.startsWith('http') && (
             <a href={lead.registry_url} target="_blank" rel="noopener noreferrer" className="btn-ghost w-full justify-center text-xs">
               <ExternalLink className="h-3.5 w-3.5" /> View on {REGISTRY_LABELS[lead.registry_source]}
             </a>

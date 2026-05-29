@@ -100,6 +100,8 @@ async def list_agent_runs(
     project_id: uuid.UUID,
     agent_type: Optional[str] = None,
     status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -109,7 +111,7 @@ async def list_agent_runs(
         stmt = stmt.where(AgentRun.agent_type == agent_type)
     if status:
         stmt = stmt.where(AgentRun.status == status)
-    stmt = stmt.order_by(AgentRun.created_at.desc())
+    stmt = stmt.order_by(AgentRun.created_at.desc()).offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     runs = result.scalars().all()

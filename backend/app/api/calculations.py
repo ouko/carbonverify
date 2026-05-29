@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -22,12 +22,15 @@ router = APIRouter(prefix="/calculations", tags=["calculations"])
 @router.get("/", response_model=List[CalculationRunOut])
 async def list_calculations(
     project_id: uuid.UUID = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
     stmt = select(CalculationRun)
     if project_id:
         stmt = stmt.where(CalculationRun.project_id == project_id)
+    stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

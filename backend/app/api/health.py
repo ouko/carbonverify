@@ -30,13 +30,9 @@ async def health_check(request: Request, db: AsyncSession = Depends(get_db)):
         logger.error("health_db_error", error=str(e))
 
     try:
-        r = redis.from_url(
-            settings.REDIS_URL,
-            socket_connect_timeout=3,
-            socket_timeout=3,
-        )
+        from app.auth.sessions import _get_redis
+        r = _get_redis()
         await r.ping()
-        await r.aclose()
     except Exception as e:
         redis_status = "error"
         logger.error("health_redis_error", error=str(e))

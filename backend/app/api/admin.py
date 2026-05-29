@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -52,49 +53,47 @@ async def get_admin_stats(
     _: User = Depends(require_permission("system:view_stats")),
 ):
     """Get system-wide admin statistics."""
-    # Total users
-    total = await db.scalar(select(func.count(User.id)))
-
-    # Active / inactive / locked
-    active = await db.scalar(select(func.count(User.id)).where(User.is_active == True))
-    inactive = await db.scalar(select(func.count(User.id)).where(User.is_active == False))
-    locked = await db.scalar(
+    # Total users + status breakdown
+    total_coro = db.scalar(select(func.count(User.id)))
+    active_coro = db.scalar(select(func.count(User.id)).where(User.is_active == True))
+    inactive_coro = db.scalar(select(func.count(User.id)).where(User.is_active == False))
+    locked_coro = db.scalar(
         select(func.count(User.id)).where(
             User.locked_until.isnot(None),
             User.locked_until > datetime.now(timezone.utc),
         )
     )
+    total, active, inactive, locked = await asyncio.gather(
+        total_coro, active_coro, inactive_coro, locked_coro
+    )
 
-    # By role
+    # By role — batch with asyncio.gather
     role_counts = {}
-    for role in ["admin", "operator", "developer", "viewer"]:
-        count = await db.scalar(select(func.count(User.id)).where(User.role == role))
+    role_coros = {
+        role: db.scalar(select(func.count(User.id)).where(User.role == role))
+        for role in ["admin", "operator", "developer", "viewer"]
+    }
+    role_results = await asyncio.gather(*role_coros.values())
+    for role, count in zip(role_coros.keys(), role_results):
         role_counts[role] = count or 0
 
-    # New users today / this week
+    # New users today / this week + MFA — batch with asyncio.gather
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=today_start.weekday())
-    new_today = await db.scalar(
-        select(func.count(User.id)).where(User.created_at >= today_start)
-    )
-    new_this_week = await db.scalar(
-        select(func.count(User.id)).where(User.created_at >= week_start)
+    new_today_coro = db.scalar(select(func.count(User.id)).where(User.created_at >= today_start))
+    new_week_coro = db.scalar(select(func.count(User.id)).where(User.created_at >= week_start))
+    mfa_coro = db.scalar(select(func.count(User.id)).where(User.mfa_enabled == True))
+    new_today, new_this_week, mfa_count = await asyncio.gather(
+        new_today_coro, new_week_coro, mfa_coro
     )
 
-    # MFA enabled count
-    mfa_count = await db.scalar(select(func.count(User.id)).where(User.mfa_enabled == True))
-
-    # Total active sessions (from Redis)
-    # This is approximate — we scan Redis for session keys
+    # Total active sessions (from Redis) — reuse pooled connection
     total_sessions = 0
     try:
-        import redis.asyncio as aioredis
-        from app.config import get_settings
-        settings = get_settings()
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-        async for key in r.scan_iter(match="session:*"):
+        from app.auth.sessions import _get_redis
+        r = _get_redis()
+        async for _key in r.scan_iter(match="session:*"):
             total_sessions += 1
-        await r.aclose()
     except Exception as e:
         logger.warning("failed_to_count_sessions", error=str(e))
 

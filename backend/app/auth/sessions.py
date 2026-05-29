@@ -5,6 +5,7 @@ Tracks user activity, enforces inactivity timeouts, and supports
 multi-device session control.
 """
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
@@ -20,10 +21,23 @@ logger = get_logger(__name__)
 
 # Lazy connection
 _redis_pool: Optional[redis.Redis] = None
+_redis_loop_id: Optional[int] = None
 
 
 def _get_redis() -> redis.Redis:
-    global _redis_pool
+    global _redis_pool, _redis_loop_id
+    try:
+        current_loop = asyncio.get_running_loop()
+        current_loop_id = id(current_loop)
+    except RuntimeError:
+        current_loop = None
+        current_loop_id = None
+
+    if _redis_pool is not None and _redis_loop_id != current_loop_id:
+        # Event loop changed (e.g., between pytest-asyncio tests) — discard stale pool
+        _redis_pool = None
+        _redis_loop_id = None
+
     if _redis_pool is None:
         _redis_pool = redis.from_url(
             settings.REDIS_URL,
@@ -33,6 +47,7 @@ def _get_redis() -> redis.Redis:
             health_check_interval=30,
             retry_on_timeout=True,
         )
+        _redis_loop_id = current_loop_id
     return _redis_pool
 
 

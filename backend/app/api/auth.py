@@ -144,16 +144,26 @@ async def login(
     result = await db.execute(select(User).where(User.email_hash == email_hash))
     user = result.scalar_one_or_none()
 
-    # Fallback: if no user found by email_hash, scan for users with missing
-    # email_hash (e.g., created before the searchable-hash migration) and
-    # compare decrypted emails. This is a safety net for data-migration gaps.
+    # Fallback: if no user found by email_hash, check for legacy users
+    # with missing email_hash by querying with a single LIMIT to avoid
+    # full table scans under load.
     if not user:
         logger.warning("login_email_hash_miss", email_hash=email_hash)
-        all_users = await db.execute(select(User))
-        for candidate in all_users.scalars().all():
+        from sqlalchemy import and_
+        legacy_result = await db.execute(
+            select(User).where(
+                and_(
+                    User.email_hash.is_(None),
+                    User.is_active == True,
+                )
+            ).limit(50)
+        )
+        for candidate in legacy_result.scalars().all():
             if candidate.email and candidate.email.lower() == payload.email.lower():
                 user = candidate
-                logger.info("login_fallback_match", user_id=str(user.id))
+                # Heal the missing hash so next login is fast
+                user.email_hash = email_hash
+                logger.info("login_fallback_match_healed", user_id=str(user.id))
                 break
 
     audit = AuditLogger(db)
@@ -203,6 +213,7 @@ async def login(
     return await _issue_tokens(user, request, response, db)
 
 
+@limiter.limit("10/minute")
 @router.post("/mfa/verify")
 async def verify_mfa(
     payload: MFAVerifyRequest,
@@ -234,8 +245,10 @@ async def verify_mfa(
     return await _issue_tokens(user, request, response, db, mfa_used=True)
 
 
+@limiter.limit("5/minute")
 @router.post("/mfa/setup")
 async def setup_mfa(
+    request: Request,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -261,9 +274,11 @@ class MFAConfirmRequest(BaseModel):
     totp_code: str
 
 
+@limiter.limit("10/minute")
 @router.post("/mfa/confirm", response_model=UserOut)
 async def confirm_mfa(
     payload: MFAConfirmRequest,
+    request: Request,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -288,8 +303,10 @@ async def confirm_mfa(
     return current_user
 
 
+@limiter.limit("5/minute")
 @router.post("/mfa/disable")
 async def disable_mfa(
+    request: Request,
     current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["require_admin"]).require_admin),
     target_user_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
@@ -435,9 +452,11 @@ async def revoke_session(
     return {"message": "Session revoked"}
 
 
+@limiter.limit("10/minute")
 @router.post("/change-password")
 async def change_password(
     payload: PasswordChangeRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -461,6 +480,7 @@ async def change_password(
     return {"message": "Password updated successfully"}
 
 
+@limiter.limit("10/minute")
 @router.post("/admin/invite", response_model=UserInviteOut, status_code=status.HTTP_201_CREATED)
 async def invite_user(
     payload: UserInviteCreate,
@@ -515,6 +535,7 @@ async def invite_user(
     return invite
 
 
+@limiter.limit("10/minute")
 @router.post("/invite/accept", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def accept_invite(
     payload: InviteAcceptRequest,
@@ -533,11 +554,11 @@ async def accept_invite(
     if not invite:
         raise HTTPException(status_code=400, detail="Invalid or expired invite token")
 
-    # Create user from invite
+    # Create user from invite (allow name override from payload)
     user = User(
         email=invite.email,
         email_hash=invite.email_hash,
-        name=invite.name,
+        name=payload.name.strip() if payload.name else invite.name,
         role=invite.role,
         hashed_password=get_password_hash(payload.password),
         permissions=invite.permissions,

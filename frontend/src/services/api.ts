@@ -60,7 +60,7 @@ api.interceptors.response.use(
         return Promise.reject(error)
       }
 
-      ;(originalRequest as any)._retry = true
+      (originalRequest as any)._retry = true
       try {
         const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
         const { access_token } = res.data

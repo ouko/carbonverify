@@ -8,7 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- **Protected `/metrics` endpoint** — Now requires admin authentication (was publicly accessible)
+- **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, and invite accept (previously unprotected from brute-force)
+- **Removed login fallback full-table scan** — Legacy email-hash miss no longer loads entire users table; instead queries only active legacy records with `LIMIT 50` and auto-heals missing hashes
+- **Added auth requirements to sensitive read endpoints** — `/compliance/consent/{subject_id}`, `/compliance/methodology/current/{name}`, `/tokenization/tokens`, `/tokenization/tokens/{id}`, `/tokenization/marketplace`, `/tokenization/retirements` now require authentication
+- **Frontend URL protocol validation** — All `href` attributes rendering API-provided URLs now validate `startsWith('http')` to prevent `javascript:` XSS vectors (`LeadsPage`, `ReportsPage`, `ReportDetailPage`)
+- **Request size limit hardening** — Malformed `Content-Length` header no longer crashes with `ValueError`; returns 400 instead
+
+### Performance
+- **Redis connection pooling** — `health.py` and `admin.py` now reuse the global pooled connection via `app.auth.sessions._get_redis()` instead of creating/closing a new connection per request
+- **Batched COUNT queries in admin stats** — `GET /admin/stats` now uses `asyncio.gather()` to parallelize role counts and status breakdowns (was ~10 sequential round-trips)
+- **Event-loop-aware Redis pool** — `_get_redis()` detects event-loop changes and recreates the pool, eliminating the pre-existing `RuntimeError: Event loop is closed` flaky test failures
+
 ### Added
+- **Invite acceptance page** — New `/register?invite={token}` route with `InviteAcceptPage` component for users to create accounts from invite links
 - **Server-side pagination on all backend list endpoints** — Every `GET` endpoint returning collections now accepts `skip` and `limit` query parameters with sensible defaults (50–100) and max caps (200–500)
   - Brokerage: `/listings`, `/transactions`
   - Tokenization: `/tokens`, `/marketplace`

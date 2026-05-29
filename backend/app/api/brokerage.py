@@ -351,6 +351,8 @@ async def release_escrow(
 @router.get("/commissions")
 async def list_commissions(
     invoiced: Optional[bool] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(require_operator),
     db: AsyncSession = Depends(get_db),
 ):
@@ -358,6 +360,7 @@ async def list_commissions(
     stmt = select(Commission).order_by(desc(Commission.created_at))
     if invoiced is not None:
         stmt = stmt.where(Commission.invoiced == invoiced)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     return result.scalars().all()

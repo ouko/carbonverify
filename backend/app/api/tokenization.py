@@ -92,6 +92,7 @@ async def list_tokens(
     status: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """List carbon credit tokens."""
@@ -107,7 +108,11 @@ async def list_tokens(
 
 
 @router.get("/tokens/{token_id}")
-async def get_token(token_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_token(
+    token_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Get a token with full provenance."""
     service = TokenizationService(db)
     token_data = await service.get_token_with_provenance(token_id)
@@ -140,6 +145,7 @@ async def browse_marketplace(
     max_price: Optional[float] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Browse token marketplace listings."""
@@ -202,6 +208,8 @@ async def retire_token(
 @router.get("/retirements")
 async def list_retirements(
     token_id: Optional[uuid.UUID] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -211,6 +219,7 @@ async def list_retirements(
         stmt = stmt.where(TokenRetirement.token_id == token_id)
     else:
         stmt = stmt.where(TokenRetirement.retired_by == current_user.id)
+    stmt = stmt.offset(skip).limit(limit)
 
     result = await db.execute(stmt)
     return result.scalars().all()

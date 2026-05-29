@@ -46,7 +46,7 @@ export default function ReportDetailPage() {
     )
   }
 
-  const hasValidPdf = report.final_pdf && !report.final_pdf.includes('example.com')
+  const hasValidPdf = report.final_pdf && report.final_pdf.startsWith('http') && !report.final_pdf.includes('example.com')
 
   return (
     <div className="space-y-6">

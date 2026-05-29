@@ -116,7 +116,7 @@ export default function ReportsPage() {
                     </span>
                   </div>
                 </div>
-                {report.final_pdf && !report.final_pdf.includes('example.com') ? (
+                {report.final_pdf && report.final_pdf.startsWith('http') && !report.final_pdf.includes('example.com') ? (
                   <div className="mt-5 flex gap-2 pt-4 border-t border-surface-100 dark:border-surface-800/50">
                     <a href={report.final_pdf} download className="btn-primary flex-1 text-xs" onClick={(e) => e.stopPropagation()}>
                       <Download className="w-3.5 h-3.5" />

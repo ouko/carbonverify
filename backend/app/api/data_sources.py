@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -15,12 +15,15 @@ router = APIRouter(prefix="/data-sources", tags=["data-sources"])
 @router.get("/", response_model=List[DataSourceOut])
 async def list_data_sources(
     project_id: uuid.UUID = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
     stmt = select(DataSource)
     if project_id:
         stmt = stmt.where(DataSource.project_id == project_id)
+    stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

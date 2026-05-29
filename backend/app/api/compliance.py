@@ -134,6 +134,7 @@ async def get_consent_status(
     subject_id: str,
     consent_type: Optional[ConsentTypeEnum] = None,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """Get current consent status for a subject."""
     stmt = select(ConsentRecord).where(ConsentRecord.subject_id == subject_id)
@@ -572,6 +573,7 @@ async def list_methodology_versions(
 async def get_current_methodology(
     methodology_name: str,
     db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
 ):
     """Get the current version of a methodology."""
     result = await db.execute(
