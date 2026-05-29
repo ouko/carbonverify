@@ -424,6 +424,9 @@ pytest tests/ -v
 | `test_lead_scorer.py` | 11 | Stuck score algorithm, priority classification |
 | `test_lead_scrapers.py` | 7 | CDM, Verra, Gold Standard scrapers with demo fallback |
 | `test_orchestrator.py` | 24 | Calculation orchestration, pipeline integration |
+| `test_auth.py` | 18 | Login, MFA, session management, invite flow, password policies |
+| `test_users.py` | 16 | Admin CRUD, permissions, role-based access control |
+| `test_admin.py` | 8 | Stats, session management, global analytics |
 
 ---
 

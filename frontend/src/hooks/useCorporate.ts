@@ -21,20 +21,45 @@ export interface PortfolioItem {
 
 export interface ESGReportPayload {
   company_name: string
-  reporting_scope: string
-  period_start: string
-  period_end: string
+  reporting_period_start: string
+  reporting_period_end: string
+  scope?: string
+  sdgs?: string[]
 }
 
 export interface ESGReportResponse {
   report_id: string
-  pdf_url: string | null
-  status: string
+  company_name: string
+  reporting_period: string
+  scope: string
+  total_offsets_tco2e: number
+  total_retired_tco2e: number
+  vintage_distribution: Record<string, number>
+  methodology_breakdown: Record<string, number>
+  sdg_impact_summary: Record<string, number>
+  project_contributions: {
+    project_id: string | null
+    project_name: string | null
+    tonnes_held: number
+    tonnes_retired: number
+    vintage: number
+    methodology: string
+    vvb_registry: string
+  }[]
+  generated_at: string
 }
 
 export interface DueDiligenceResponse {
   token_id: string
-  documents: { label: string; url: string }[]
+  vintage: number
+  methodology: string
+  vvb_registry: string
+  vvb_certificate_id: string | null
+  radix_token_address: string | null
+  project: Record<string, unknown>
+  calculation_run: Record<string, unknown>
+  mrv_provenance: Record<string, unknown>
+  retirement_status: string
 }
 
 // ─── Backend shape ───────────────────────────────────────────────────────────

@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +11,8 @@ from sqlalchemy import select, update
 
 from app.core.encryption import compute_searchable_hash
 from app.database import get_db
-from app.models import User, RefreshToken
-from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest
+from app.models import User, RefreshToken, UserInvite, UserRoleEnum
+from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
 from app.auth.security import (
     verify_password,
     get_password_hash,
@@ -26,7 +28,7 @@ from app.auth.mfa import (
     is_mfa_required,
 )
 from app.auth.sessions import SessionManager
-from app.auth.dependencies import validate_refresh_token, get_current_user
+from app.auth.dependencies import validate_refresh_token, get_current_user, require_admin
 from app.security.audit_logging import AuditLogger
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -96,13 +98,16 @@ async def register(
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Self-registration defaults to viewer role for security
+    # Only admins can create users with other roles via POST /users/
     user = User(
         email=payload.email,
         email_hash=email_hash,
         name=payload.name,
-        role=payload.role,
-        mfa_enabled=payload.mfa_enabled,
+        role="viewer",
+        mfa_enabled=False,
         hashed_password=get_password_hash(payload.password),
+        is_active=True,
     )
     db.add(user)
     await db.commit()
@@ -114,7 +119,7 @@ async def register(
         actor_id=user.id,
         target_type="user",
         target_id=user.id,
-        metadata={"event": "registration"},
+        metadata={"event": "self_registration", "role": "viewer"},
     )
 
     logger.info("user_registered", user_id=str(user.id), email=user.email)
@@ -251,7 +256,7 @@ async def setup_mfa(
     }
 
 
-class MFAConfirmRequest(LoginRequest):
+class MFAConfirmRequest(BaseModel):
     secret: str
     totp_code: str
 
@@ -454,6 +459,110 @@ async def change_password(
 
     logger.info("password_changed", user_id=str(current_user.id))
     return {"message": "Password updated successfully"}
+
+
+@router.post("/admin/invite", response_model=UserInviteOut, status_code=status.HTTP_201_CREATED)
+async def invite_user(
+    payload: UserInviteCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Admin-only: generate an invite token for a new user."""
+    email_hash = compute_searchable_hash(payload.email)
+
+    # Check if email already exists
+    result = await db.execute(select(User).where(User.email_hash == email_hash))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Check for existing active invite
+    result = await db.execute(
+        select(UserInvite).where(
+            UserInvite.email_hash == email_hash,
+            UserInvite.used_at.is_(None),
+            UserInvite.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Active invite already exists for this email")
+
+    token = secrets.token_urlsafe(32)
+    invite = UserInvite(
+        token=token,
+        email=payload.email,
+        email_hash=email_hash,
+        name=payload.name,
+        role=UserRoleEnum(payload.role),
+        permissions={"granted": payload.permissions, "revoked": []},
+        invited_by=current_user.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+    )
+    db.add(invite)
+    await db.commit()
+    await db.refresh(invite)
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_created,
+        actor_id=current_user.id,
+        target_type="user_invite",
+        target_id=invite.id,
+        metadata={"email": payload.email, "role": payload.role, "token": token},
+    )
+
+    logger.info("invite_created", invite_id=str(invite.id), email=payload.email, admin_id=str(current_user.id))
+    return invite
+
+
+@router.post("/invite/accept", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def accept_invite(
+    payload: InviteAcceptRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept an invite token and create a user account."""
+    result = await db.execute(
+        select(UserInvite).where(
+            UserInvite.token == payload.token,
+            UserInvite.used_at.is_(None),
+            UserInvite.expires_at > datetime.now(timezone.utc),
+        )
+    )
+    invite = result.scalar_one_or_none()
+    if not invite:
+        raise HTTPException(status_code=400, detail="Invalid or expired invite token")
+
+    # Create user from invite
+    user = User(
+        email=invite.email,
+        email_hash=invite.email_hash,
+        name=invite.name,
+        role=invite.role,
+        hashed_password=get_password_hash(payload.password),
+        permissions=invite.permissions,
+        is_active=True,
+    )
+    db.add(user)
+    await db.flush()
+
+    # Mark invite as used
+    invite.used_at = datetime.now(timezone.utc)
+    invite.used_by_user_id = user.id
+    await db.commit()
+    await db.refresh(user)
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_created,
+        actor_id=user.id,
+        target_type="user",
+        target_id=user.id,
+        metadata={"event": "invite_accepted", "invite_id": str(invite.id)},
+    )
+
+    logger.info("invite_accepted", user_id=str(user.id), invite_id=str(invite.id))
+    return user
 
 
 async def _issue_tokens(

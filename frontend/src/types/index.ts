@@ -4,7 +4,41 @@ export interface User {
   name: string
   role: 'admin' | 'operator' | 'developer' | 'viewer'
   mfa_enabled: boolean
+  is_active: boolean
+  permissions: { granted: string[]; revoked: string[] }
   created_at: string
+}
+
+export interface UserDetail extends User {
+  last_login_at: string | null
+  last_activity_at: string | null
+  failed_login_count: number
+  locked_until: string | null
+  effective_permissions: string[]
+}
+
+export interface AdminStats {
+  total_users: number
+  active_users: number
+  inactive_users: number
+  locked_users: number
+  users_by_role: Record<string, number>
+  new_users_today: number
+  new_users_this_week: number
+  total_sessions: number
+  mfa_enabled_count: number
+}
+
+export interface AdminSession {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  device: string
+  ip: string
+  last_active: string | null
+  created_at: string | null
+  current: boolean
 }
 
 export interface Project {

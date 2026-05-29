@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 import LoginPage from './pages/LoginPage';
 
 // Core dashboard pages (eager — visited on every login)
@@ -36,6 +37,14 @@ const VVBPipelinePage = lazy(() => import('./pages/command/VVBPipelinePage').the
 const QualityMetricsPage = lazy(() => import('./pages/command/QualityMetricsPage').then(m => ({ default: m.QualityMetricsPage })));
 const AgentPerformancePage = lazy(() => import('./pages/command/AgentPerformancePage').then(m => ({ default: m.AgentPerformancePage })));
 const SettingsPage = lazy(() => import('./pages/command/SettingsPage').then(m => ({ default: m.SettingsPage })));
+
+// Admin pages
+const AdminLayout = lazy(() => import('./layouts/AdminLayout').then(m => ({ default: m.default })));
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage').then(m => ({ default: m.default })));
+const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage').then(m => ({ default: m.default })));
+const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage').then(m => ({ default: m.default })));
+const SessionManagementPage = lazy(() => import('./pages/admin/SessionManagementPage').then(m => ({ default: m.default })));
+const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage').then(m => ({ default: m.default })));
 
 function App() {
   useEffect(() => {
@@ -76,6 +85,16 @@ function App() {
                 <Route path="/command-center/agents" element={<Suspense fallback={<LoadingSpinner />}><AgentPerformancePage /></Suspense>} />
                 <Route path="/command-center/settings" element={<Suspense fallback={<LoadingSpinner />}><SettingsPage /></Suspense>} />
                 <Route path="/command-center" element={<Navigate to="/command-center/inbox" replace />} />
+              </Route>
+              <Route element={<AdminRoute />}>
+                <Route element={<Suspense fallback={<LoadingSpinner />}><AdminLayout /></Suspense>}>
+                  <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                  <Route path="/admin/dashboard" element={<Suspense fallback={<LoadingSpinner />}><AdminDashboardPage /></Suspense>} />
+                  <Route path="/admin/users" element={<Suspense fallback={<LoadingSpinner />}><UserManagementPage /></Suspense>} />
+                  <Route path="/admin/users/:id" element={<Suspense fallback={<LoadingSpinner />}><UserDetailPage /></Suspense>} />
+                  <Route path="/admin/sessions" element={<Suspense fallback={<LoadingSpinner />}><SessionManagementPage /></Suspense>} />
+                  <Route path="/admin/settings" element={<Suspense fallback={<LoadingSpinner />}><AdminSettingsPage /></Suspense>} />
+                </Route>
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

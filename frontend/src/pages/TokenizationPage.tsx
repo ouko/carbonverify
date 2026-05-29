@@ -179,13 +179,11 @@ export function TokenizationPage() {
     const retireTonnes = parseInt(retireForm.tonnes) || 0
     retireMutation.mutate(
       {
-        tokenId: retireForm.tokenId,
-        payload: {
-          tonnes: retireTonnes,
-          purpose: retireForm.purpose,
-          beneficiary: retireForm.beneficiary,
-          location: retireForm.location,
-        },
+        token_id: retireForm.tokenId,
+        tonnes_retired: retireTonnes,
+        purpose: retireForm.purpose,
+        beneficiary_name: retireForm.beneficiary,
+        beneficiary_location: retireForm.location,
       },
       {
         onSuccess: () => {
@@ -198,7 +196,7 @@ export function TokenizationPage() {
   }
 
   const handleBuy = (listingId: string, projectName: string) => {
-    buyMutation.mutate(listingId, {
+    buyMutation.mutate({ listingId, tonnesToBuy: 1 }, {
       onSuccess: () => showToast(`Purchase request sent for ${projectName}`),
     })
   }

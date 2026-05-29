@@ -53,7 +53,7 @@ async def trigger_project_state(
     logger.info(
         "orchestrator_triggered",
         project_id=str(project_id),
-        trigger=trigger,
+        trigger=payload.trigger,
         user_id=str(current_user.id),
     )
     return result
@@ -207,7 +207,7 @@ async def resolve_review_item(
     logger.info(
         "review_item_resolved",
         item_id=str(item_id),
-        decision=decision,
+        decision=payload.decision,
         user_id=str(current_user.id),
     )
     return result

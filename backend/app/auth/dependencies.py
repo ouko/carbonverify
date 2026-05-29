@@ -41,6 +41,13 @@ async def get_current_user(
             detail="User not found",
         )
 
+    # Check account is active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated. Contact your administrator.",
+        )
+
     # Check account lockout
     if user.locked_until and user.locked_until > __import__("datetime").datetime.now(__import__("datetime").timezone.utc):
         raise HTTPException(
@@ -83,6 +90,32 @@ class RoleChecker:
                 detail="Insufficient permissions",
             )
         return user
+
+
+class PermissionChecker:
+    def __init__(self, required_permission: str):
+        self.required_permission = required_permission
+
+    async def __call__(self, user: User = Depends(get_current_user)) -> User:
+        from app.permissions import has_permission
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is deactivated",
+            )
+
+        if not has_permission(user.role.value, user.permissions or [], self.required_permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {self.required_permission}",
+            )
+        return user
+
+
+def require_permission(permission: str):
+    """Factory for creating permission-based dependencies."""
+    return PermissionChecker(permission)
 
 
 require_admin = RoleChecker(["admin"])

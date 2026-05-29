@@ -28,19 +28,20 @@ export interface MarketplaceListing {
 
 export interface MintPayload {
   project_id: string
+  calculation_run_id: string
   tonnes_co2e: number
   vintage_year: number
   methodology: string
   vvb_registry: string
   vvb_certificate_id?: string
-  calculation_run_id?: string
 }
 
 export interface RetirePayload {
-  tonnes: number
-  purpose: string
-  beneficiary: string
-  location: string
+  token_id: string
+  tonnes_retired: number
+  purpose?: string
+  beneficiary_name?: string
+  beneficiary_location?: string
 }
 
 // ─── Backend shapes ──────────────────────────────────────────────────────────
@@ -138,9 +139,9 @@ export function useMintToken() {
 
 export function useBuyToken() {
   const qc = useQueryClient()
-  return useMutation<unknown, Error, string>({
-    mutationFn: async (listingId) => {
-      const res = await api.post(`/tokenization/marketplace/${listingId}/buy`)
+  return useMutation<unknown, Error, { listingId: string; tonnesToBuy: number }>({
+    mutationFn: async ({ listingId, tonnesToBuy }) => {
+      const res = await api.post(`/tokenization/marketplace/${listingId}/buy?tonnes_to_buy=${tonnesToBuy}`)
       return res.data
     },
     onSuccess: () => {
@@ -152,9 +153,9 @@ export function useBuyToken() {
 
 export function useRetireToken() {
   const qc = useQueryClient()
-  return useMutation<unknown, Error, { tokenId: string; payload: RetirePayload }>({
-    mutationFn: async ({ tokenId, payload }) => {
-      const res = await api.post(`/tokenization/tokens/${tokenId}/retire`, payload)
+  return useMutation<unknown, Error, RetirePayload>({
+    mutationFn: async (payload) => {
+      const res = await api.post(`/tokenization/tokens/${payload.token_id}/retire`, payload)
       return res.data
     },
     onSuccess: () => {

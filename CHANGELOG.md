@@ -37,6 +37,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **CORS** — Added `192.168.1.97:5173` (network IP) to allowed origins for local dev across devices
 
 ### Added
+- **Admin System (Phase 1 & 2)** — Full admin dashboard with role-based access control
+  - Backend: Granular permission system (`users:read`, `projects:create`, etc.), `PermissionChecker` dependency, `GET /admin/stats`, `GET /admin/sessions`, `GET /admin/permissions`
+  - Backend: User CRUD with soft delete (`is_active`), permission grant/revoke, session revocation, force logout
+  - Frontend: Admin layout with sidebar, dashboard stats, user management table with search/filter, user detail with permission editor, session management, settings
+  - Frontend: `AdminRoute` guard, `RequirePermission` component, admin nav link in main layout (admin-only)
+- **Invite Flow** — Secure user provisioning without email service
+  - `POST /auth/admin/invite` — admin generates 7-day invite token
+  - `POST /auth/invite/accept` — user creates account with token + password
+  - Frontend: Generate Invite modal with copy-to-clipboard link
+- **Registration Security Fix** — `POST /auth/register` no longer accepts role from client; always creates `viewer` role
+
+### Fixed
+- **Critical backend NameError bugs** in `orchestrator.py` (`trigger`/`decision` undefined in log lines) and `validation_engine.py` (`offset` vs `skip`)
+- **Frontend-backend type mismatches** causing HTTP 422 errors at runtime:
+  - `useSecurity.ts` MFA confirm — backend no longer requires `email`/`password` in `MFAConfirmRequest`
+  - `useTokenization.ts` — `useBuyToken` now passes `tonnes_to_buy` query param; `useRetireToken` payload fields aligned with `TokenRetireRequest`; `MintPayload.calculation_run_id` made required
+  - `useCorporate.ts` — `ESGReportPayload` fields aligned with `ESGReportConfig` (`reporting_period_start`, `reporting_period_end`, `scope`, `sdgs`)
+  - `useDashboardStats.ts` — `useEmissionsTrend` now unpacks `res.data.trend`
+  - `useBrokerage.ts` — `MatchResponse` and `GlobalMatchResponse` types aligned with actual backend responses
+  - `useCompliance.ts` — `DSR.subject` → `subject_id`, `Breach.sla_ok` → `sla_violated`, `ConflictOfInterest` fields aligned with backend
+- **Missing Python dependencies** — Added `playwright==1.44.0`, `playwright-stealth==1.0.6`, `slowapi==0.1.9` to `requirements.txt`
+
+### Added
 - **Workflow Validation Engine** — Enterprise-grade autonomous QA system
   - JSON-defined workflow graph schema with Pydantic validation (10 step types: HTTP, DB query, service call, external API, notification, DOM capture, decision gate, wait, parallel, subflow)
   - State machine with 9 states and immutable transition audit trail (SHA-256 chained hashes)

@@ -4,10 +4,13 @@ import { api } from '../services/api'
 export interface DSR {
   id: string
   type: 'access' | 'erasure' | 'portability'
-  subject: string
+  subject_id: string
+  subject_type: string
   status: 'received' | 'under_review' | 'fulfilled' | 'rejected'
   days_remaining: number
   assigned_to: string | null
+  sla_deadline: string
+  created_at: string
 }
 
 export interface Breach {
@@ -16,16 +19,19 @@ export interface Breach {
   severity: 'high' | 'medium' | 'low'
   status: 'contained' | 'notified_regulator' | 'investigating' | 'resolved'
   hours_elapsed: number
-  sla_ok: boolean
+  sla_violated: boolean
+  affected_subjects_count: number
 }
 
 export interface ConflictOfInterest {
   id: string
-  user: string
-  project: string
-  type: 'financial' | 'employment' | 'personal'
-  status: 'pending_review' | 'approved' | 'rejected'
-  disclosed: string
+  user_id: string
+  project_id: string
+  relationship_type: 'financial' | 'employment' | 'personal'
+  description: string
+  disclosed_at: string
+  approved: boolean
+  reviewed_by: string | null
 }
 
 export function useDSRs() {

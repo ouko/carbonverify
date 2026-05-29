@@ -39,13 +39,92 @@ class UserCreate(UserBase):
         return v
 
 
+class UserCreateByAdmin(BaseModel):
+    email: EmailStr
+    name: str
+    role: str
+    password: str = Field(..., min_length=8)
+    mfa_enabled: bool = False
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password_complexity(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[@$!%*?&]", v):
+            raise ValueError("Password must contain at least one special character (@$!%*?&)")
+        return v
+
+
+class UserUpdateByAdmin(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    mfa_enabled: Optional[bool] = None
+
+
 class UserOut(UserBase, ORMBase):
     id: uuid.UUID
+    is_active: bool
+    permissions: list
     created_at: datetime
+
+
+class UserDetailOut(UserOut):
+    last_login_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
+    failed_login_count: int = 0
+    locked_until: Optional[datetime] = None
 
 
 class UserInDB(UserOut):
     hashed_password: str
+
+
+class UserInviteCreate(BaseModel):
+    email: EmailStr
+    name: str
+    role: str = "viewer"
+    permissions: List[str] = []
+
+
+class UserInviteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    token: str
+    email: str
+    name: str
+    role: str
+    expires_at: datetime
+    created_at: datetime
+    used_at: Optional[datetime] = None
+
+
+class InviteAcceptRequest(BaseModel):
+    token: str
+    password: str = Field(..., min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def _validate_password_complexity(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[@$!%*?&]", v):
+            raise ValueError("Password must contain at least one special character (@$!%*?&)")
+        return v
 
 
 # ─── Developers ───────────────────────────────────────────────────────────────
@@ -681,3 +760,37 @@ class LeadStats(BaseModel):
     avg_stuck_score: float
     high_priority_count: int
     critical_count: int
+
+
+# ─── Admin ────────────────────────────────────────────────────────────────────
+
+class AdminStats(BaseModel):
+    total_users: int
+    active_users: int
+    inactive_users: int
+    locked_users: int
+    users_by_role: Dict[str, int]
+    new_users_today: int
+    new_users_this_week: int
+    total_sessions: int
+    mfa_enabled_count: int
+
+
+class PermissionGrantRequest(BaseModel):
+    permission: str
+
+
+class PermissionRevokeRequest(BaseModel):
+    permission: str
+
+
+class SessionOut(BaseModel):
+    id: str
+    user_id: str
+    user_name: str
+    user_email: str
+    device: str
+    ip: str
+    last_active: Optional[str] = None
+    created_at: Optional[str] = None
+    current: bool = False

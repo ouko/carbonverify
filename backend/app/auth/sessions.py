@@ -157,3 +157,16 @@ class SessionManager:
                 # Clean up stale reference
                 await r.srem(cls._user_sessions_key(user_id), sid)
         return sessions
+
+    @classmethod
+    async def list_all_sessions(cls) -> list[Dict[str, Any]]:
+        """List all active sessions across all users."""
+        r = _get_redis()
+        sessions = []
+        async for key in r.scan_iter(match=f"{cls.SESSION_PREFIX}:*"):
+            data = await r.get(key)
+            if data:
+                session = json.loads(data)
+                session["session_id"] = key.split(":", 1)[1]
+                sessions.append(session)
+        return sessions

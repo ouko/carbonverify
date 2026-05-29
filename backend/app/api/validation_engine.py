@@ -250,7 +250,7 @@ async def list_runs(
         query = query.where(ValidationRun.workflow_id == uuid.UUID(workflow_id))
     if status:
         query = query.where(ValidationRun.status == status)
-    query = query.order_by(ValidationRun.created_at.desc()).offset(offset).limit(limit)
+    query = query.order_by(ValidationRun.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     runs = result.scalars().all()
     return [_run_to_response(r) for r in runs]

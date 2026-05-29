@@ -208,6 +208,7 @@ class User(Base):
         Index("ix_users_role", "role"),
         Index("ix_users_created_at", "created_at"),
         Index("ix_users_email_hash", "email_hash"),
+        Index("ix_users_is_active", "is_active"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -223,9 +224,34 @@ class User(Base):
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    permissions: Mapped[list] = mapped_column(JSONB, default=list)  # explicit granular permissions
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     developer_profile: Mapped[Optional["Developer"]] = relationship("Developer", back_populates="user", uselist=False)
+
+
+class UserInvite(Base):
+    __tablename__ = "user_invites"
+
+    __table_args__ = (
+        Index("ix_user_invites_token", "token"),
+        Index("ix_user_invites_email_hash", "email_hash"),
+        Index("ix_user_invites_expires_at", "expires_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
+    email_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRoleEnum] = mapped_column(Enum(UserRoleEnum, name="user_role"), nullable=False)
+    permissions: Mapped[list] = mapped_column(JSONB, default=list)
+    invited_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class Developer(Base):

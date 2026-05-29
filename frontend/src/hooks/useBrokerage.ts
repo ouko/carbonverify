@@ -45,9 +45,21 @@ export interface CreateTransactionPayload {
 }
 
 export interface MatchResponse {
-  match_id: string
-  status: string
-  message: string
+  listing_id: string
+  matches: {
+    buyer_id: string
+    score: number
+    methodology_match: boolean
+    price_match: boolean
+    location_match: boolean
+    timeline_match: boolean
+  }[]
+}
+
+export interface GlobalMatchResponse {
+  listings_scanned: number
+  buyers_scanned: number
+  matches_created: number
 }
 
 // ─── Backend response shapes (snake_case) ───────────────────────────────────
@@ -176,7 +188,7 @@ export function useRunGlobalMatch() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const res = await api.post<MatchResponse>('/brokerage/match/run-global')
+      const res = await api.post<GlobalMatchResponse>('/brokerage/match/run-global')
       return res.data
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['brokerage', 'listings'] }),

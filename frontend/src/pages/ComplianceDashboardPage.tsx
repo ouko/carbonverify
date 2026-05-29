@@ -70,8 +70,8 @@ export function ComplianceDashboardPage() {
   const openDSRs = (dsrs || []).filter(d => d.status !== 'fulfilled' && d.status !== 'rejected').length
   const urgentDSRs = (dsrs || []).filter(d => d.days_remaining <= 15 && d.status !== 'fulfilled' && d.status !== 'rejected').length
   const activeBreaches = (breaches || []).filter(b => b.status !== 'resolved').length
-  const slaOkBreaches = (breaches || []).filter(b => b.sla_ok).length
-  const pendingCOI = (conflicts || []).filter(c => c.status === 'pending_review').length
+  const slaOkBreaches = (breaches || []).filter(b => !b.sla_violated).length
+  const pendingCOI = (conflicts || []).filter(c => !c.approved).length
 
   const tabs = [
     { key: 'dsr' as const, label: 'Data Subject Requests', icon: FileText },
@@ -195,7 +195,7 @@ export function ComplianceDashboardPage() {
                     </span>
                   </div>
                   <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                    {dsr.type} · Subject: {dsr.subject} · Assigned: {dsr.assigned_to || 'Unassigned'}
+                    {dsr.type} · Subject: {dsr.subject_id} · Assigned: {dsr.assigned_to || 'Unassigned'}
                   </p>
                 </div>
                 <div className="text-right">
@@ -237,8 +237,8 @@ export function ComplianceDashboardPage() {
                       {b.severity}
                     </span>
                   </div>
-                  <span className={`text-xs flex items-center gap-1 ${b.sla_ok ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {b.sla_ok ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                  <span className={`text-xs flex items-center gap-1 ${!b.sla_violated ? 'text-primary-600 dark:text-primary-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {!b.sla_violated ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                     {b.hours_elapsed}h / 72h SLA
                   </span>
                 </div>
@@ -268,16 +268,16 @@ export function ComplianceDashboardPage() {
               <div key={coi.id} className="flex items-center justify-between px-6 py-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{coi.user}</span>
-                    <span className={`badge text-[10px] ${STATUS_COLORS[coi.status]}`}>
-                      {(coi.status || '').replace('_', ' ')}
+                    <span className="text-sm font-semibold text-surface-900 dark:text-surface-100">{coi.user_id}</span>
+                    <span className={`badge text-[10px] ${coi.approved ? STATUS_COLORS.approved : STATUS_COLORS.pending_review}`}>
+                      {coi.approved ? 'approved' : 'pending review'}
                     </span>
                   </div>
                   <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                    {coi.type} · {coi.project} · Disclosed {coi.disclosed}
+                    {coi.relationship_type} · {coi.project_id} · Disclosed {new Date(coi.disclosed_at).toLocaleDateString()}
                   </p>
                 </div>
-                {coi.status === 'pending_review' && (
+                {!coi.approved && (
                   <button
                     onClick={() => setReviewingCOI(coi.id)}
                     className="btn-primary text-xs"

@@ -22,7 +22,7 @@ export function useEmissionsTrend() {
     queryKey: ['dashboard', 'emissions-trend'],
     queryFn: async () => {
       const res = await api.get('/dashboard/emissions-trend')
-      return res.data as EmissionsTrendPoint[]
+      return (res.data?.trend ?? []) as EmissionsTrendPoint[]
     },
   })
 }
