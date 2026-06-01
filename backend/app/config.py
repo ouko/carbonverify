@@ -97,6 +97,15 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_TLS: bool = True
 
+    # OAuth / SSO
+    OAUTH_GOOGLE_CLIENT_ID: str = ""
+    OAUTH_GOOGLE_CLIENT_SECRET: str = ""
+    OAUTH_MICROSOFT_CLIENT_ID: str = ""
+    OAUTH_MICROSOFT_CLIENT_SECRET: str = ""
+    OAUTH_OKTA_CLIENT_ID: str = ""
+    OAUTH_OKTA_CLIENT_SECRET: str = ""
+    OAUTH_OKTA_DOMAIN: str = ""  # e.g. https://your-org.okta.com
+
 
 @lru_cache()
 def get_settings() -> Settings:

@@ -4,6 +4,37 @@ import { Leaf, Eye, EyeOff, ArrowRight, Shield } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import packageJson from '../../package.json'
 
+function OAuthButton({
+  provider,
+  label,
+  onClick,
+}: {
+  provider: 'google' | 'microsoft' | 'okta'
+  label: string
+  onClick: () => void
+}) {
+  const colors: Record<string, string> = {
+    google: 'bg-white text-surface-800 border border-surface-200 hover:bg-surface-50 dark:bg-surface-900 dark:text-surface-200 dark:border-surface-700 dark:hover:bg-surface-800',
+    microsoft: 'bg-white text-surface-800 border border-surface-200 hover:bg-surface-50 dark:bg-surface-900 dark:text-surface-200 dark:border-surface-700 dark:hover:bg-surface-800',
+    okta: 'bg-white text-surface-800 border border-surface-200 hover:bg-surface-50 dark:bg-surface-900 dark:text-surface-200 dark:border-surface-700 dark:hover:bg-surface-800',
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${colors[provider]}`}
+    >
+      <span className="text-base">
+        {provider === 'google' && '🔍'}
+        {provider === 'microsoft' && '⊞'}
+        {provider === 'okta' && '◉'}
+      </span>
+      {label}
+    </button>
+  )
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -142,6 +173,20 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
+
+          {/* OAuth */}
+          <div className="mt-5 space-y-3">
+            <div className="relative flex items-center gap-3">
+              <div className="h-px flex-1 bg-surface-100 dark:bg-surface-800/50" />
+              <span className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 font-medium">Or continue with</span>
+              <div className="h-px flex-1 bg-surface-100 dark:bg-surface-800/50" />
+            </div>
+            <div className="space-y-2">
+              <OAuthButton provider="google" label="Google" onClick={() => window.location.href = '/auth/oauth/google'} />
+              <OAuthButton provider="microsoft" label="Microsoft" onClick={() => window.location.href = '/auth/oauth/microsoft'} />
+              <OAuthButton provider="okta" label="Okta" onClick={() => window.location.href = '/auth/oauth/okta'} />
+            </div>
+          </div>
 
           {/* Footer */}
           <div className="mt-6 pt-5 border-t border-surface-100 dark:border-surface-800/50">

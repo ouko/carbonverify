@@ -708,6 +708,25 @@ class ApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
+class OAuthAccount(Base):
+    __tablename__ = "oauth_accounts"
+
+    __table_args__ = (
+        Index("ix_oauth_accounts_user_id", "user_id"),
+        Index("ix_oauth_accounts_provider", "provider"),
+        Index("ix_oauth_accounts_provider_account_id", "provider_account_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    provider_account_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    refresh_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 # ─── Compliance ───────────────────────────────────────────────────────────────
 
 class ConsentTypeEnum(str, PyEnum):

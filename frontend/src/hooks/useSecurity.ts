@@ -130,3 +130,33 @@ export function useUpdateUserSettings() {
     },
   })
 }
+
+export interface OAuthAccount {
+  id: string
+  provider: string
+  provider_account_id: string
+  created_at: string
+}
+
+export function useOAuthAccounts() {
+  return useQuery<OAuthAccount[]>({
+    queryKey: ['oauth-accounts'],
+    queryFn: async () => {
+      const res = await api.get('/auth/oauth/accounts')
+      return res.data as OAuthAccount[]
+    },
+  })
+}
+
+export function useUnlinkOAuth() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (provider: string) => {
+      const res = await api.delete(`/auth/oauth/${provider}/unlink`)
+      return res.data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['oauth-accounts'] })
+    },
+  })
+}

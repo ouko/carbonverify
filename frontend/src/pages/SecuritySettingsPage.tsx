@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Shield, Smartphone, Key, Eye, EyeOff, CheckCircle, AlertTriangle, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
-import { useSessions, useChangePassword, useRevokeSession, useLogoutAll, useMFASetup, useMFAConfirm } from '../hooks/useSecurity'
+import { Shield, Smartphone, Key, Eye, EyeOff, CheckCircle, AlertTriangle, LogOut, ChevronDown, ChevronUp, Link2, Unlink } from 'lucide-react'
+import { useSessions, useChangePassword, useRevokeSession, useLogoutAll, useMFASetup, useMFAConfirm, useOAuthAccounts, useUnlinkOAuth } from '../hooks/useSecurity'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export function SecuritySettingsPage() {
@@ -81,6 +81,13 @@ export function SecuritySettingsPage() {
     } catch (err: any) {
       // Error handled by mutation
     }
+  }
+
+  const { data: oauthAccounts, isLoading: oauthLoading } = useOAuthAccounts()
+  const unlinkOAuth = useUnlinkOAuth()
+
+  const handleLinkOAuth = (provider: string) => {
+    window.location.href = `/auth/oauth/${provider}`
   }
 
   return (
@@ -227,6 +234,64 @@ export function SecuritySettingsPage() {
             {changePassword.isPending ? 'Updating...' : 'Update Password'}
           </button>
         </div>
+      </div>
+
+      {/* Connected Accounts */}
+      <div className="card p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+            <Link2 className="h-5 w-5 text-surface-600 dark:text-surface-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-surface-900 dark:text-surface-100">Connected Accounts</h3>
+            <p className="text-xs text-surface-400 dark:text-surface-500">Link social or enterprise logins</p>
+          </div>
+        </div>
+
+        {oauthLoading ? (
+          <LoadingSpinner />
+        ) : (
+          <div className="space-y-3">
+            {(['google', 'microsoft', 'okta'] as const).map((provider) => {
+              const linked = oauthAccounts?.find((a) => a.provider === provider)
+              return (
+                <div key={provider} className="flex items-center justify-between rounded-xl border border-surface-100 dark:border-surface-800 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">
+                      {provider === 'google' && '🔍'}
+                      {provider === 'microsoft' && '⊞'}
+                      {provider === 'okta' && '◉'}
+                    </span>
+                    <span className="text-sm font-medium capitalize text-surface-800 dark:text-surface-200">{provider}</span>
+                    {linked && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400 font-medium">
+                        Linked
+                      </span>
+                    )}
+                  </div>
+                  {linked ? (
+                    <button
+                      onClick={() => unlinkOAuth.mutate(provider)}
+                      disabled={unlinkOAuth.isPending}
+                      className="text-xs flex items-center gap-1 text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-40"
+                    >
+                      <Unlink className="w-3.5 h-3.5" />
+                      Unlink
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleLinkOAuth(provider)}
+                      className="text-xs flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Link
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Active Sessions */}
