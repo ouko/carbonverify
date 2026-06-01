@@ -12,6 +12,7 @@ import {
   LogOut,
   Leaf,
   ChevronLeft,
+  Key,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -20,6 +21,7 @@ const adminNavItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/users', icon: Users, label: 'Users' },
   { to: '/admin/sessions', icon: Activity, label: 'Sessions' },
+  { to: '/admin/api-keys', icon: Key, label: 'API Keys' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ]
 

@@ -45,6 +45,7 @@ from app.api.corporate import router as corporate_router
 from app.api.leads import router as leads_router
 from app.api.validation_engine import router as validation_engine_router
 from app.api.admin import router as admin_router
+from app.api.api_keys import router as api_keys_router
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -173,6 +174,7 @@ app.include_router(corporate_router)
 app.include_router(leads_router)
 app.include_router(validation_engine_router)
 app.include_router(admin_router)
+app.include_router(api_keys_router)
 
 
 @app.get("/metrics")

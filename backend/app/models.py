@@ -687,6 +687,27 @@ class RefreshToken(Base):
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
 
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    __table_args__ = (
+        Index("ix_api_keys_key_hash", "key_hash", unique=True),
+        Index("ix_api_keys_created_by", "created_by"),
+        Index("ix_api_keys_is_active", "is_active"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    scopes: Mapped[list] = mapped_column(JSONB, default=list)  # list of permission strings
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 # ─── Compliance ───────────────────────────────────────────────────────────────
 
 class ConsentTypeEnum(str, PyEnum):

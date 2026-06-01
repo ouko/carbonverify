@@ -50,6 +50,7 @@ const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage')
 const UserDetailPage = lazy(() => import('./pages/admin/UserDetailPage').then(m => ({ default: m.default })));
 const SessionManagementPage = lazy(() => import('./pages/admin/SessionManagementPage').then(m => ({ default: m.default })));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage').then(m => ({ default: m.default })));
+const ApiKeysPage = lazy(() => import('./pages/admin/ApiKeysPage').then(m => ({ default: m.default })));
 
 function App() {
   useEffect(() => {
@@ -101,6 +102,7 @@ function App() {
                   <Route path="/admin/users" element={<Suspense fallback={<LoadingSpinner />}><UserManagementPage /></Suspense>} />
                   <Route path="/admin/users/:id" element={<Suspense fallback={<LoadingSpinner />}><UserDetailPage /></Suspense>} />
                   <Route path="/admin/sessions" element={<Suspense fallback={<LoadingSpinner />}><SessionManagementPage /></Suspense>} />
+                  <Route path="/admin/api-keys" element={<Suspense fallback={<LoadingSpinner />}><ApiKeysPage /></Suspense>} />
                   <Route path="/admin/settings" element={<Suspense fallback={<LoadingSpinner />}><AdminSettingsPage /></Suspense>} />
                 </Route>
               </Route>

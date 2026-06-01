@@ -118,6 +118,16 @@ class PermissionChecker:
                 detail="Account is deactivated",
             )
 
+        # If authenticated via API key, check scopes first
+        api_key_scopes = getattr(user, "_api_key_scopes", None)
+        if api_key_scopes is not None:
+            if self.required_permission not in api_key_scopes:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"API key scope denied: {self.required_permission}",
+                )
+            return user
+
         if not has_permission(user.role.value, user.permissions or [], self.required_permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -221,3 +231,29 @@ async def require_mfa_if_enabled(
             detail="MFA verification required",
         )
     return user
+
+
+async def get_current_user_or_api_key(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Authenticate via JWT token or API key.
+
+    API keys must be passed as: Authorization: ApiKey <key>
+    JWT tokens are passed as: Authorization: Bearer <token>
+    """
+    token = credentials.credentials
+    scheme = credentials.scheme.lower() if credentials.scheme else "bearer"
+
+    if scheme == "apikey":
+        from app.auth.api_key_auth import validate_api_key, get_user_from_api_key
+        api_key_record = await validate_api_key(token, db)
+        user = await get_user_from_api_key(api_key_record, db)
+        # Attach API key scopes to user for permission checking
+        user._api_key_scopes = api_key_record.scopes or []
+        return user
+
+    # Fall back to JWT
+    return await get_current_user(credentials, db, request)

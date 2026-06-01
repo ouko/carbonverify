@@ -435,6 +435,31 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+# ─── API Keys ─────────────────────────────────────────────────────────────────
+
+class ApiKeyCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    scopes: List[str] = []
+    expires_in_days: Optional[int] = Field(None, ge=1, le=365)
+
+
+class ApiKeyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    key_prefix: str
+    scopes: list
+    created_by: uuid.UUID
+    last_used_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    is_active: bool
+    created_at: datetime
+
+
+class ApiKeyCreateResponse(ApiKeyOut):
+    key: str
+
+
 # ─── Health ───────────────────────────────────────────────────────────────────
 
 class HealthCheck(BaseModel):
