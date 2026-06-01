@@ -19,6 +19,7 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
+    request: Request = None,
 ) -> User:
     token = credentials.credentials
     payload = decode_token(token)
@@ -57,6 +58,17 @@ async def get_current_user(
             detail="Account temporarily locked due to failed login attempts",
         )
 
+    # If x-session-id is provided, validate the session as defense-in-depth
+    if request:
+        session_id = request.headers.get("x-session-id")
+        if session_id:
+            valid = await SessionManager.is_session_valid(session_id)
+            if not valid:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session expired due to inactivity",
+                )
+
     return user
 
 
@@ -66,7 +78,7 @@ async def get_current_user_with_session(
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Validate user and update session activity."""
-    user = await get_current_user(credentials, db)
+    user = await get_current_user(credentials, db, request)
 
     session_id = request.headers.get("x-session-id")
     if session_id:

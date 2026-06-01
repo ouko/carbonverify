@@ -8,7 +8,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.database import get_db
-from app.models import Project, FileUpload, FileUploadStatusEnum, User
+from app.models import Project, FileUpload, FileUploadStatusEnum, User, AuditActionEnum
+from app.security.audit_logging import AuditLogger
 from app.schemas import FileUploadOut, FileUploadResponse
 from app.auth.dependencies import require_operator, require_viewer
 from app.services.file_detector import detect_file_type, compute_sha256, generate_s3_key
@@ -130,6 +131,16 @@ async def upload_file(
         user_id=str(current_user.id),
     )
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.data_ingested,
+        actor_id=current_user.id,
+        target_type="file_upload",
+        target_id=upload_record.id,
+        metadata={"project_id": str(project_id), "detected_type": detected_type_str, "filename": filename},
+        request=request,
+    )
+
     return FileUploadResponse(
         file_id=upload_record.id,
         detected_type=detected_type_str,
@@ -189,6 +200,16 @@ async def reprocess_upload(
     await db.commit()
 
     process_uploaded_file.delay(str(upload.id))
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.data_ingested,
+        actor_id=_.id,
+        target_type="file_upload",
+        target_id=upload.id,
+        metadata={"event": "reprocess", "project_id": str(upload.project_id)},
+        request=request,
+    )
 
     return FileUploadResponse(
         file_id=upload.id,

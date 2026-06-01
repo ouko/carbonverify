@@ -85,13 +85,6 @@ class DSRUpdateRequest(BaseModel):
     rejection_reason: Optional[str] = None
 
 
-class MethodologyUpdateRequest(BaseModel):
-    status: Optional[DSRStatusEnum] = None
-    assigned_to: Optional[uuid.UUID] = None
-    fulfillment_notes: Optional[str] = None
-    rejection_reason: Optional[str] = None
-
-
 class COIReviewRequest(BaseModel):
     approved: bool
     review_notes: Optional[str] = None

@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user
 from app.core.logging import get_logger
 from app.database import get_db
-from app.models import User
+from app.models import User, AuditActionEnum
+from app.security.audit_logging import AuditLogger
 from app.validation_engine.models import (
     EscalationLevel,
     EscalationStatus,
@@ -81,6 +82,15 @@ async def create_workflow(
     await db.commit()
     await db.refresh(workflow)
     logger.info("workflow_created", workflow_id=str(workflow.id), name=workflow.name)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.methodology_updated,
+        actor_id=current_user.id,
+        target_type="validation_workflow",
+        target_id=workflow.id,
+        metadata={"name": workflow.name, "version": workflow.version},
+        request=request,
+    )
     return WorkflowResponse(
         id=str(workflow.id),
         name=workflow.name,
@@ -185,6 +195,15 @@ async def update_workflow(
 
     await db.commit()
     await db.refresh(workflow)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.methodology_updated,
+        actor_id=current_user.id,
+        target_type="validation_workflow",
+        target_id=workflow.id,
+        metadata={"name": workflow.name, "version": workflow.version, "event": "updated"},
+        request=request,
+    )
     return WorkflowResponse(
         id=str(workflow.id),
         name=workflow.name,
@@ -226,6 +245,15 @@ async def trigger_run(
         triggered_by=str(current_user.id),
     )
     logger.info("validation_run_triggered", run_id=str(run.id), workflow_id=payload.workflow_id)
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.calculation_run,
+        actor_id=current_user.id,
+        target_type="validation_run",
+        target_id=run.id,
+        metadata={"workflow_id": payload.workflow_id, "project_id": str(payload.project_id) if payload.project_id else None},
+        request=request,
+    )
 
     # Queue for async execution
     from app.validation_engine.tasks import execute_validation_run
@@ -296,6 +324,15 @@ async def cancel_run(
         WorkflowRunStatus.failed,
         actor_type="user",
         reason=f"Cancelled by user {current_user.id}",
+    )
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.calculation_run,
+        actor_id=current_user.id,
+        target_type="validation_run",
+        target_id=run.id,
+        metadata={"event": "cancelled"},
+        request=request,
     )
     return {"detail": "Run cancelled"}
 
@@ -445,6 +482,15 @@ async def create_synthetic_actor(
         custom_behavior=payload.behavior_config,
         custom_context=payload.context_data,
     )
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_created,
+        actor_id=current_user.id,
+        target_type="synthetic_actor",
+        target_id=actor.id,
+        metadata={"name": payload.name, "actor_type": payload.actor_type.value if hasattr(payload.actor_type, 'value') else str(payload.actor_type)},
+        request=request,
+    )
     return _actor_to_response(actor)
 
 
@@ -525,6 +571,15 @@ async def acknowledge_escalation(
     escalation.assigned_to = current_user.id
     escalation.acknowledged_at = datetime.now(timezone.utc)
     await db.commit()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="escalation",
+        target_id=escalation.id,
+        metadata={"event": "acknowledged", "run_id": str(escalation.run_id)},
+        request=request,
+    )
     return {"detail": "Escalation acknowledged"}
 
 
@@ -566,6 +621,15 @@ async def resolve_escalation(
         from app.validation_engine.tasks import execute_validation_run
         execute_validation_run.delay(str(run.id))
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.human_reviewed,
+        actor_id=current_user.id,
+        target_type="escalation",
+        target_id=escalation.id,
+        metadata={"event": "resolved", "run_id": str(escalation.run_id), "decision": payload.decision},
+        request=request,
+    )
     return {"detail": "Escalation resolved"}
 
 
