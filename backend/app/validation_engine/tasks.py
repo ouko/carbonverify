@@ -126,6 +126,10 @@ def cleanup_archived_runs(days: int = 30):
 async def _cleanup_archived_async(days: int):
     async with AsyncSessionLocal() as db:
         from sqlalchemy import func
+        from app.validation_engine.models import ValidationProof, ValidationRunTransition, ValidationStepExecution
+        from app.services.s3 import get_s3_client
+        from app.config import get_settings
+
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         result = await db.execute(
@@ -138,10 +142,62 @@ async def _cleanup_archived_async(days: int):
         runs = result.scalars().all()
 
         archived_count = 0
+        s3_client = get_s3_client()
+        s3_bucket = get_settings().S3_BUCKET_NAME
+
         for run in runs:
             run.status = WorkflowRunStatus.archived
             run.archived_at = datetime.now(timezone.utc)
             archived_count += 1
+
+            # Delete associated step executions in batches
+            while True:
+                batch_result = await db.execute(
+                    select(ValidationStepExecution)
+                    .where(ValidationStepExecution.run_id == run.id)
+                    .limit(100)
+                )
+                batch = batch_result.scalars().all()
+                if not batch:
+                    break
+                for row in batch:
+                    await db.delete(row)
+                await db.commit()
+
+            # Delete associated proofs (and S3 objects) in batches
+            while True:
+                batch_result = await db.execute(
+                    select(ValidationProof)
+                    .where(ValidationProof.run_id == run.id)
+                    .limit(100)
+                )
+                batch = batch_result.scalars().all()
+                if not batch:
+                    break
+                for row in batch:
+                    proof_data = row.proof_data or {}
+                    s3_key = proof_data.get("s3_key")
+                    if s3_key and s3_bucket:
+                        try:
+                            s3_client.delete_object(Bucket=s3_bucket, Key=s3_key)
+                        except Exception as exc:
+                            logger.warning("cleanup_s3_delete_failed", s3_key=s3_key, error=str(exc))
+                    await db.delete(row)
+                await db.commit()
+
+            # Delete associated transitions in batches
+            while True:
+                batch_result = await db.execute(
+                    select(ValidationRunTransition)
+                    .where(ValidationRunTransition.run_id == run.id)
+                    .limit(100)
+                )
+                batch = batch_result.scalars().all()
+                if not batch:
+                    break
+                for row in batch:
+                    await db.delete(row)
+                await db.commit()
 
         await db.commit()
         logger.info("cleanup_archived_runs", archived_count=archived_count, cutoff=cutoff.isoformat())

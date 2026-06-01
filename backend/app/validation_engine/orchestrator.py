@@ -356,6 +356,9 @@ class ValidationOrchestrator:
 
         await self.db.commit()
 
+        # Record step-level transition
+        await self._record_step_transition(run, step_exec, step)
+
         # Generate proof for this step
         await self.advance_state(run, WorkflowRunStatus.proof_generating, reason=f"Generating proof for step '{step.id}'")
         if step.capture_proof:
@@ -405,6 +408,7 @@ class ValidationOrchestrator:
             # Reset step execution for retry
             step_exec.status = StepExecutionStatus.retried
             await self.db.commit()
+            await self._record_step_transition(run, step_exec, step)
             return True
 
         except Exception as exc:
@@ -440,6 +444,54 @@ class ValidationOrchestrator:
         """Generate the Merkle tree and anchor to Radix."""
         await self.proof_generator.build_merkle_tree(self.db, run)
         await self.proof_generator.anchor_to_radix(self.db, run)
+        await self.db.commit()
+
+    async def _record_step_transition(
+        self,
+        run: ValidationRun,
+        step_exec: ValidationStepExecution,
+        step: WorkflowStep,
+    ) -> None:
+        """Write a step-level transition record documenting the status change."""
+        # Determine from_state based on current step_exec status
+        to_state = step_exec.status.value
+        from_state = StepExecutionStatus.running.value
+        if to_state == StepExecutionStatus.retried.value:
+            from_state = StepExecutionStatus.failed.value
+
+        prev = await self.db.execute(
+            select(ValidationRunTransition)
+            .where(ValidationRunTransition.run_id == run.id)
+            .order_by(ValidationRunTransition.occurred_at.desc())
+            .limit(1)
+        )
+        prev_transition = prev.scalar_one_or_none()
+        previous_hash = prev_transition.transition_hash if prev_transition else None
+
+        occurred_at = datetime.now(timezone.utc)
+        transition_hash = _hash_transition(
+            str(run.id),
+            from_state,
+            to_state,
+            "system",
+            occurred_at,
+            previous_hash,
+            {"step_id": step.id, "step_name": step.name, "step_type": step.type.value},
+        )
+
+        transition = ValidationRunTransition(
+            run_id=run.id,
+            from_state=from_state,
+            to_state=to_state,
+            triggered_by=run.triggered_by,
+            actor_type="system",
+            reason=f"Step '{step.id}' transitioned from {from_state} to {to_state}",
+            transition_hash=transition_hash,
+            previous_hash=previous_hash,
+            occurred_at=occurred_at,
+            metadata_json={"step_id": step.id, "step_name": step.name, "step_type": step.type.value},
+        )
+        self.db.add(transition)
         await self.db.commit()
 
     def _resolve_variables(self, config: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:

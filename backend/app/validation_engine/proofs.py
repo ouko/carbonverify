@@ -16,6 +16,18 @@ from app.validation_engine.models import (
     ValidationStepExecution,
 )
 from app.validation_engine.schemas import WorkflowStep
+from app.services.s3 import upload_bytes
+
+
+PROOF_S3_THRESHOLD_BYTES = 100 * 1024  # 100 KB
+
+
+def _upload_proof_to_s3(data: dict, run_id: str) -> str:
+    """Upload proof data to S3 and return the S3 key."""
+    s3_key = f"proofs/{run_id}/{uuid.uuid4()}.json"
+    payload = json.dumps(data, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    upload_bytes(payload, s3_key, content_type="application/json")
+    return s3_key
 
 
 def _canonical_json(data: Any) -> str:
@@ -163,6 +175,12 @@ class ProofGenerator:
 
         canonical = _canonical_json(proof_data)
         proof_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        proof_size_bytes = len(canonical.encode("utf-8"))
+
+        # Offload to S3 if proof data exceeds threshold
+        if proof_size_bytes > PROOF_S3_THRESHOLD_BYTES:
+            s3_key = _upload_proof_to_s3(proof_data, str(run.id))
+            proof_data = {"s3_key": s3_key}
 
         proof = ValidationProof(
             run_id=run.id,
@@ -170,7 +188,7 @@ class ProofGenerator:
             proof_type=ProofType.http_request if step.type == WorkflowStepType.http_request else ProofType.service_output,
             proof_data=proof_data,
             proof_hash=proof_hash,
-            proof_size_bytes=len(canonical.encode("utf-8")),
+            proof_size_bytes=proof_size_bytes,
         )
         db.add(proof)
         await db.commit()

@@ -44,14 +44,6 @@ class StepExecutor(Protocol):
 class HttpRequestExecutor:
     """Execute HTTP request steps."""
 
-    def __init__(self):
-        self._client: Optional[httpx.AsyncClient] = None
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
-        return self._client
-
     async def execute(
         self,
         config: Dict[str, Any],
@@ -59,12 +51,9 @@ class HttpRequestExecutor:
         run: ValidationRun,
     ) -> Dict[str, Any]:
         cfg = HttpStepConfig.model_validate(config)
-        client = await self._get_client()
 
-        # Interpolate variables in URL
+        # URL is already interpolated by the orchestrator; do not double-interpolate
         url = cfg.url
-        for key, val in context.get("variables", {}).items():
-            url = url.replace(f"${{{key}}}", str(val))
 
         headers = cfg.headers.copy()
         # Inject synthetic actor trace header if present in context
@@ -74,13 +63,14 @@ class HttpRequestExecutor:
 
         started = time.monotonic()
         try:
-            response = await client.request(
-                method=cfg.method,
-                url=url,
-                headers=headers,
-                json=cfg.body,
-                timeout=cfg.timeout_ms / 1000.0,
-            )
+            async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+                response = await client.request(
+                    method=cfg.method,
+                    url=url,
+                    headers=headers,
+                    json=cfg.body,
+                    timeout=cfg.timeout_ms / 1000.0,
+                )
             latency_ms = int((time.monotonic() - started) * 1000)
 
             if response.status_code not in cfg.expected_status_codes:

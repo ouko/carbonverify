@@ -31,10 +31,17 @@ celery_app.conf.update(
         "app.tasks.jobs.*": {"queue": "default"},
         "app.tasks.report_jobs.*": {"queue": "default"},
         "app.tasks.lead_jobs.*": {"queue": "default"},
+        # Validation and compliance tasks route to dedicated queues with DLQ semantics
+        "app.validation_engine.tasks.*": {"queue": "validation"},
+        "app.tasks.compliance_jobs.*": {"queue": "compliance"},
     },
     task_default_exchange="default",
     task_default_queue="default",
     task_default_routing_key="default",
+    # DLQ configuration: failed tasks after max retries are routed to dead-letter queues.
+    # When using Redis as broker, declare companion queues (e.g., "validation.dlq",
+    # "compliance.dlq") and route failed messages there via worker event hooks or
+    # a custom Task class that overrides on_failure to re-publish to the DLQ.
     # Retry settings
     task_default_retry_delay=60,
     task_max_retries=3,

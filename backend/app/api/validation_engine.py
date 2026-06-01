@@ -297,7 +297,6 @@ async def cancel_run(
         actor_type="user",
         reason=f"Cancelled by user {current_user.id}",
     )
-    await db.commit()
     return {"detail": "Run cancelled"}
 
 
