@@ -34,6 +34,11 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    hmr: {
+      host: 'localhost',
+      port: 5173,
+      protocol: 'ws',
+    },
     proxy: {
       '/auth': { target: 'http://localhost:8000', changeOrigin: true },
       '/users': { target: 'http://localhost:8000', changeOrigin: true },
