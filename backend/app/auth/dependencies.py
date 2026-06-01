@@ -237,7 +237,11 @@ async def validate_refresh_token(
         await _revoke_all_user_tokens(user_id, db)
         raise HTTPException(status_code=401, detail="Token reuse detected. All sessions terminated.")
 
-    if token_record.expires_at < datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    expires_at = token_record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < now:
         raise HTTPException(status_code=401, detail="Refresh token expired")
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -248,7 +252,10 @@ async def validate_refresh_token(
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Account deactivated")
 
-    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+    locked_until = user.locked_until
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > now:
         raise HTTPException(status_code=403, detail="Account locked")
 
     return user, token_record

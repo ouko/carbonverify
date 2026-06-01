@@ -68,6 +68,29 @@ def _get_oauth_client(provider: str):
     )
 
 
+@limiter.limit("60/minute")
+@router.get("/accounts")
+async def list_oauth_accounts(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List OAuth accounts linked to the current user."""
+    result = await db.execute(
+        select(OAuthAccount).where(OAuthAccount.user_id == current_user.id)
+    )
+    accounts = result.scalars().all()
+    return [
+        {
+            "id": str(a.id),
+            "provider": a.provider,
+            "provider_account_id": a.provider_account_id,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in accounts
+    ]
+
+
 @limiter.limit("10/minute")
 @router.get("/{provider}")
 async def oauth_login(
@@ -309,29 +332,6 @@ async def unlink_oauth_account(
 
     logger.info("oauth_unlinked", provider=provider, user_id=str(current_user.id))
     return {"message": f"{provider} account unlinked"}
-
-
-@limiter.limit("60/minute")
-@router.get("/accounts")
-async def list_oauth_accounts(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """List OAuth accounts linked to the current user."""
-    result = await db.execute(
-        select(OAuthAccount).where(OAuthAccount.user_id == current_user.id)
-    )
-    accounts = result.scalars().all()
-    return [
-        {
-            "id": str(a.id),
-            "provider": a.provider,
-            "provider_account_id": a.provider_account_id,
-            "created_at": a.created_at.isoformat(),
-        }
-        for a in accounts
-    ]
 
 
 async def _issue_oauth_tokens(

@@ -202,7 +202,11 @@ async def login(
     audit = AuditLogger(db)
 
     # Check lockout BEFORE incrementing failed login count
-    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    locked_until = user.locked_until if user else None
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if user and locked_until and locked_until > now:
         await audit.log_login(
             user_id=user.id,
             success=False,
@@ -292,7 +296,11 @@ async def verify_mfa(
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Account deactivated")
 
-    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    locked_until = user.locked_until
+    if locked_until and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    if locked_until and locked_until > now:
         raise HTTPException(status_code=403, detail="Account locked")
 
     if not user.mfa_secret:

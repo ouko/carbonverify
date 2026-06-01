@@ -39,7 +39,11 @@ async def validate_api_key(raw_key: str, db: AsyncSession) -> ApiKey:
             headers={"WWW-Authenticate": "ApiKey"},
         )
 
-    if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    expires_at = api_key.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < now:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key expired",
