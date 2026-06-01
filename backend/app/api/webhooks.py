@@ -1,7 +1,8 @@
 import uuid
+import json
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -13,6 +14,11 @@ from app.services.validation_engine import run_full_validation
 from app.services.provenance import build_full_provenance
 from app.config import get_settings
 from app.core.logging import get_logger
+from app.security.webhook_security import (
+    check_replay_protection,
+    verify_hmac_signature,
+    build_request_identifier,
+)
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -36,12 +42,42 @@ def _require_iot_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> str
     return x_api_key
 
 
+async def _require_iot_signature(request: Request) -> None:
+    """Validate HMAC-SHA256 signature if a webhook secret is configured."""
+    if not settings.IOT_WEBHOOK_SECRET:
+        return
+    body = await request.body()
+    signature = request.headers.get("X-Signature", "")
+    if not signature:
+        logger.warning("iot_webhook_missing_signature")
+        raise HTTPException(status_code=401, detail="Missing signature")
+    if not verify_hmac_signature(body, settings.IOT_WEBHOOK_SECRET, signature):
+        logger.warning("iot_webhook_invalid_signature")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+
+async def _require_iot_replay_protection(request: Request) -> None:
+    """Reject replayed requests using X-Request-ID."""
+    request_id = request.headers.get("X-Request-ID", "")
+    if not request_id:
+        logger.warning("iot_webhook_missing_request_id")
+        raise HTTPException(status_code=401, detail="Missing request ID")
+    identifier = build_request_identifier(request_id)
+    is_fresh = await check_replay_protection(identifier, ttl_seconds=300)
+    if not is_fresh:
+        logger.warning("iot_webhook_replay_detected", request_id=request_id[:16])
+        raise HTTPException(status_code=403, detail="Replay detected")
+
+
 @router.post("/iot/{project_id}", response_model=IoTWebhookResponse)
 async def receive_iot_webhook(
     project_id: uuid.UUID,
     payload: Dict[str, Any],
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _api_key: str = Depends(_require_iot_api_key),
+    _signature: None = Depends(_require_iot_signature),
+    _replay: None = Depends(_require_iot_replay_protection),
 ):
     # Validate project exists
     result = await db.execute(select(Project).where(Project.id == project_id))

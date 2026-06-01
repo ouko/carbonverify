@@ -343,8 +343,21 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/v1/auth/register` | Create account |
-| `POST` | `/api/v1/auth/login` | JWT access + refresh tokens |
+| `POST` | `/api/v1/auth/login` | JWT access + refresh tokens (returns `mfa_required` if MFA enabled) |
+| `POST` | `/api/v1/auth/mfa/verify` | Verify TOTP or backup code during MFA login |
+| `POST` | `/api/v1/auth/mfa/confirm` | Confirm MFA setup (returns 10 backup codes) |
+| `POST` | `/api/v1/auth/mfa/regenerate-backup-codes` | Regenerate MFA backup codes |
+| `POST` | `/api/v1/auth/forgot-password` | Request password reset email |
+| `POST` | `/api/v1/auth/reset-password` | Reset password with token |
 | `POST` | `/api/v1/auth/refresh` | Rotate access token |
+| `GET` | `/api/v1/auth/oauth/{provider}` | Initiate OAuth login (google, microsoft, okta) |
+| `GET` | `/api/v1/auth/oauth/{provider}/callback` | OAuth callback |
+| `POST` | `/api/v1/auth/oauth/{provider}/link` | Link OAuth account |
+| `DELETE` | `/api/v1/auth/oauth/{provider}/unlink` | Unlink OAuth account |
+| `GET` | `/api/v1/auth/oauth/accounts` | List linked OAuth accounts |
+| `POST` | `/api/v1/api-keys/` | Create API key (returns full key once) |
+| `GET` | `/api/v1/api-keys/` | List API keys |
+| `DELETE` | `/api/v1/api-keys/{id}` | Revoke API key |
 | `GET` | `/api/v1/users/me` | Current user profile |
 | `POST` | `/api/v1/projects` | Create project |
 | `GET` | `/api/v1/projects` | List projects |
@@ -365,7 +378,7 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 ## Frontend
 
 - **State Management:** Zustand for auth + theme + notifications; React Query for server state
-- **Routing:** Protected routes with role-based access (admin / operator / developer / viewer)
+- **Routing:** Protected routes with permission-based access (`AdminRoute` checks specific permissions, not just role). RBAC middleware supports both role-based and explicit permission grants
 - **Data Viz:** Recharts for dashboard metrics
 - **Styling:** Tailwind CSS with dark mode (class strategy)
 - **API Client:** Axios with automatic token refresh on 401
@@ -465,6 +478,17 @@ See `.env.example` for all required variables. Key ones:
 | `ENVIRONMENT` | `development` or `production` |
 | `LEAD_SCRAPER_MODE` | `live` or `demo` (controls scraper behavior) |
 | `WHATSAPP_VERIFY_TOKEN` | Meta webhook verification token for WhatsApp bot |
+| `WHATSAPP_APP_SECRET` | Meta app secret for webhook signature validation |
+| `IOT_WEBHOOK_SECRET` | Shared secret for IoT webhook HMAC signature verification |
+| `OAUTH_GOOGLE_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_SECRET` | Google OAuth credentials |
+| `OAUTH_MICROSOFT_CLIENT_ID` / `OAUTH_MICROSOFT_CLIENT_SECRET` | Microsoft OAuth credentials |
+| `OAUTH_OKTA_CLIENT_ID` / `OAUTH_OKTA_CLIENT_SECRET` / `OAUTH_OKTA_DOMAIN` | Okta OAuth credentials |
+| `AWS_SES_FROM_EMAIL` | From address for password reset / security emails |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | SMTP fallback for email service |
+| `SIEM_ENDPOINT` | Splunk HEC or generic SIEM HTTP endpoint |
+| `SIEM_TOKEN` | SIEM authentication token |
+| `SIEM_SOURCE` | SIEM source field (default: `carbonverify`) |
+| `SIEM_INDEX` | SIEM index field (default: `main`) |
 | `PROXY_URL` | HTTP proxy for scraper IP rotation |
 | `SCRAPER_FORCE_HEADLESS` | `true` to force headless Playwright in production |
 | `SCRAPER_USER_AGENTS` | Comma-separated custom user agents for scraper rotation |

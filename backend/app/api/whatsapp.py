@@ -23,6 +23,7 @@ from app.auth.dependencies import require_operator, require_admin, require_viewe
 from app.services.whatsapp.bot import get_whatsapp_bot
 from app.services.whatsapp.meta_api import get_whatsapp_api
 from app.services.whatsapp.state_machine import conversation_state
+from app.security.webhook_security import check_replay_protection, build_request_identifier
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -73,6 +74,13 @@ async def whatsapp_webhook_receive(request: Request):
         if not hmac.compare_digest(expected, signature):
             logger.warning("whatsapp_invalid_signature", signature=signature)
             raise HTTPException(status_code=403, detail="Invalid webhook signature")
+
+        # Replay protection: reject duplicate signatures within 5 minutes
+        replay_id = build_request_identifier(signature)
+        is_fresh = await check_replay_protection(replay_id, ttl_seconds=300)
+        if not is_fresh:
+            logger.warning("whatsapp_replay_detected", signature=signature[:16])
+            raise HTTPException(status_code=403, detail="Replay detected")
 
     try:
         payload = await request.json()

@@ -14,7 +14,7 @@ from sqlalchemy import select, update, and_
 from app.core.encryption import compute_searchable_hash
 from app.database import get_db
 from app.models import User, RefreshToken, UserInvite, UserRoleEnum, AuditActionEnum
-from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
+from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, MFAConfirmResponse, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
 from app.auth.security import (
     verify_password,
     get_password_hash,
@@ -31,6 +31,9 @@ from app.auth.mfa import (
 from app.auth.sessions import SessionManager
 from app.auth.dependencies import validate_refresh_token, get_current_user, require_admin
 from app.security.audit_logging import AuditLogger
+import secrets
+import hashlib
+import string
 from app.services.email import get_email_service
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -216,6 +219,22 @@ async def login(
             if user.failed_login_count >= MAX_FAILED_LOGINS:
                 user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
                 logger.warning("account_locked", user_id=str(user.id), failed_count=user.failed_login_count)
+                # Send account lockout email
+                try:
+                    email_service = get_email_service()
+                    await email_service.send_email(
+                        to=user.email,
+                        subject="CarbonVerify — Account Locked",
+                        body_text=f"Hi {user.name},\n\nYour account has been temporarily locked due to too many failed login attempts.\n\nYou can try again after {user.locked_until.isoformat()}.\n\nIf you did not attempt to log in, please change your password immediately.\n",
+                        body_html=f"""
+                        <p>Hi {user.name},</p>
+                        <p>Your account has been temporarily locked due to too many failed login attempts.</p>
+                        <p>You can try again after <strong>{user.locked_until.isoformat()}</strong>.</p>
+                        <p>If you did not attempt to log in, please change your password immediately.</p>
+                        """,
+                    )
+                except Exception as e:
+                    logger.error("lockout_email_failed", user_id=str(user.id), error=str(e))
             await db.commit()
         await audit.log_login(
             user_id=user.id if user else None,
@@ -279,10 +298,21 @@ async def verify_mfa(
     if not user.mfa_secret:
         raise HTTPException(status_code=400, detail="MFA not configured for this user")
 
+    # Try TOTP first, then backup codes
     if not verify_totp(user.mfa_secret, payload.totp_code):
-        audit = AuditLogger(db)
-        await audit.log_login(user_id=user.id, success=False, request=request, mfa_used=True)
-        raise HTTPException(status_code=401, detail="Invalid TOTP code")
+        # Check backup codes
+        backup_code_hash = hashlib.sha256(payload.totp_code.encode()).hexdigest()
+        backup_codes = list(user.mfa_backup_codes or [])
+        if backup_code_hash in backup_codes:
+            # Consume the backup code
+            backup_codes.remove(backup_code_hash)
+            user.mfa_backup_codes = backup_codes
+            await db.commit()
+            logger.info("mfa_backup_code_used", user_id=str(user.id))
+        else:
+            audit = AuditLogger(db)
+            await audit.log_login(user_id=user.id, success=False, request=request, mfa_used=True)
+            raise HTTPException(status_code=401, detail="Invalid TOTP code or backup code")
 
     return await _issue_tokens(user, request, response, db, mfa_used=True, mfa_verified=True)
 
@@ -318,7 +348,7 @@ class MFAConfirmRequest(BaseModel):
 
 
 @limiter.limit("10/minute")
-@router.post("/mfa/confirm", response_model=UserOut)
+@router.post("/mfa/confirm", response_model=MFAConfirmResponse)
 async def confirm_mfa(
     payload: MFAConfirmRequest,
     request: Request,
@@ -334,6 +364,16 @@ async def confirm_mfa(
 
     current_user.mfa_secret = payload.secret
     current_user.mfa_enabled = True
+
+    # Generate 10 backup codes (each 8 chars alphanumeric uppercase)
+    import string
+    alphabet = string.ascii_uppercase + string.digits
+    raw_backup_codes = [''.join(secrets.choice(alphabet) for _ in range(8)) for _ in range(10)]
+    # Store SHA-256 hashes
+    current_user.mfa_backup_codes = [
+        hashlib.sha256(code.encode()).hexdigest() for code in raw_backup_codes
+    ]
+
     await db.commit()
     await db.refresh(current_user)
 
@@ -346,7 +386,35 @@ async def confirm_mfa(
     )
 
     logger.info("mfa_enabled", user_id=str(current_user.id))
-    return current_user
+
+    # Send security notification email
+    try:
+        email_service = get_email_service()
+        await email_service.send_email(
+            to=current_user.email,
+            subject="CarbonVerify — MFA Enabled",
+            body_text=f"Hi {current_user.name},\n\nMulti-factor authentication has been enabled on your account.\n\nYour backup codes (save these securely):\n" + "\n".join(f"  {i+1}. {code}" for i, code in enumerate(raw_backup_codes)) + "\n\nEach code can only be used once. If you lose your authenticator app, use these to sign in.\n",
+            body_html=f"""
+            <p>Hi {current_user.name},</p>
+            <p>Multi-factor authentication has been enabled on your account.</p>
+            <p><strong>Your backup codes</strong> (save these securely — each can only be used once):</p>
+            <ul>
+            {''.join(f'<li><code>{code}</code></li>' for code in raw_backup_codes)}
+            </ul>
+            <p>If you lose your authenticator app, use these to sign in.</p>
+            """,
+        )
+    except Exception as e:
+        logger.error("mfa_email_failed", user_id=str(current_user.id), error=str(e))
+
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "role": current_user.role.value,
+        "mfa_enabled": current_user.mfa_enabled,
+        "backup_codes": raw_backup_codes,
+    }
 
 
 @limiter.limit("5/minute")
@@ -377,6 +445,66 @@ async def disable_mfa(
 
     logger.info("mfa_disabled", admin_id=str(current_user.id), target_user_id=str(user.id))
     return {"message": "MFA disabled"}
+
+
+@limiter.limit("5/minute")
+@router.post("/mfa/regenerate-backup-codes", response_model=MFAConfirmResponse)
+async def regenerate_backup_codes(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Regenerate MFA backup codes (requires current password)."""
+    if not current_user.mfa_enabled:
+        raise HTTPException(status_code=400, detail="MFA is not enabled")
+
+    alphabet = string.ascii_uppercase + string.digits
+    raw_backup_codes = [''.join(secrets.choice(alphabet) for _ in range(8)) for _ in range(10)]
+    current_user.mfa_backup_codes = [
+        hashlib.sha256(code.encode()).hexdigest() for code in raw_backup_codes
+    ]
+    await db.commit()
+    await db.refresh(current_user)
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.mfa_enabled,
+        actor_id=current_user.id,
+        target_type="user",
+        target_id=current_user.id,
+        metadata={"action": "regenerate_backup_codes"},
+    )
+
+    logger.info("mfa_backup_codes_regenerated", user_id=str(current_user.id))
+
+    # Send security notification email
+    try:
+        email_service = get_email_service()
+        await email_service.send_email(
+            to=current_user.email,
+            subject="CarbonVerify — MFA Backup Codes Regenerated",
+            body_text=f"Hi {current_user.name},\n\nYour MFA backup codes have been regenerated.\n\nNew backup codes (save these securely):\n" + "\n".join(f"  {i+1}. {code}" for i, code in enumerate(raw_backup_codes)) + "\n\nYour old backup codes are no longer valid.\n",
+            body_html=f"""
+            <p>Hi {current_user.name},</p>
+            <p>Your MFA backup codes have been regenerated.</p>
+            <p><strong>New backup codes</strong> (save these securely — each can only be used once):</p>
+            <ul>
+            {''.join(f'<li><code>{code}</code></li>' for code in raw_backup_codes)}
+            </ul>
+            <p>Your old backup codes are no longer valid.</p>
+            """,
+        )
+    except Exception as e:
+        logger.error("mfa_email_failed", user_id=str(current_user.id), error=str(e))
+
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "name": current_user.name,
+        "role": current_user.role.value,
+        "mfa_enabled": current_user.mfa_enabled,
+        "backup_codes": raw_backup_codes,
+    }
 
 
 @limiter.limit("20/minute")
@@ -566,10 +694,42 @@ async def change_password(
     )
 
     logger.info("password_changed", user_id=str(current_user.id))
+
+    # Send security notification email
+    try:
+        email_service = get_email_service()
+        await email_service.send_email(
+            to=current_user.email,
+            subject="CarbonVerify — Password Changed",
+            body_text=f"Hi {current_user.name},\n\nYour password has been changed.\n\nIf you did not make this change, please contact support immediately.\n",
+            body_html=f"""
+            <p>Hi {current_user.name},</p>
+            <p>Your password has been changed.</p>
+            <p>If you did not make this change, please contact support immediately.</p>
+            """,
+        )
+    except Exception as e:
+        logger.error("password_change_email_failed", user_id=str(current_user.id), error=str(e))
+
     return {"message": "Password updated successfully"}
 
 
-@limiter.limit("5/minute")
+def _get_forgot_password_email_key(request: Request) -> str:
+    """Rate limit key for forgot-password based on email in request body."""
+    try:
+        body = getattr(request, "_body", None)
+        if body:
+            data = json.loads(body)
+            email = data.get("email")
+            if email:
+                return f"forgot:{email.lower()}"
+    except Exception:
+        pass
+    return get_remote_address(request)
+
+
+@limiter.limit("3/minute")
+@limiter.limit("5/minute", key_func=_get_forgot_password_email_key)
 @router.post("/forgot-password")
 async def forgot_password(
     payload: ForgotPasswordRequest,

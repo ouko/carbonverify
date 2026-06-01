@@ -10,15 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 - **Protected `/metrics` endpoint** — Now requires admin authentication (was publicly accessible)
-- **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, invite accept, and file uploads (previously unprotected from brute-force)
+- **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, invite accept, OAuth login/callback/link/unlink, and file uploads (previously unprotected from brute-force)
 - **Removed login fallback full-table scan** — Legacy email-hash miss no longer loads entire users table; instead queries only active legacy records with `LIMIT 50` and auto-heals missing hashes
 - **Added auth requirements to sensitive read endpoints** — `/compliance/consent/{subject_id}`, `/compliance/methodology/current/{name}`, `/tokenization/tokens`, `/tokenization/tokens/{id}`, `/tokenization/marketplace`, `/tokenization/retirements` now require authentication
 - **Frontend URL protocol validation** — All `href` attributes rendering API-provided URLs now validate `startsWith('http')` to prevent `javascript:` XSS vectors (`LeadsPage`, `ReportsPage`, `ReportDetailPage`)
 - **Request size limit hardening** — Malformed `Content-Length` header no longer crashes with `ValueError`; returns 400 instead
-- **WhatsApp webhook signature validation** — `POST /whatsapp` now validates `X-Hub-Signature-256` against `WHATSAPP_APP_SECRET` when configured (previously accepted any POST body)
+- **WhatsApp webhook signature validation + replay protection** — `POST /whatsapp` now validates `X-Hub-Signature-256` against `WHATSAPP_APP_SECRET` and rejects duplicate signatures within 5 minutes via Redis deduplication
+- **IoT webhook hardening** — `POST /webhooks/iot/{project_id}` now supports optional HMAC-SHA256 signature verification (`X-Signature` + `IOT_WEBHOOK_SECRET`) and mandatory replay protection (`X-Request-ID` + Redis dedup); API key remains as base layer
 - **SQL wildcard sanitization** — `users.py` and `leads.py` search filters now escape `%` and `_` wildcards and cap input length at 100 chars to prevent wildcard injection
 - **Password policy aligned** — All password schemas (`UserCreate`, `UserCreateByAdmin`, `PasswordChangeRequest`) now consistently require minimum 12 characters (was 8 for registration, 12 for password changes)
 - **Hardcoded S3 bucket removed** — Upload endpoint now reads `S3_BUCKET_NAME` from config instead of hardcoded string
+- **JWT refresh token uniqueness** — Added `jti` (JWT ID) claim to prevent hash collisions when multiple refresh tokens are issued within the same microsecond
 
 ### Performance
 - **Redis connection pooling** — `health.py` and `admin.py` now reuse the global pooled connection via `app.auth.sessions._get_redis()` instead of creating/closing a new connection per request
@@ -78,6 +80,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `POST /auth/invite/accept` — user creates account with token + password
   - Frontend: Generate Invite modal with copy-to-clipboard link
 - **Registration Security Fix** — `POST /auth/register` no longer accepts role from client; always creates `viewer` role
+- **Password Reset Flow** — `POST /auth/forgot-password` (enumeration-safe, per-email rate limit) + `POST /auth/reset-password` (token hash verification, complexity enforcement, session revocation). Email service with AWS SES primary / SMTP fallback
+- **API Keys / M2M Auth** — `POST/GET/DELETE /api-keys/` with scope enforcement. `FlexibleHTTPBearer` supports both `Bearer <jwt>` and `ApiKey <key>` schemes. SHA-256 hashed keys with `cv_` prefix
+- **SSO / OAuth** — Google, Microsoft, Okta via Authlib. `GET /auth/oauth/{provider}` + callback, link/unlink accounts. Frontend OAuth buttons + Connected Accounts section
+- **MFA Backup Codes** — 10 one-time codes generated on MFA confirm, stored as SHA-256 hashes. Backup codes accepted as alternative to TOTP at login. `POST /auth/mfa/regenerate-backup-codes` endpoint
+- **Security Event Emails** — Email notifications sent on MFA enabled, backup codes regenerated, password changed, and account locked
+- **SIEM Streaming** — New `app/security/siem_streaming.py` streams audit logs to Splunk HEC or generic HTTP endpoints. Batched async sends with retry. Configured via `SIEM_ENDPOINT`, `SIEM_TOKEN`, `SIEM_SOURCE`, `SIEM_INDEX`
+- **Frontend Permission Guards** — `AdminRoute` now checks specific admin permissions (`users:read`, `system:configure`, `audit:read`, etc.) instead of hardcoded `role === 'admin'`. Non-admin users with granted admin permissions can now access the admin UI
 
 ### Fixed
 - **Critical backend NameError bugs** in `orchestrator.py` (`trigger`/`decision` undefined in log lines) and `validation_engine.py` (`offset` vs `skip`)

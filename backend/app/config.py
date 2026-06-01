@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -69,6 +70,13 @@ class Settings(BaseSettings):
 
     # IoT Webhook
     IOT_WEBHOOK_API_KEY: str = ""
+    IOT_WEBHOOK_SECRET: str = ""
+
+    # SIEM streaming
+    SIEM_ENDPOINT: Optional[str] = None
+    SIEM_TOKEN: Optional[str] = None
+    SIEM_SOURCE: str = "carbonverify"
+    SIEM_INDEX: str = "main"
     WHATSAPP_VERIFY_TOKEN: str = ""
     WHATSAPP_APP_SECRET: str = ""
 

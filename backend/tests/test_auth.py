@@ -204,3 +204,168 @@ class TestLogout:
         # Cookie should be cleared (Set-Cookie header present)
         set_cookie = logout_res.headers.get("set-cookie", "")
         assert "refresh_token" in set_cookie
+
+
+class TestMFABackupCodes:
+    @pytest.mark.asyncio
+    async def test_mfa_confirm_returns_backup_codes(self, client, test_user, db_session):
+        import pyotp
+        secret = pyotp.random_base32()
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+
+        # Login first
+        login = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        token = login.json()["access_token"]
+
+        response = await client.post(
+            "/auth/mfa/confirm",
+            json={
+                "secret": secret,
+                "totp_code": code,
+                "current_password": "Testpassword123!",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["mfa_enabled"] is True
+        assert "backup_codes" in data
+        assert len(data["backup_codes"]) == 10
+        for bc in data["backup_codes"]:
+            assert len(bc) == 8
+
+    @pytest.mark.asyncio
+    async def test_login_with_backup_code(self, client, test_user, db_session):
+        import pyotp
+        import hashlib
+        secret = pyotp.random_base32()
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+
+        # Login and setup MFA
+        login = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        token = login.json()["access_token"]
+
+        confirm = await client.post(
+            "/auth/mfa/confirm",
+            json={
+                "secret": secret,
+                "totp_code": code,
+                "current_password": "Testpassword123!",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        backup_codes = confirm.json()["backup_codes"]
+        backup_code = backup_codes[0]
+
+        # Now login should require MFA
+        login2 = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        assert login2.status_code == 200
+        assert login2.json()["mfa_required"] is True
+        temp_token = login2.json()["temp_token"]
+
+        # Use backup code instead of TOTP
+        verify = await client.post("/auth/mfa/verify", json={
+            "temp_token": temp_token,
+            "totp_code": backup_code,
+        })
+        assert verify.status_code == 200
+        assert "access_token" in verify.json()
+
+    @pytest.mark.asyncio
+    async def test_backup_code_consumed(self, client, test_user, db_session):
+        import pyotp
+        import hashlib
+        secret = pyotp.random_base32()
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+
+        login = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        token = login.json()["access_token"]
+
+        confirm = await client.post(
+            "/auth/mfa/confirm",
+            json={
+                "secret": secret,
+                "totp_code": code,
+                "current_password": "Testpassword123!",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        backup_codes = confirm.json()["backup_codes"]
+        backup_code = backup_codes[0]
+
+        # Login and use backup code
+        login2 = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        assert login2.json()["mfa_required"] is True
+        temp_token = login2.json()["temp_token"]
+
+        verify1 = await client.post("/auth/mfa/verify", json={
+            "temp_token": temp_token,
+            "totp_code": backup_code,
+        })
+        assert verify1.status_code == 200
+
+        # Try using same backup code again (should fail)
+        login3 = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        assert login3.json()["mfa_required"] is True
+        temp_token2 = login3.json()["temp_token"]
+
+        verify2 = await client.post("/auth/mfa/verify", json={
+            "temp_token": temp_token2,
+            "totp_code": backup_code,
+        })
+        assert verify2.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_regenerate_backup_codes(self, client, test_user, db_session):
+        import pyotp
+        secret = pyotp.random_base32()
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+
+        login = await client.post("/auth/login", json={
+            "email": "test@carbonverify.io",
+            "password": "Testpassword123!",
+        })
+        token = login.json()["access_token"]
+
+        confirm = await client.post(
+            "/auth/mfa/confirm",
+            json={
+                "secret": secret,
+                "totp_code": code,
+                "current_password": "Testpassword123!",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        old_codes = confirm.json()["backup_codes"]
+
+        # Regenerate
+        regen = await client.post(
+            "/auth/mfa/regenerate-backup-codes",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert regen.status_code == 200
+        new_codes = regen.json()["backup_codes"]
+        assert len(new_codes) == 10
+        assert new_codes != old_codes

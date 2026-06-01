@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from app.models import AuditLog, AuditActionEnum
 from app.blockchain.radix_client import AuditTrailAnchor
+from app.security.siem_streaming import get_siem_streamer
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -99,6 +100,26 @@ class AuditLogger:
 
         await self.db.commit()
         logger.info("audit_log_created", action=action_type.value, actor_id=str(actor_id), target_id=str(target_id))
+
+        # Stream to SIEM if configured
+        try:
+            siem = get_siem_streamer()
+            await siem.send({
+                "id": str(log_entry.id),
+                "action": action_type.value,
+                "actor_id": str(actor_id) if actor_id else None,
+                "actor_type": actor_type,
+                "target_type": target_type,
+                "target_id": str(target_id) if target_id else None,
+                "timestamp": log_entry.timestamp.isoformat() if log_entry.timestamp else None,
+                "metadata": metadata,
+                "ip_address": ip_address,
+                "user_agent": user_agent,
+                "radix_tx_ref": log_entry.radix_tx_ref,
+            })
+        except Exception as exc:
+            logger.error("siem_stream_failed", log_id=str(log_entry.id), error=str(exc))
+
         return log_entry
 
     async def log_login(

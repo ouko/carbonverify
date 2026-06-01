@@ -402,6 +402,15 @@ class MFAVerifyRequest(BaseModel):
     totp_code: str
 
 
+class MFAConfirmResponse(BaseModel):
+    id: str
+    email: Optional[str] = None
+    name: Optional[str] = None
+    role: Optional[str] = None
+    mfa_enabled: bool = False
+    backup_codes: List[str] = []
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 

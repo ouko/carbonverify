@@ -6,9 +6,11 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.models import ApiKey, User, AuditActionEnum
@@ -21,6 +23,7 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api-keys", tags=["api_keys"])
+limiter = Limiter(key_func=get_remote_address)
 
 API_KEY_PREFIX = "cv_"
 
@@ -28,6 +31,7 @@ API_KEY_PREFIX = "cv_"
 @router.post("/", response_model=ApiKeyCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_api_key(
     payload: ApiKeyCreateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("system:configure")),
 ):
@@ -88,6 +92,7 @@ async def create_api_key(
 
 @router.get("/", response_model=List[ApiKeyOut])
 async def list_api_keys(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("system:configure")),
     skip: int = Query(0, ge=0),
@@ -106,6 +111,7 @@ async def list_api_keys(
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_api_key(
     key_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("system:configure")),
 ):

@@ -220,6 +220,7 @@ class User(Base):
     role: Mapped[UserRoleEnum] = mapped_column(Enum(UserRoleEnum, name="user_role"), nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     mfa_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mfa_backup_codes: Mapped[list] = mapped_column(JSONB, default=list)  # hashed backup codes
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

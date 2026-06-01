@@ -58,7 +58,7 @@ carbonverify/
 │   │   ├── validation_engine/      # Workflow Validation Engine (orchestrator, proofs, synthetic actors, remediation)
 │   │   └── vvb_liaison/            # Registry clients
 │   ├── alembic/                    # DB migrations
-│   └── tests/                      # pytest suite (225 tests)
+│   └── tests/                      # pytest suite (~318 tests)
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx                 # Router config
@@ -96,9 +96,9 @@ carbonverify/
 - **SQLAlchemy 2.0 style**: `Mapped[type] = mapped_column(...)` with type hints
 - **Pydantic v2**: Use `model_validate`, `model_dump`, not deprecated v1 methods
 - **Router pattern**: Each domain has its own `api/{domain}.py` router, included in `main.py`
-- **RBAC**: Use `Depends(require_viewer)` / `require_operator` / `require_admin` from `auth/rbac.py`
+- **RBAC**: Use `Depends(require_viewer)` / `require_operator` / `require_admin` from `auth/rbac.py`, or `require_permission("users:read")` for granular checks. API key auth uses `get_current_user_or_api_key` which checks `user._api_key_scopes`
 - **Celery tasks**: Place in `tasks/{domain}_jobs.py`, include in `celery_app.py` `include` list
-- **Tests**: Use `pytest-asyncio`, `AsyncClient` from `httpx`, fixtures in `conftest.py`
+- **Tests**: Use `pytest-asyncio`, `AsyncClient` from `httpx`, fixtures in `conftest.py`. Current count: ~318 tests
 
 ### Frontend (TypeScript / React)
 
@@ -221,7 +221,18 @@ Key variables in `.env`:
 | `SCRAPER_USER_AGENTS` | Comma-separated custom user agents for scraper rotation |
 | `ENCRYPTION_KEY_HEX` | 32-byte hex key for PII field-level encryption |
 | `IOT_WEBHOOK_API_KEY` | API key for IoT device webhook authentication |
+| `IOT_WEBHOOK_SECRET` | Shared secret for HMAC signature verification on IoT webhooks |
 | `WHATSAPP_VERIFY_TOKEN` | Meta webhook verification token for WhatsApp bot |
+| `WHATSAPP_APP_SECRET` | Meta app secret for webhook signature validation |
+| `OAUTH_GOOGLE_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_SECRET` | Google OAuth credentials |
+| `OAUTH_MICROSOFT_CLIENT_ID` / `OAUTH_MICROSOFT_CLIENT_SECRET` | Microsoft OAuth credentials |
+| `OAUTH_OKTA_CLIENT_ID` / `OAUTH_OKTA_CLIENT_SECRET` / `OAUTH_OKTA_DOMAIN` | Okta OAuth credentials |
+| `AWS_SES_FROM_EMAIL` | From address for transactional emails |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | SMTP fallback for email delivery |
+| `SIEM_ENDPOINT` | Splunk HEC or generic SIEM HTTP endpoint for audit log streaming |
+| `SIEM_TOKEN` | SIEM authentication token |
+| `SIEM_SOURCE` | SIEM source field (default: `carbonverify`) |
+| `SIEM_INDEX` | SIEM index field (default: `main`) |
 | `CLAMAV_HOST` | ClamAV daemon hostname (e.g., `clamav`) |
 | `CLAMAV_PORT` | ClamAV daemon TCP port (default `3310`) |
 | `CLAMAV_SOCKET_PATH` | Unix socket path for ClamAV (alternative to TCP) |

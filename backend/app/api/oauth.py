@@ -7,6 +7,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.models import User, OAuthAccount, AuditActionEnum, UserRoleEnum
@@ -20,6 +22,7 @@ from app.core.logging import get_logger
 from app.api.auth import _set_refresh_cookie, _get_device_fingerprint, _get_client_ip
 
 logger = get_logger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth/oauth", tags=["oauth"])
 settings = get_settings()
 
@@ -65,6 +68,7 @@ def _get_oauth_client(provider: str):
     )
 
 
+@limiter.limit("10/minute")
 @router.get("/{provider}")
 async def oauth_login(
     provider: str,
@@ -95,6 +99,7 @@ async def oauth_login(
     return response
 
 
+@limiter.limit("20/minute")
 @router.get("/{provider}/callback")
 async def oauth_callback(
     provider: str,
@@ -236,6 +241,7 @@ async def oauth_callback(
     return await _issue_oauth_tokens(user, request, response, db)
 
 
+@limiter.limit("10/minute")
 @router.post("/{provider}/link")
 async def link_oauth_account(
     provider: str,
@@ -266,9 +272,11 @@ async def link_oauth_account(
     return {"authorization_url": authorization_url}
 
 
+@limiter.limit("10/minute")
 @router.delete("/{provider}/unlink")
 async def unlink_oauth_account(
     provider: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -303,8 +311,10 @@ async def unlink_oauth_account(
     return {"message": f"{provider} account unlinked"}
 
 
+@limiter.limit("60/minute")
 @router.get("/accounts")
 async def list_oauth_accounts(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
