@@ -19,6 +19,7 @@ from app.models import (
     AuditActionEnum,
 )
 from app.auth.dependencies import require_operator, require_viewer
+from app.security.project_auth import require_project_access
 from app.orchestrator.orchestrator import KimiClawOrchestrator
 from app.orchestrator.events import EventLogger
 from app.services.kimi_api import get_kimi_client
@@ -40,11 +41,12 @@ class ProjectTriggerRequest(BaseModel):
 async def trigger_project_state(
     project_id: uuid.UUID,
     payload: ProjectTriggerRequest,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
     """Trigger a state transition for a project."""
-    result = await db.execute(select(Project).where(Project.id == payload.project_id))
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -73,6 +75,7 @@ async def trigger_project_state(
 @router.get("/projects/{project_id}/state")
 async def get_project_orchestrator_state(
     project_id: uuid.UUID,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -85,6 +88,7 @@ async def get_project_orchestrator_state(
 async def get_project_event_history(
     project_id: uuid.UUID,
     limit: int = Query(100, ge=1, le=500),
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -113,6 +117,7 @@ async def list_agent_runs(
     status: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -242,7 +247,9 @@ async def assign_review_item(
     current_user: User = Depends(require_operator),
 ):
     """Self-assign a review queue item."""
-    result = await db.execute(select(HumanReviewQueue).where(HumanReviewQueue.id == item_id))
+    result = await db.execute(
+        select(HumanReviewQueue).where(HumanReviewQueue.id == item_id).with_for_update()
+    )
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Queue item not found")
@@ -279,10 +286,11 @@ class DraftVVBResponseRequest(BaseModel):
 async def draft_vvb_response(
     payload: DraftVVBResponseRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """Use Kimi AI to draft a VVB clarification response."""
-    result = await db.execute(select(Project).where(Project.id == project_id))
+    await require_project_access(payload.project_id, current_user, db)
+    result = await db.execute(select(Project).where(Project.id == payload.project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -305,6 +313,7 @@ async def draft_vvb_response(
 async def generate_executive_summary(
     project_id: uuid.UUID,
     calculation_run_id: uuid.UUID,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
@@ -391,6 +400,7 @@ async def run_agent_directly(
     project_id: uuid.UUID,
     agent_type: str,
     context: Optional[Dict[str, Any]] = None,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):

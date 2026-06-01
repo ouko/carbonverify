@@ -5,12 +5,35 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import Project, User, AuditActionEnum
+from app.models import Project, User, AuditActionEnum, ProjectStatusEnum
 from app.security.audit_logging import AuditLogger
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut
 from app.auth.dependencies import require_operator, require_viewer
+from app.security.project_auth import require_project_access
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+VALID_PROJECT_TRANSITIONS = {
+    ProjectStatusEnum.onboarding: {ProjectStatusEnum.data_collection},
+    ProjectStatusEnum.data_collection: {ProjectStatusEnum.calculation},
+    ProjectStatusEnum.calculation: {ProjectStatusEnum.review},
+    ProjectStatusEnum.review: {ProjectStatusEnum.submitted},
+    ProjectStatusEnum.submitted: {ProjectStatusEnum.verified},
+    ProjectStatusEnum.verified: {ProjectStatusEnum.monitoring},
+}
+
+
+def validate_status_transition(from_status, to_status, valid_map):
+    """Validate a status transition against a defined state machine."""
+    if from_status == to_status:
+        return
+    allowed = valid_map.get(from_status, set())
+    if to_status not in allowed and to_status.value != "rejected":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status transition from {from_status.value} to {to_status.value}",
+        )
 
 
 @router.get("/", response_model=List[ProjectOut])
@@ -47,13 +70,10 @@ async def create_project(
 @router.get("/{project_id}", response_model=ProjectOut)
 async def get_project(
     project_id: uuid.UUID,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
     return project
 
 
@@ -61,15 +81,16 @@ async def get_project(
 async def update_project(
     project_id: uuid.UUID,
     payload: ProjectUpdate,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    update_data = payload.model_dump(exclude_unset=True)
+    if "status" in update_data:
+        new_status = ProjectStatusEnum(update_data["status"])
+        validate_status_transition(project.status, new_status, VALID_PROJECT_TRANSITIONS)
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in update_data.items():
         setattr(project, field, value)
 
     await db.commit()
@@ -87,13 +108,10 @@ async def update_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: uuid.UUID,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
-    result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
     await db.delete(project)
     await db.commit()
     audit = AuditLogger(db)

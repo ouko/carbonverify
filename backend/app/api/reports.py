@@ -5,10 +5,12 @@ from typing import List
 import uuid
 
 from app.database import get_db
-from app.models import Report, Project, CalculationRun, User, AuditActionEnum
+from app.models import Report, Project, CalculationRun, User, AuditActionEnum, CalculationStatusEnum, ReportStatusEnum
 from app.schemas import ReportCreate, ReportUpdate, ReportOut
 from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer
+from app.security.project_auth import require_project_access
+from app.api.projects import validate_status_transition
 from app.reports.quality_gates import run_quality_gates
 from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
 from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient
@@ -20,14 +22,38 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 
+VALID_REPORT_TRANSITIONS = {
+    ReportStatusEnum.draft: {
+        ReportStatusEnum.submitted,
+        ReportStatusEnum.approved,
+        ReportStatusEnum.human_review,
+        ReportStatusEnum.rejected,
+    },
+    ReportStatusEnum.human_review: {
+        ReportStatusEnum.approved,
+        ReportStatusEnum.rejected,
+    },
+    ReportStatusEnum.approved: {
+        ReportStatusEnum.submitted,
+        ReportStatusEnum.rejected,
+    },
+    ReportStatusEnum.submitted: {
+        ReportStatusEnum.vvb_approved,
+        ReportStatusEnum.rejected,
+    },
+}
+
+
 @router.get("/", response_model=List[ReportOut])
 async def list_reports(
     project_id: uuid.UUID = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    current_user: User = Depends(require_viewer),
 ):
+    if project_id:
+        await require_project_access(project_id, current_user, db)
     stmt = select(Report)
     if project_id:
         stmt = stmt.where(Report.project_id == project_id)
@@ -42,6 +68,16 @@ async def create_report(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
+    await require_project_access(payload.project_id, current_user, db)
+    calc_result = await db.execute(
+        select(CalculationRun).where(CalculationRun.id == payload.calculation_run_id)
+    )
+    calc_run = calc_result.scalar_one_or_none()
+    if not calc_run:
+        raise HTTPException(status_code=404, detail="Calculation run not found")
+    if calc_run.status != CalculationStatusEnum.approved:
+        raise HTTPException(status_code=400, detail="Calculation run must be approved before creating a report")
+
     report = Report(**payload.model_dump())
     db.add(report)
     await db.commit()
@@ -60,12 +96,13 @@ async def create_report(
 async def get_report(
     report_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    current_user: User = Depends(require_viewer),
 ):
     result = await db.execute(select(Report).where(Report.id == report_id))
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    await require_project_access(report.project_id, current_user, db)
     return report
 
 
@@ -80,7 +117,12 @@ async def update_report(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    await require_project_access(report.project_id, current_user, db)
+    update_data = payload.model_dump(exclude_unset=True)
+    if "status" in update_data:
+        new_status = ReportStatusEnum(update_data["status"])
+        validate_status_transition(report.status, new_status, VALID_REPORT_TRANSITIONS)
+    for field, value in update_data.items():
         setattr(report, field, value)
     await db.commit()
     await db.refresh(report)
@@ -104,6 +146,7 @@ async def delete_report(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    await require_project_access(report.project_id, current_user, db)
     await db.delete(report)
     await db.commit()
     audit = AuditLogger(db)
@@ -129,6 +172,8 @@ async def generate_report_endpoint(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+
+    await require_project_access(report.project_id, current_user, db)
 
     # Get associated project and calculation
     proj_result = await db.execute(select(Project).where(Project.id == report.project_id))
@@ -171,6 +216,8 @@ async def run_report_quality_check(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+
+    await require_project_access(report.project_id, current_user, db)
 
     calc_result = await db.execute(select(CalculationRun).where(CalculationRun.id == report.calculation_run_id))
     calc_run = calc_result.scalar_one_or_none()
@@ -221,8 +268,17 @@ async def submit_report_to_registry(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
+    await require_project_access(report.project_id, current_user, db)
+
     calc_result = await db.execute(select(CalculationRun).where(CalculationRun.id == report.calculation_run_id))
     calc_run = calc_result.scalar_one_or_none()
+
+    if not calc_run:
+        raise HTTPException(status_code=400, detail="Calculation run not found")
+    if report.status != ReportStatusEnum.approved:
+        raise HTTPException(status_code=400, detail="Report must be approved before submission")
+    if calc_run.status != CalculationStatusEnum.approved:
+        raise HTTPException(status_code=400, detail="Calculation run must be approved before submission")
 
     report_data = {
         "monitoring_period_start": str(calc_run.monitoring_period_start) if calc_run else None,
@@ -282,6 +338,8 @@ async def draft_clarification(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+
+    await require_project_access(report.project_id, current_user, db)
 
     proj_result = await db.execute(select(Project).where(Project.id == report.project_id))
     project = proj_result.scalar_one_or_none()

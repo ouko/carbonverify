@@ -9,6 +9,7 @@ from app.models import DataSource, User, AuditActionEnum
 from app.security.audit_logging import AuditLogger
 from app.schemas import DataSourceCreate, DataSourceUpdate, DataSourceOut
 from app.auth.dependencies import require_operator, require_viewer
+from app.security.project_auth import require_project_access
 
 router = APIRouter(prefix="/data-sources", tags=["data-sources"])
 
@@ -19,8 +20,10 @@ async def list_data_sources(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    current_user: User = Depends(require_viewer),
 ):
+    if project_id:
+        await require_project_access(project_id, current_user, db)
     stmt = select(DataSource)
     if project_id:
         stmt = stmt.where(DataSource.project_id == project_id)
@@ -35,6 +38,7 @@ async def create_data_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
+    await require_project_access(payload.project_id, current_user, db)
     ds = DataSource(**payload.model_dump())
     db.add(ds)
     await db.commit()
@@ -53,12 +57,13 @@ async def create_data_source(
 async def get_data_source(
     ds_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    current_user: User = Depends(require_viewer),
 ):
     result = await db.execute(select(DataSource).where(DataSource.id == ds_id))
     ds = result.scalar_one_or_none()
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
+    await require_project_access(ds.project_id, current_user, db)
     return ds
 
 
@@ -73,6 +78,7 @@ async def update_data_source(
     ds = result.scalar_one_or_none()
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
+    await require_project_access(ds.project_id, current_user, db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(ds, field, value)
     await db.commit()
@@ -97,6 +103,7 @@ async def delete_data_source(
     ds = result.scalar_one_or_none()
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
+    await require_project_access(ds.project_id, current_user, db)
     await db.delete(ds)
     await db.commit()
     audit = AuditLogger(db)
