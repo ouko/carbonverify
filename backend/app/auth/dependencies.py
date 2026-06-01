@@ -12,7 +12,36 @@ from app.auth.sessions import SessionManager
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-security = HTTPBearer()
+
+
+class FlexibleHTTPBearer(HTTPBearer):
+    """HTTPBearer that accepts any authorization scheme (Bearer, ApiKey, etc.)."""
+
+    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials:
+        authorization = request.headers.get("Authorization")
+        if not authorization:
+            if self.auto_error:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return None
+
+        scheme, _, credentials = authorization.partition(" ")
+        if not credentials:
+            if self.auto_error:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication credentials",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return None
+
+        return HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials)
+
+
+security = FlexibleHTTPBearer()
 
 
 async def get_current_user(
@@ -92,11 +121,37 @@ async def get_current_user_with_session(
     return user
 
 
+async def get_current_user_or_api_key(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Authenticate via JWT token or API key.
+
+    API keys must be passed as: Authorization: ApiKey <key>
+    JWT tokens are passed as: Authorization: Bearer <token>
+    """
+    token = credentials.credentials
+    scheme = credentials.scheme.lower() if credentials.scheme else "bearer"
+
+    if scheme == "apikey":
+        from app.auth.api_key_auth import validate_api_key, get_user_from_api_key
+        api_key_record = await validate_api_key(token, db)
+        user = await get_user_from_api_key(api_key_record, db)
+        # Attach API key scopes to user for permission checking
+        user._api_key_scopes = api_key_record.scopes or []
+        return user
+
+    # Fall back to JWT
+    return await get_current_user(credentials, db, request)
+
+
 class RoleChecker:
     def __init__(self, allowed_roles: list[str]):
         self.allowed_roles = allowed_roles
 
-    async def __call__(self, user: User = Depends(get_current_user)) -> User:
+    async def __call__(self, user: User = Depends(get_current_user_or_api_key)) -> User:
         if user.role.value not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -109,7 +164,7 @@ class PermissionChecker:
     def __init__(self, required_permission: str):
         self.required_permission = required_permission
 
-    async def __call__(self, user: User = Depends(get_current_user)) -> User:
+    async def __call__(self, user: User = Depends(get_current_user_or_api_key)) -> User:
         from app.permissions import has_permission
 
         if not user.is_active:
@@ -231,29 +286,3 @@ async def require_mfa_if_enabled(
             detail="MFA verification required",
         )
     return user
-
-
-async def get_current_user_or_api_key(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    request: Request = None,
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """
-    Authenticate via JWT token or API key.
-
-    API keys must be passed as: Authorization: ApiKey <key>
-    JWT tokens are passed as: Authorization: Bearer <token>
-    """
-    token = credentials.credentials
-    scheme = credentials.scheme.lower() if credentials.scheme else "bearer"
-
-    if scheme == "apikey":
-        from app.auth.api_key_auth import validate_api_key, get_user_from_api_key
-        api_key_record = await validate_api_key(token, db)
-        user = await get_user_from_api_key(api_key_record, db)
-        # Attach API key scopes to user for permission checking
-        user._api_key_scopes = api_key_record.scopes or []
-        return user
-
-    # Fall back to JWT
-    return await get_current_user(credentials, db, request)

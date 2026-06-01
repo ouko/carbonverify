@@ -58,7 +58,7 @@ for models_mod in [models_module, validation_models_module]:
 
 from app.main import app  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
-from app.auth.dependencies import get_current_user  # noqa: E402
+from app.auth.dependencies import get_current_user, get_current_user_or_api_key  # noqa: E402
 from app.models import User, UserRoleEnum  # noqa: E402
 
 # Register UUID adapter for sqlite3
@@ -143,6 +143,7 @@ async def authenticated_client(engine):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[get_current_user_or_api_key] = override_get_current_user
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac, mock_user

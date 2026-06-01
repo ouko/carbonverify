@@ -79,7 +79,9 @@ async def create_api_key(
         key=raw_key,
         key_prefix=key_prefix,
         scopes=api_key.scopes,
+        created_by=api_key.created_by,
         expires_at=api_key.expires_at,
+        is_active=api_key.is_active,
         created_at=api_key.created_at,
     )
 
