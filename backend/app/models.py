@@ -17,6 +17,7 @@ from sqlalchemy import (
     CheckConstraint,
     UniqueConstraint,
     Index,
+    text,
 )
 from app.core.encrypted_types import EncryptedString
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -240,6 +241,7 @@ class UserInvite(Base):
         Index("ix_user_invites_token", "token"),
         Index("ix_user_invites_email_hash", "email_hash"),
         Index("ix_user_invites_expires_at", "expires_at"),
+        Index("ix_user_invites_active_email", "email_hash", unique=True, postgresql_where=text("used_at IS NULL")),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -280,7 +282,7 @@ class Project(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    developer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("developers.id"), nullable=False)
+    developer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("developers.id", ondelete="CASCADE"), nullable=False)
     methodology: Mapped[MethodologyEnum] = mapped_column(
         Enum(MethodologyEnum, name="methodology"), nullable=False
     )
@@ -293,6 +295,7 @@ class Project(Base):
     confidence_threshold: Mapped[float] = mapped_column(Float, default=0.85)
     brokerage_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tokenization_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    version_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     developer: Mapped["Developer"] = relationship("Developer", back_populates="projects")
@@ -314,7 +317,7 @@ class FileUpload(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     detected_type: Mapped[DetectedFileTypeEnum] = mapped_column(
         Enum(DetectedFileTypeEnum, name="detected_file_type"), nullable=False
@@ -346,7 +349,7 @@ class DataSource(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     source_type: Mapped[SourceTypeEnum] = mapped_column(
         Enum(SourceTypeEnum, name="source_type"), nullable=False
     )
@@ -373,7 +376,7 @@ class CalculationRun(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     monitoring_period_start: Mapped[date] = mapped_column(Date, nullable=False)
     monitoring_period_end: Mapped[date] = mapped_column(Date, nullable=False)
     fNRB_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -385,7 +388,8 @@ class CalculationRun(Base):
     status: Mapped[CalculationStatusEnum] = mapped_column(
         Enum(CalculationStatusEnum, name="calculation_status"), default=CalculationStatusEnum.draft, nullable=False
     )
-    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    approved_by: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="calculation_runs")
@@ -402,8 +406,8 @@ class Report(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
-    calculation_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calculation_runs.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    calculation_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calculation_runs.id", ondelete="CASCADE"), nullable=False)
     template_type: Mapped[ReportTemplateTypeEnum] = mapped_column(
         Enum(ReportTemplateTypeEnum, name="report_template_type"), nullable=False
     )
@@ -413,6 +417,7 @@ class Report(Base):
         Enum(ReportStatusEnum, name="report_status"), default=ReportStatusEnum.draft, nullable=False
     )
     vvb_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="reports")
@@ -425,6 +430,7 @@ class HumanReviewQueue(Base):
     __table_args__ = (
         Index("ix_human_review_queue_assigned_to", "assigned_to"),
         Index("ix_human_review_queue_status", "status"),
+        Index("ix_human_review_queue_item", "item_type", "item_id"),
         CheckConstraint("priority BETWEEN 1 AND 5", name="check_priority_range"),
     )
 
@@ -433,6 +439,7 @@ class HumanReviewQueue(Base):
         Enum(QueueItemTypeEnum, name="queue_item_type"), nullable=False
     )
     item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    version_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False)
     priority_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -461,7 +468,7 @@ class AgentRun(Base):
     __tablename__ = "agent_runs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     agent_type: Mapped[AgentTypeEnum] = mapped_column(
         Enum(AgentTypeEnum, name="agent_type"), nullable=False
     )
@@ -484,7 +491,7 @@ class OrchestratorEvent(Base):
     __tablename__ = "orchestrator_events"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     event_type: Mapped[OrchestratorEventTypeEnum] = mapped_column(
         Enum(OrchestratorEventTypeEnum, name="orchestrator_event_type"), nullable=False
     )
@@ -528,7 +535,7 @@ class Enumerator(Base):
     __tablename__ = "enumerators"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone_number: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
     language_preference: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
@@ -546,7 +553,7 @@ class WhatsAppConversation(Base):
     __tablename__ = "whatsapp_conversations"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     phone_number: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
     flow_type: Mapped[ConversationFlowEnum] = mapped_column(
         Enum(ConversationFlowEnum, name="conversation_flow"), default=ConversationFlowEnum.idle, nullable=False
@@ -568,7 +575,7 @@ class SurveyResponse(Base):
     __tablename__ = "survey_responses"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
     enumerator_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("enumerators.id"), nullable=True)
     household_id: Mapped[Optional[str]] = mapped_column(EncryptedString(100), nullable=True)
@@ -591,7 +598,7 @@ class SupportTicket(Base):
     __tablename__ = "support_tickets"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     conversation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("whatsapp_conversations.id"), nullable=False)
     phone_number: Mapped[str] = mapped_column(EncryptedString(255), nullable=False)
     issue_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -783,7 +790,7 @@ class ConflictOfInterest(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     relationship_type: Mapped[str] = mapped_column(String(100), nullable=False)  # financial | familial | employment | other
     description: Mapped[str] = mapped_column(Text, nullable=False)
     disclosed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -854,7 +861,7 @@ class BrokerageListing(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     seller_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     available_credits: Mapped[float] = mapped_column(Float, nullable=False)
     price_per_credit_usd: Mapped[float] = mapped_column(Float, nullable=False)
@@ -1012,7 +1019,7 @@ class CarbonCreditToken(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     calculation_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("calculation_runs.id"), nullable=False)
     tonnes_co2e: Mapped[float] = mapped_column(Float, nullable=False)
     vintage_year: Mapped[int] = mapped_column(Integer, nullable=False)

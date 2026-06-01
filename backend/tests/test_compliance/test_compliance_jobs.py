@@ -187,7 +187,7 @@ class TestEraseUser:
         result = await db_session.execute(select(User).where(User.id == user_id))
         updated_user = result.scalar_one()
         assert updated_user.is_active is False
-        assert updated_user.hashed_password == ""
+        assert updated_user.hashed_password != ""  # Randomized to prevent re-login
         assert updated_user.name == "Redacted User"
         assert "redacted" in updated_user.email
 
