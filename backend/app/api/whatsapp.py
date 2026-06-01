@@ -1,6 +1,5 @@
 """WhatsApp Business API webhook and bot endpoints."""
 
-import os
 import hmac
 import hashlib
 

@@ -26,7 +26,6 @@ from app.auth.mfa import (
     generate_mfa_secret,
     verify_totp,
     generate_qr_code_png,
-    is_mfa_required,
 )
 from app.auth.sessions import SessionManager
 from app.auth.dependencies import validate_refresh_token, get_current_user, require_admin

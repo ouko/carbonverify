@@ -28,7 +28,6 @@ from app.models import (
     AuditLog,
 )
 from app.core.logging import get_logger
-from app.core.encryption import get_field_encryption
 from app.auth.sessions import SessionManager
 
 logger = get_logger(__name__)

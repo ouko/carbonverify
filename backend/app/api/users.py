@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update
+from sqlalchemy import select, update
 from typing import List, Optional
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models import User, RefreshToken, AuditActionEnum
 from app.schemas import (
     UserOut, UserDetailOut, UserCreateByAdmin, UserUpdateByAdmin,
-    PermissionGrantRequest, PermissionRevokeRequest, SessionOut,
+    PermissionGrantRequest, SessionOut,
 )
-from app.auth.dependencies import get_current_user, require_admin, require_permission
+from app.auth.dependencies import get_current_user, require_permission
 from app.auth.security import get_password_hash
 from app.auth.sessions import SessionManager
 from app.permissions import list_all_permissions, has_permission

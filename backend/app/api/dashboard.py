@@ -59,8 +59,6 @@ async def get_emissions_trend(
 ):
     """Return monthly emissions reduction trend for the dashboard chart."""
     from sqlalchemy import extract
-    from datetime import datetime
-
     results = await db.execute(
         select(
             extract("month", CalculationRun.monitoring_period_end).label("month"),

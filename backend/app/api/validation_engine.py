@@ -16,7 +16,6 @@ from app.database import get_db
 from app.models import User, AuditActionEnum
 from app.security.audit_logging import AuditLogger
 from app.validation_engine.models import (
-    EscalationLevel,
     EscalationStatus,
     HumanEscalation,
     SyntheticActor,
@@ -35,7 +34,6 @@ from app.validation_engine.schemas import (
     HumanDecisionRequest,
     ProofCertificateResponse,
     ProofResponse,
-    RemediationResponse,
     RunResponse,
     RunTriggerRequest,
     StepExecutionResponse,

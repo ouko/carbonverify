@@ -15,7 +15,6 @@ from sqlalchemy import (
     Enum,
     Integer,
     Index,
-    CheckConstraint,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB

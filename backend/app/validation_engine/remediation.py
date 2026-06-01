@@ -8,8 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.validation_engine.models import (
     RemediationAction,
-    RemediationStatus,
-    ValidationRemediation,
     ValidationRun,
     ValidationStepExecution,
 )

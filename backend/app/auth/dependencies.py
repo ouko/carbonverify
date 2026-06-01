@@ -9,7 +9,6 @@ from app.database import get_db
 from app.models import User, RefreshToken
 from app.auth.security import decode_token, hash_token, is_token_expired
 from app.auth.sessions import SessionManager
-from app.auth.mfa import is_mfa_required
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

@@ -1,7 +1,6 @@
 """Validation workflow state machine with transition rules and guards."""
 
 from dataclasses import dataclass
-from enum import Enum
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from app.validation_engine.models import WorkflowRunStatus

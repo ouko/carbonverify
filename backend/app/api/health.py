@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from datetime import datetime, timezone
-import redis.asyncio as redis
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 

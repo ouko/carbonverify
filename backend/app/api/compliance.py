@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.database import get_db
-from app.schemas import SubjectTypeEnum
 from app.models import (
     User, ConsentRecord, ConsentTypeEnum, DataSubjectRequest,
     DSRTypeEnum, DSRStatusEnum, BreachNotification, BreachStatusEnum,
