@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     LEAD_SCRAPER_REQUEST_TIMEOUT: int = 30
     LEAD_SCRAPER_MAX_RETRIES: int = 3
     LEAD_SCRAPER_RETRY_DELAY: int = 5
+
+    # Kenya National Carbon Registry
+    KENYA_NATIONAL_REGISTRY_BASE_URL: str = ""  # e.g. https://api.kenyacarbonregistry.go.ke/v1
+    KENYA_NATIONAL_REGISTRY_API_KEY: str = ""
     PROXY_URL: str = ""  # HTTP proxy for scraper (e.g., http://proxy:8080)
     SCRAPER_FORCE_HEADLESS: bool = False  # Force headless mode in production
     # Comma-separated list of user agents for rotation; falls back to default if empty

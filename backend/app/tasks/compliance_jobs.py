@@ -1,5 +1,6 @@
 """Celery tasks for compliance workflows (GDPR erasure, etc.)."""
 
+import secrets
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import select, delete, update
@@ -7,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.tasks.celery_app import celery_app
 from app.database import AsyncSessionLocal
+from app.auth.security import get_password_hash
 from app.models import (
     DataSubjectRequest,
     DSRStatusEnum,
@@ -161,37 +163,44 @@ async def _erase_household(db: AsyncSession, subject_id: str):
     SQL queries don't work. We load all responses and filter in Python.
     For production scale, add a household_id_hash column for searchable lookup.
     """
-    result = await db.execute(select(SurveyResponse).limit(1000))
-    responses = result.scalars().all()
-    deleted = 0
-    s3_keys = []
-    for response in responses:
-        if response.household_id == subject_id:
-            for photo in (response.photos or []):
-                if isinstance(photo, str):
-                    s3_keys.append(photo)
-                elif isinstance(photo, dict):
-                    key = photo.get("s3_key") or photo.get("key")
-                    if key:
-                        s3_keys.append(key)
-            await db.delete(response)
-            deleted += 1
-    await db.commit()
+    batch_size = 500
+    offset = 0
+    total_deleted = 0
+    while True:
+        result = await db.execute(select(SurveyResponse).offset(offset).limit(batch_size))
+        responses = result.scalars().all()
+        if not responses:
+            break
+        s3_keys = []
+        for response in responses:
+            if response.household_id == subject_id:
+                for photo in (response.photos or []):
+                    if isinstance(photo, str):
+                        s3_keys.append(photo)
+                    elif isinstance(photo, dict):
+                        key = photo.get("s3_key") or photo.get("key")
+                        if key:
+                            s3_keys.append(key)
+                await db.delete(response)
+                total_deleted += 1
+        await db.commit()
 
-    # Delete S3 objects
-    if s3_keys and boto3 is not None:
-        from app.config import get_settings
-        settings = get_settings()
-        s3 = boto3.client("s3")
-        for s3_key in s3_keys:
-            try:
-                s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=s3_key)
-            except Exception as e:
-                logger.warning("s3_delete_failed", key=s3_key, error=str(e))
+        # Delete S3 objects for this batch
+        if s3_keys and boto3 is not None:
+            from app.config import get_settings
+            settings = get_settings()
+            s3 = boto3.client("s3")
+            for s3_key in s3_keys:
+                try:
+                    s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=s3_key)
+                except Exception as e:
+                    logger.warning("s3_delete_failed", key=s3_key, error=str(e))
 
-    if len(responses) >= 1000:
-        logger.warning("erasure_household_batch_limit", household_id=subject_id, hint="Add household_id_hash for scalable lookup")
-    logger.info("erasure_household", household_id=subject_id, deleted=deleted, s3_keys_deleted=len(s3_keys))
+        if len(responses) < batch_size:
+            break
+        offset += batch_size
+
+    logger.info("erasure_household_complete", household_id=subject_id, deleted=total_deleted)
 
 
 async def _erase_developer(db: AsyncSession, subject_id: str):
@@ -202,18 +211,25 @@ async def _erase_developer(db: AsyncSession, subject_id: str):
     For production scale, add a developer_email_hash column for searchable lookup.
     """
     # Anonymize lead developer info instead of deleting (leads are business records)
-    result = await db.execute(select(Lead).limit(1000))
-    leads = result.scalars().all()
-    anonymized = 0
-    for lead in leads:
-        if lead.developer_email == subject_id:
-            lead.developer_contact = None
-            lead.developer_email = None
-            anonymized += 1
-    await db.commit()
-    if len(leads) >= 1000:
-        logger.warning("erasure_developer_batch_limit", developer_email=subject_id, hint="Add developer_email_hash for scalable lookup")
-    logger.info("erasure_developer", developer_email=subject_id, leads_anonymized=anonymized)
+    batch_size = 500
+    offset = 0
+    total_anonymized = 0
+    while True:
+        result = await db.execute(select(Lead).offset(offset).limit(batch_size))
+        leads = result.scalars().all()
+        if not leads:
+            break
+        for lead in leads:
+            if lead.developer_email == subject_id:
+                lead.developer_contact = None
+                lead.developer_email = None
+                total_anonymized += 1
+        await db.commit()
+        if len(leads) < batch_size:
+            break
+        offset += batch_size
+
+    logger.info("erasure_developer_complete", developer_email=subject_id, leads_anonymized=total_anonymized)
 
 
 async def _erase_user(db: AsyncSession, subject_id: str):
@@ -266,7 +282,7 @@ async def _erase_user(db: AsyncSession, subject_id: str):
     if user:
         user.email = f"redacted-{user.id}@deleted.carbonverify.io"
         user.name = "Redacted User"
-        user.hashed_password = ""
+        user.hashed_password = get_password_hash(secrets.token_urlsafe(32))
         user.mfa_secret = None
         user.mfa_enabled = False
         user.is_active = False
