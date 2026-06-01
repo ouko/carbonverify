@@ -31,14 +31,13 @@ async def get_dashboard_stats(
         )
     )
 
-    statuses, pending_reviews, recent_calculations, total_emissions = await asyncio.gather(
+    total_projects, statuses, pending_reviews, recent_calculations, total_emissions = await asyncio.gather(
+        total_projects_coro,
         asyncio.gather(*status_coros),
         pending_reviews_coro,
         recent_calculations_coro,
         total_emissions_coro,
     )
-
-    total_projects = await total_projects_coro
     status_counts = dict(zip(
         ["onboarding", "data_collection", "calculation", "review", "submitted", "verified", "monitoring"],
         [s or 0 for s in statuses],

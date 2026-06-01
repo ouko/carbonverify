@@ -44,6 +44,9 @@ async def upload_file(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    if not settings.S3_BUCKET_NAME:
+        raise HTTPException(status_code=500, detail="S3 bucket not configured")
+
     # Validate filename extension
     filename = file.filename or "unknown"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -101,7 +104,7 @@ async def upload_file(
         detected_type=detected_type,
         mime_type=mime_type,
         s3_key=s3_key,
-        s3_bucket=settings.S3_BUCKET_NAME or "carbonverify-uploads",
+        s3_bucket=settings.S3_BUCKET_NAME,
         file_size_bytes=len(file_bytes),
         file_hash_sha256=file_hash,
         status=FileUploadStatusEnum.uploaded,
@@ -169,9 +172,11 @@ async def get_upload(
     return upload
 
 
+@limiter.limit("30/minute")
 @router.post("/{upload_id}/reprocess", response_model=FileUploadResponse)
 async def reprocess_upload(
     upload_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):

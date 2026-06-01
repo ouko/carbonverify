@@ -1,5 +1,6 @@
 """Enhanced WebSocket for real-time orchestrator and project updates."""
 
+import asyncio
 import json
 from typing import Dict, Optional, Set
 
@@ -12,6 +13,8 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
+
+AUTH_TIMEOUT_SECONDS = 5.0
 
 
 class ProjectConnectionManager:
@@ -92,23 +95,39 @@ class ProjectConnectionManager:
 manager = ProjectConnectionManager()
 
 
-def _validate_ws_token(websocket: WebSocket) -> bool:
-    """Validate JWT from query param before accepting WebSocket connection."""
-    token = websocket.query_params.get("token")
-    if not token:
-        return False
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
-        return False
-    return True
+async def _authenticate_ws(websocket: WebSocket, timeout: float = AUTH_TIMEOUT_SECONDS) -> Optional[str]:
+    """
+    Wait for an auth message from the client and validate the JWT.
+
+    Expects: {"type": "auth", "token": "<jwt_access_token>"}
+    Returns the user_id if valid, None otherwise.
+    """
+    try:
+        data = await asyncio.wait_for(websocket.receive_text(), timeout=timeout)
+        payload = json.loads(data)
+        if payload.get("type") == "auth":
+            token = payload.get("token")
+            decoded = decode_token(token)
+            if decoded and decoded.get("type") == "access":
+                return decoded.get("sub")
+    except asyncio.TimeoutError:
+        logger.debug("websocket_auth_timeout")
+    except json.JSONDecodeError:
+        logger.debug("websocket_auth_invalid_json")
+    except Exception as exc:
+        logger.debug("websocket_auth_error", error=str(exc))
+    return None
 
 
 @router.websocket("/notifications")
 async def global_notifications_websocket(websocket: WebSocket):
     """Global notifications WebSocket."""
-    if not _validate_ws_token(websocket):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token")
+    await websocket.accept()
+    user_id = await _authenticate_ws(websocket)
+    if not user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
         return
+
     await manager.connect(websocket)
     try:
         while True:
@@ -126,9 +145,12 @@ async def global_notifications_websocket(websocket: WebSocket):
 @router.websocket("/projects/{project_id}")
 async def project_websocket(websocket: WebSocket, project_id: str):
     """Project-specific real-time updates WebSocket."""
-    if not _validate_ws_token(websocket):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token")
+    await websocket.accept()
+    user_id = await _authenticate_ws(websocket)
+    if not user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
         return
+
     await manager.connect(websocket, project_id)
     try:
         await websocket.send_json({
@@ -167,9 +189,12 @@ async def project_websocket(websocket: WebSocket, project_id: str):
 @router.websocket("/review-queue")
 async def review_queue_websocket(websocket: WebSocket):
     """Real-time review queue updates."""
-    if not _validate_ws_token(websocket):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or missing token")
+    await websocket.accept()
+    user_id = await _authenticate_ws(websocket)
+    if not user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication required")
         return
+
     await manager.connect(websocket)
     try:
         while True:

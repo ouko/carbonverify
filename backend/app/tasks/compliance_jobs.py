@@ -1,6 +1,7 @@
 """Celery tasks for compliance workflows (GDPR erasure, etc.)."""
 
 import uuid
+from datetime import datetime, timezone
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,7 +76,7 @@ async def _async_process_erasure(dsr_id: str):
 
             # Mark as completed
             dsr.status = DSRStatusEnum.completed
-            dsr.completed_at = __import__("datetime", fromlist=["datetime"]).datetime.now(__import__("datetime", fromlist=["timezone"]).timezone.utc)
+            dsr.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
             logger.info("erasure_completed", dsr_id=dsr_id)

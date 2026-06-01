@@ -109,14 +109,14 @@ class UserInviteOut(BaseModel):
 
 class InviteAcceptRequest(BaseModel):
     token: str
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=12)
     name: Optional[str] = None
 
     @field_validator("password")
     @classmethod
     def _validate_password_complexity(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
+        if len(v) < 12:
+            raise ValueError("Password must be at least 12 characters")
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must contain at least one uppercase letter")
         if not re.search(r"[a-z]", v):

@@ -3,7 +3,7 @@
 import asyncio
 from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date as dt_date
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,8 @@ async def list_leads(
         stmt = stmt.where(Lead.registry_source == registry_source)
     if country:
         country_clean = country[:100].replace("%", "\\%").replace("_", "\\_")
-        stmt = stmt.where(Lead.country.ilike(f"%{country_clean}%"))
+        country_pattern = "%" + country_clean + "%"
+        stmt = stmt.where(Lead.country.ilike(country_pattern))
     if priority:
         stmt = stmt.where(Lead.priority == priority)
     if lead_status:
@@ -52,7 +53,8 @@ async def list_leads(
         stmt = stmt.where(Lead.stuck_score >= min_stuck_score)
     if search:
         search_clean = search[:100].replace("%", "\\%").replace("_", "\\_")
-        stmt = stmt.where(Lead.project_name.ilike(f"%{search_clean}%"))
+        search_pattern = "%" + search_clean + "%"
+        stmt = stmt.where(Lead.project_name.ilike(search_pattern))
 
     stmt = stmt.order_by(Lead.stuck_score.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
@@ -274,7 +276,6 @@ async def trigger_scrape(
             lead = existing_leads.get(raw.get("external_id"))
 
             # Compute score
-            from datetime import date as dt_date
             cp_end = None
             if raw.get("crediting_period_end"):
                 cp_end = dt_date.fromisoformat(raw["crediting_period_end"])

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,7 +51,7 @@ async def get_current_user(
         )
 
     # Check account lockout
-    if user.locked_until and user.locked_until > __import__("datetime").datetime.now(__import__("datetime").timezone.utc):
+    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account temporarily locked due to failed login attempts",
@@ -159,7 +161,7 @@ async def validate_refresh_token(
         await _revoke_all_user_tokens(user_id, db)
         raise HTTPException(status_code=401, detail="Token reuse detected. All sessions terminated.")
 
-    if token_record.expires_at < __import__("datetime").datetime.now(__import__("datetime").timezone.utc):
+    if token_record.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail="Refresh token expired")
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -176,7 +178,7 @@ async def _revoke_all_user_tokens(user_id: str, db: AsyncSession) -> None:
     await db.execute(
         update(RefreshToken)
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
-        .values(revoked_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc))
+        .values(revoked_at=datetime.now(timezone.utc))
     )
     await db.commit()
 

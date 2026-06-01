@@ -9,14 +9,6 @@ function getBaseWSUrl(): string {
   return `${protocol}//${window.location.host}/ws/notifications`
 }
 
-function getWSUrl(): string {
-  const token = useAuthStore.getState().accessToken
-  const base = getBaseWSUrl()
-  if (!token) return base
-  const separator = base.includes('?') ? '&' : '?'
-  return `${base}${separator}token=${encodeURIComponent(token)}`
-}
-
 export function useCommandWebSocket() {
   const ws = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<number | null>(null)
@@ -26,11 +18,16 @@ export function useCommandWebSocket() {
     if (ws.current?.readyState === WebSocket.OPEN) return
 
     try {
-      const WS_URL = getWSUrl()
+      const WS_URL = getBaseWSUrl()
       ws.current = new WebSocket(WS_URL)
 
       ws.current.onopen = () => {
-        // WebSocket connected
+        // Authenticate via first message frame instead of URL query param
+        // to prevent JWT leakage into browser history, proxy logs, and Referer headers
+        const token = useAuthStore.getState().accessToken
+        if (token && ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({ type: 'auth', token }))
+        }
       }
 
       ws.current.onmessage = (event) => {

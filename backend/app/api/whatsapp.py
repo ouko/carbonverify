@@ -1,6 +1,8 @@
 """WhatsApp Business API webhook and bot endpoints."""
 
 import os
+import hmac
+import hashlib
 
 from fastapi import APIRouter, Request, HTTPException, status, Depends, Query
 from fastapi.responses import PlainTextResponse
@@ -64,12 +66,12 @@ async def whatsapp_webhook_receive(request: Request):
     # Validate X-Hub-Signature-256 if app secret is configured
     if _settings.WHATSAPP_APP_SECRET:
         signature = request.headers.get("X-Hub-Signature-256", "")
-        expected = "sha256=" + __import__("hmac").new(
+        expected = "sha256=" + hmac.new(
             _settings.WHATSAPP_APP_SECRET.encode(),
             body,
-            __import__("hashlib").sha256,
+            hashlib.sha256,
         ).hexdigest()
-        if not __import__("hmac").compare_digest(expected, signature):
+        if not hmac.compare_digest(expected, signature):
             logger.warning("whatsapp_invalid_signature", signature=signature)
             raise HTTPException(status_code=403, detail="Invalid webhook signature")
 

@@ -1,11 +1,14 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 
 from app.database import get_db
-from app.models import Report, Project, CalculationRun, User
+from app.models import Report, Project, CalculationRun, User, AuditActionEnum
 from app.auth.dependencies import require_operator
+from app.security.audit_logging import AuditLogger
 from app.vvb_liaison.polling import RegistryPoller
 from app.vvb_liaison.auto_responder import draft_clarification_response
 from app.core.logging import get_logger
@@ -18,12 +21,21 @@ router = APIRouter(prefix="/vvb", tags=["vvb-liaison"])
 async def poll_registry(
     registry: str,  # "verra", "gold_standard", "kenya_national"
     project_id: uuid.UUID,
-    _: User = Depends(require_operator),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
 ):
     """Manually poll a registry for project status."""
     poller = RegistryPoller()
     result = poller.poll_project(registry, str(project_id))
     poller.close()
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.vvb_submitted,
+        actor_id=current_user.id,
+        target_type="project",
+        target_id=project_id,
+        metadata={"event": "registry_poll", "registry": registry},
+    )
     return result
 
 
@@ -32,7 +44,7 @@ async def draft_vvb_response(
     report_id: uuid.UUID,
     query_text: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """Draft a response to a VVB technical query."""
     result = await db.execute(select(Report).where(Report.id == report_id))
@@ -40,10 +52,11 @@ async def draft_vvb_response(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    proj_result = await db.execute(select(Project).where(Project.id == report.project_id))
+    proj_result, calc_result = await asyncio.gather(
+        db.execute(select(Project).where(Project.id == report.project_id)),
+        db.execute(select(CalculationRun).where(CalculationRun.id == report.calculation_run_id)),
+    )
     project = proj_result.scalar_one_or_none()
-
-    calc_result = await db.execute(select(CalculationRun).where(CalculationRun.id == report.calculation_run_id))
     calc_run = calc_result.scalar_one_or_none()
 
     project_data = {
@@ -80,6 +93,14 @@ async def draft_vvb_response(
         methodology=report.template_type.value,
     )
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.vvb_responded,
+        actor_id=current_user.id,
+        target_type="report",
+        target_id=report_id,
+        metadata={"event": "draft_vvb_response"},
+    )
     return {
         "report_id": report_id,
         "query": query_text,

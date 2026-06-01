@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
 
 from app.database import get_db
-from app.models import User, RefreshToken
+from app.models import User, RefreshToken, AuditActionEnum
 from app.schemas import (
     UserOut, UserDetailOut, UserCreateByAdmin, UserUpdateByAdmin,
     PermissionGrantRequest, PermissionRevokeRequest, SessionOut,
@@ -96,7 +96,8 @@ async def list_users(
     if search:
         # Defensive: limit search length, sanitize wildcards
         search_clean = search[:100].replace("%", "\\%").replace("_", "\\_")
-        stmt = stmt.where(User.name.ilike(f"%{search_clean}%") | User.email.ilike(f"%{search_clean}%"))
+        pattern = "%" + search_clean + "%"
+        stmt = stmt.where(User.name.ilike(pattern) | User.email.ilike(pattern))
     stmt = stmt.order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -131,7 +132,7 @@ async def create_user(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_created,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,
@@ -192,7 +193,7 @@ async def update_user(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_updated,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,
@@ -223,9 +224,8 @@ async def deactivate_user(
 
     # Revoke all sessions and refresh tokens
     await SessionManager.destroy_all_user_sessions(str(user.id))
-    from sqlalchemy import update as sa_update
     await db.execute(
-        sa_update(RefreshToken)
+        update(RefreshToken)
         .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(timezone.utc))
     )
@@ -233,7 +233,7 @@ async def deactivate_user(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_updated,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,
@@ -264,7 +264,7 @@ async def reactivate_user(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_updated,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,
@@ -391,7 +391,7 @@ async def revoke_user_session(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_logout,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,
@@ -415,9 +415,8 @@ async def force_logout_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     await SessionManager.destroy_all_user_sessions(str(user_id))
-    from sqlalchemy import update as sa_update
     await db.execute(
-        sa_update(RefreshToken)
+        update(RefreshToken)
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(timezone.utc))
     )
@@ -425,7 +424,7 @@ async def force_logout_user(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_logout,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,

@@ -1,7 +1,7 @@
 """Celery tasks for the Workflow Validation Engine."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from celery import shared_task
 from sqlalchemy import select
@@ -126,7 +126,7 @@ def cleanup_archived_runs(days: int = 30):
 async def _cleanup_archived_async(days: int):
     async with AsyncSessionLocal() as db:
         from sqlalchemy import func
-        cutoff = datetime.now(timezone.utc) - __import__("datetime").timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         result = await db.execute(
             select(ValidationRun).where(

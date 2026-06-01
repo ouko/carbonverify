@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { useAuthStore } from '../stores/authStore';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function InviteAcceptPage() {
@@ -16,14 +17,9 @@ export default function InviteAcceptPage() {
 
   useEffect(() => {
     // If user is already logged in, redirect to dashboard
-    const authUser = localStorage.getItem('cv-auth');
-    if (authUser) {
-      try {
-        const parsed = JSON.parse(authUser);
-        if (parsed?.state?.user) {
-          navigate('/');
-        }
-      } catch { /* ignore */ }
+    const state = useAuthStore.getState();
+    if (state.user) {
+      navigate('/');
     }
   }, [navigate]);
 

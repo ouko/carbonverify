@@ -7,11 +7,11 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, and_
 
 from app.core.encryption import compute_searchable_hash
 from app.database import get_db
-from app.models import User, RefreshToken, UserInvite, UserRoleEnum
+from app.models import User, RefreshToken, UserInvite, UserRoleEnum, AuditActionEnum
 from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
 from app.auth.security import (
     verify_password,
@@ -115,7 +115,7 @@ async def register(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_login,
         actor_id=user.id,
         target_type="user",
         target_id=user.id,
@@ -149,7 +149,6 @@ async def login(
     # full table scans under load.
     if not user:
         logger.warning("login_email_hash_miss", email_hash=email_hash)
-        from sqlalchemy import and_
         legacy_result = await db.execute(
             select(User).where(
                 and_(
@@ -249,7 +248,7 @@ async def verify_mfa(
 @router.post("/mfa/setup")
 async def setup_mfa(
     request: Request,
-    current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -279,7 +278,7 @@ class MFAConfirmRequest(BaseModel):
 async def confirm_mfa(
     payload: MFAConfirmRequest,
     request: Request,
-    current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Confirm MFA setup with secret and verification code."""
@@ -293,7 +292,7 @@ async def confirm_mfa(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.mfa_enabled,
+        action_type=AuditActionEnum.mfa_enabled,
         actor_id=current_user.id,
         target_type="user",
         target_id=current_user.id,
@@ -307,7 +306,7 @@ async def confirm_mfa(
 @router.post("/mfa/disable")
 async def disable_mfa(
     request: Request,
-    current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["require_admin"]).require_admin),
+    current_user: User = Depends(require_admin),
     target_user_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -323,7 +322,7 @@ async def disable_mfa(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.mfa_disabled,
+        action_type=AuditActionEnum.mfa_disabled,
         actor_id=current_user.id,
         target_type="user",
         target_id=user.id,
@@ -355,6 +354,15 @@ async def refresh(
     old_token_record.revoked_at = datetime.now(timezone.utc)
     await db.commit()
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_login,
+        actor_id=user.id,
+        target_type="user",
+        target_id=user.id,
+        metadata={"event": "token_refresh"},
+    )
+
     # Issue new tokens
     return await _issue_tokens(user, request, response, db, is_refresh=True)
 
@@ -363,7 +371,7 @@ async def refresh(
 async def logout(
     request: Request,
     response: Response,
-    current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Logout user and destroy session."""
@@ -385,7 +393,7 @@ async def logout(
 async def logout_all_sessions(
     request: Request,
     response: Response,
-    current_user: User = Depends(__import__("app.auth.dependencies", fromlist=["get_current_user"]).get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Logout from all devices."""
@@ -446,6 +454,15 @@ async def revoke_session(
 
     await SessionManager.destroy_session(session_id)
 
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_logout,
+        actor_id=current_user.id,
+        target_type="user",
+        target_id=current_user.id,
+        metadata={"event": "session_revoked", "session_id": session_id},
+    )
+
     # Also revoke the refresh token associated with this session
     # (We don't have a direct mapping, but we revoke all non-current tokens as defense)
     logger.info("session_revoked", session_id=session_id, user_id=str(current_user.id))
@@ -469,7 +486,7 @@ async def change_password(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_login,
+        action_type=AuditActionEnum.user_updated,
         actor_id=current_user.id,
         target_type="user",
         target_id=current_user.id,
@@ -524,7 +541,7 @@ async def invite_user(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_created,
+        action_type=AuditActionEnum.user_created,
         actor_id=current_user.id,
         target_type="user_invite",
         target_id=invite.id,
@@ -575,7 +592,7 @@ async def accept_invite(
 
     audit = AuditLogger(db)
     await audit.log(
-        action_type=__import__("app.models", fromlist=["AuditActionEnum"]).AuditActionEnum.user_created,
+        action_type=AuditActionEnum.user_created,
         actor_id=user.id,
         target_type="user",
         target_id=user.id,
