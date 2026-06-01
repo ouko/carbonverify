@@ -1,14 +1,17 @@
 """Step execution registry and handlers for each workflow step type."""
 
 import asyncio
+import ast
 import hashlib
 import json
+import operator
 import time
 from typing import Any, Dict, List, Optional, Protocol
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.validation_engine.models import (
     ValidationRun,
     WorkflowStepType,
@@ -21,6 +24,8 @@ from app.validation_engine.schemas import (
     ServiceCallConfig,
     WaitConfig,
 )
+
+logger = get_logger(__name__)
 
 
 class StepExecutor(Protocol):
@@ -184,12 +189,9 @@ class ServiceCallExecutor:
                 "latency_ms": latency_ms,
             }
         except Exception as exc:
-            return {
-                "service_name": cfg.service_name,
-                "method_name": cfg.method_name,
-                "exception": str(exc),
-                "exception_type": type(exc).__name__,
-            }
+            raise RuntimeError(
+                f"Service call '{cfg.service_name}.{cfg.method_name}' failed: {exc}"
+            ) from exc
 
 
 class ExternalApiExecutor:
@@ -387,23 +389,106 @@ class DecisionGateExecutor:
         }
 
     def _evaluate_condition(self, condition: str, context: Dict[str, Any]) -> bool:
-        """Safely evaluate a simple condition expression."""
+        """Safely evaluate a simple condition expression using a restricted AST visitor."""
         # Replace context references
         expr = condition
         for key, val in context.get("variables", {}).items():
             expr = expr.replace(f"${{{key}}}", repr(val))
 
-        # Simple evaluation — only allow comparison operators
-        allowed_names = {
-            "True": True,
-            "False": False,
-            "None": None,
-            "len": len,
-        }
         try:
-            return bool(eval(expr, {"__builtins__": {}}, allowed_names))
+            tree = ast.parse(expr, mode="eval")
+        except SyntaxError:
+            logger.warning("decision_gate_syntax_error", condition=condition)
+            return False
+
+        try:
+            result = self._eval_node(tree.body)
+        except ValueError as exc:
+            logger.warning("decision_gate_disallowed_expression", condition=condition, error=str(exc))
+            return False
         except Exception:
             return False
+
+        return bool(result)
+
+    def _eval_node(self, node: ast.AST) -> Any:
+        """Recursively evaluate an AST node using only allowed operations."""
+        if isinstance(node, ast.Constant):
+            return node.value
+        if hasattr(ast, "Num") and isinstance(node, ast.Num):  # For Python < 3.8 compatibility
+            return node.n
+        if hasattr(ast, "Str") and isinstance(node, ast.Str):  # For Python < 3.8 compatibility
+            return node.s
+        if hasattr(ast, "NameConstant") and isinstance(node, ast.NameConstant):  # For Python < 3.8 compatibility
+            return node.value
+        if isinstance(node, ast.Name):
+            if node.id in ("True", "False", "None"):
+                return {"True": True, "False": False, "None": None}[node.id]
+            raise ValueError(f"Disallowed name: {node.id}")
+        if isinstance(node, ast.BinOp):
+            left = self._eval_node(node.left)
+            right = self._eval_node(node.right)
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Div):
+                return left / right
+            raise ValueError(f"Disallowed binary operator: {type(node.op).__name__}")
+        if isinstance(node, ast.UnaryOp):
+            operand = self._eval_node(node.operand)
+            if isinstance(node.op, ast.Not):
+                return not operand
+            if isinstance(node.op, ast.USub):
+                return -operand
+            if isinstance(node.op, ast.UAdd):
+                return +operand
+            raise ValueError(f"Disallowed unary operator: {type(node.op).__name__}")
+        if isinstance(node, ast.Compare):
+            left = self._eval_node(node.left)
+            if len(node.ops) != 1 or len(node.comparators) != 1:
+                raise ValueError("Chained comparisons are not allowed")
+            right = self._eval_node(node.comparators[0])
+            op = node.ops[0]
+            if isinstance(op, ast.Eq):
+                return left == right
+            if isinstance(op, ast.NotEq):
+                return left != right
+            if isinstance(op, ast.Lt):
+                return left < right
+            if isinstance(op, ast.LtE):
+                return left <= right
+            if isinstance(op, ast.Gt):
+                return left > right
+            if isinstance(op, ast.GtE):
+                return left >= right
+            if isinstance(op, ast.In):
+                return left in right
+            raise ValueError(f"Disallowed comparison operator: {type(op).__name__}")
+        if isinstance(node, ast.BoolOp):
+            values = [self._eval_node(v) for v in node.values]
+            if isinstance(node.op, ast.And):
+                return all(values)
+            if isinstance(node.op, ast.Or):
+                return any(values)
+            raise ValueError(f"Disallowed boolean operator: {type(node.op).__name__}")
+        if isinstance(node, ast.List):
+            return [self._eval_node(elt) for elt in node.elts]
+        if hasattr(ast, "Tuple") and isinstance(node, ast.Tuple):
+            return tuple(self._eval_node(elt) for elt in node.elts)
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name):
+                raise ValueError("Only simple function calls are allowed")
+            if node.func.id != "len":
+                raise ValueError(f"Disallowed function call: {node.func.id}")
+            if len(node.args) != 1 or node.keywords:
+                raise ValueError("len() accepts exactly one positional argument")
+            return len(self._eval_node(node.args[0]))
+        if isinstance(node, ast.Expression):
+            return self._eval_node(node.body)
+        raise ValueError(f"Disallowed AST node type: {type(node).__name__}")
 
 
 class WaitExecutor:

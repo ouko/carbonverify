@@ -36,7 +36,7 @@ async def _execute_validation_run_async(run_id: str):
     async with AsyncSessionLocal() as db:
         try:
             result = await db.execute(
-                select(ValidationRun).where(ValidationRun.id == uuid.UUID(run_id))
+                select(ValidationRun).where(ValidationRun.id == uuid.UUID(run_id)).with_for_update()
             )
             run = result.scalar_one_or_none()
             if run is None:
@@ -146,6 +146,58 @@ async def _cleanup_archived_async(days: int):
         await db.commit()
         logger.info("cleanup_archived_runs", archived_count=archived_count, cutoff=cutoff.isoformat())
         return {"archived_count": archived_count}
+
+
+@shared_task
+def recover_stuck_validation_runs():
+    """Detect and fail validation runs that have been stuck for too long.
+
+    Run periodically via Celery beat or manually.
+    """
+    import asyncio
+    return asyncio.run(_recover_stuck_runs_async())
+
+
+async def _recover_stuck_runs_async(db=None):
+    session_context = AsyncSessionLocal() if db is None else db
+    async with session_context as db:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=2)
+        result = await db.execute(
+            select(ValidationRun).where(
+                ValidationRun.status.notin_([
+                    WorkflowRunStatus.completed,
+                    WorkflowRunStatus.failed,
+                    WorkflowRunStatus.archived,
+                ]),
+                ValidationRun.updated_at < cutoff,
+            )
+        )
+        runs = result.scalars().all()
+
+        recovered_count = 0
+        for run in runs:
+            run.status = WorkflowRunStatus.failed
+            run.error_message = run.error_message or "Stuck run detected by recovery task"
+            run.completed_at = datetime.now(timezone.utc)
+
+            escalation = HumanEscalation(
+                run_id=run.id,
+                escalation_reason="Stuck run detected by recovery task",
+                severity_score=0.6,
+                level=EscalationLevel.l2_engineer,
+                status=EscalationStatus.pending,
+                sla_deadline=datetime.now(timezone.utc) + timedelta(hours=4),
+            )
+            db.add(escalation)
+            recovered_count += 1
+
+        await db.commit()
+        logger.warning(
+            "recover_stuck_validation_runs",
+            recovered_count=recovered_count,
+            cutoff=cutoff.isoformat(),
+        )
+        return {"recovered_count": recovered_count}
 
 
 @shared_task

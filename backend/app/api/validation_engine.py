@@ -560,6 +560,8 @@ async def resolve_escalation(
     run = run_result.scalar_one_or_none()
     if run and run.awaiting_human_decision:
         run.awaiting_human_decision = False
+        if run.status == WorkflowRunStatus.failed:
+            run.status = WorkflowRunStatus.queued
         await db.commit()
         # Re-queue the run for continuation
         from app.validation_engine.tasks import execute_validation_run

@@ -3,7 +3,7 @@
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -117,6 +117,12 @@ class ValidationOrchestrator:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> ValidationRunTransition:
         """Advance a run to a new state with full audit trail."""
+        # Re-fetch run with row-level lock to prevent concurrent state mutations
+        locked_result = await self.db.execute(
+            select(ValidationRun).where(ValidationRun.id == run.id).with_for_update()
+        )
+        run = locked_result.scalar_one()
+
         current = run.status
 
         # Validate transition
@@ -424,7 +430,7 @@ class ValidationOrchestrator:
                 "run_input": run.input_data,
                 "error": error_message,
             },
-            sla_deadline=datetime.now(timezone.utc),
+            sla_deadline=datetime.now(timezone.utc) + timedelta(hours=4),
         )
         self.db.add(escalation)
         run.human_intervened = True

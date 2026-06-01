@@ -208,6 +208,12 @@ class ValidationRun(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Number of remediation attempts made
     remediation_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -29,11 +29,13 @@ from app.validation_engine.models import (
     WorkflowRunStatus,
     WorkflowStepType,
 )
+from app.validation_engine.executors import DecisionGateExecutor, ServiceCallExecutor
 from app.validation_engine.orchestrator import ValidationOrchestrator
 from app.validation_engine.proofs import MerkleTree, ProofGenerator
 from app.validation_engine.schemas import WorkflowGraph, WorkflowStep
 from app.validation_engine.state_machine import TransitionError, WorkflowStateMachine
 from app.validation_engine.synthetic import SyntheticActorFactory
+from app.validation_engine.tasks import _recover_stuck_runs_async
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -664,3 +666,232 @@ class TestHumanEscalation:
         fetched = result.scalar_one()
         assert fetched.status == EscalationStatus.resolved
         assert fetched.human_decision == "approve"
+
+
+# ─── Safe Evaluator Tests ─────────────────────────────────────────────────────
+
+class TestSafeEvaluator:
+    def test_simple_comparisons(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("5 > 3", {}) is True
+        assert executor._evaluate_condition("5 < 3", {}) is False
+        assert executor._evaluate_condition("5 == 5", {}) is True
+        assert executor._evaluate_condition("5 != 3", {}) is True
+        assert executor._evaluate_condition("5 >= 5", {}) is True
+        assert executor._evaluate_condition("5 <= 4", {}) is False
+
+    def test_string_equality(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("'hello' == 'hello'", {}) is True
+        assert executor._evaluate_condition("'hello' != 'world'", {}) is True
+
+    def test_arithmetic(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("2 + 2 == 4", {}) is True
+        assert executor._evaluate_condition("10 - 3 == 7", {}) is True
+        assert executor._evaluate_condition("3 * 4 == 12", {}) is True
+        assert executor._evaluate_condition("10 / 2 == 5.0", {}) is True
+
+    def test_boolean_logic(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("True and True", {}) is True
+        assert executor._evaluate_condition("True and False", {}) is False
+        assert executor._evaluate_condition("True or False", {}) is True
+        assert executor._evaluate_condition("not False", {}) is True
+        assert executor._evaluate_condition("not True", {}) is False
+
+    def test_in_operator(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("'a' in ['a', 'b']", {}) is True
+        assert executor._evaluate_condition("'c' in ['a', 'b']", {}) is False
+
+    def test_len_function(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("len([1, 2, 3]) == 3", {}) is True
+        assert executor._evaluate_condition("len('hello') == 5", {}) is True
+
+    def test_variable_interpolation(self):
+        executor = DecisionGateExecutor()
+        context = {"variables": {"score": 85, "name": "test"}}
+        assert executor._evaluate_condition("${score} > 80", context) is True
+        assert executor._evaluate_condition("${name} == 'test'", context) is True
+
+    def test_none_literal(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("None == None", {}) is True
+
+    def test_disallowed_import(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("__import__('os')", {}) is False
+
+    def test_disallowed_name(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("open('file.txt')", {}) is False
+
+    def test_disallowed_attribute_access(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("(1).__class__", {}) is False
+
+    def test_disallowed_call(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("exec('pass')", {}) is False
+
+    def test_malformed_expression(self):
+        executor = DecisionGateExecutor()
+        assert executor._evaluate_condition("5 > > 3", {}) is False
+
+
+# ─── ServiceCallExecutor Tests ────────────────────────────────────────────────
+
+class TestServiceCallExecutor:
+    @pytest.mark.asyncio
+    async def test_service_call_re_raises_exception(self):
+        executor = ServiceCallExecutor()
+
+        class FakeService:
+            def broken_method(self):
+                raise ValueError("Intentional failure")
+
+        ServiceCallExecutor.register_service("fake", FakeService())
+
+        config = {
+            "service_name": "fake",
+            "method_name": "broken_method",
+            "args": [],
+            "kwargs": {},
+        }
+
+        with pytest.raises(RuntimeError, match="Service call 'fake.broken_method' failed"):
+            await executor.execute(config, {}, None)
+
+
+# ─── Escalation Resolution Tests ──────────────────────────────────────────────
+
+class TestEscalationResolution:
+    @pytest.mark.asyncio
+    async def test_resolve_escalation_transitions_failed_run(self, authenticated_client, db_session, test_workflow, test_user):
+        client, user = authenticated_client
+        # Create a run in failed state awaiting human decision
+        run = ValidationRun(
+            workflow_id=test_workflow.id,
+            trigger_event="escalation_resolve_api_test",
+            input_data={},
+            status=WorkflowRunStatus.failed,
+            triggered_by=test_user.id,
+            awaiting_human_decision=True,
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        escalation = HumanEscalation(
+            run_id=run.id,
+            escalation_reason="Test resolution",
+            severity_score=0.5,
+            level=EscalationLevel.l1_operator,
+            status=EscalationStatus.pending,
+        )
+        db_session.add(escalation)
+        await db_session.commit()
+
+        response = await client.post(
+            f"/validation/escalations/{escalation.id}/resolve",
+            json={"decision": "approve", "notes": "Looks good"},
+        )
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Escalation resolved"
+
+        # Refresh run and verify status transitioned to queued
+        await db_session.refresh(run)
+        assert run.status == WorkflowRunStatus.queued
+        assert run.awaiting_human_decision is False
+
+
+# ─── Run Failure SLA Tests ────────────────────────────────────────────────────
+
+class TestRunFailureSLA:
+    @pytest.mark.asyncio
+    async def test_sla_deadline_extended_on_failure(self, db_session, test_workflow, test_user):
+        from datetime import timedelta
+        orchestrator = ValidationOrchestrator(db_session)
+        run = await orchestrator.create_run(
+            workflow_id=str(test_workflow.id),
+            trigger_event="sla_test",
+            input_data={},
+            triggered_by=str(test_user.id),
+        )
+        # Force run into running state so _handle_run_failure can be called
+        run.status = WorkflowRunStatus.running
+        await db_session.commit()
+
+        await orchestrator._handle_run_failure(run, "Test failure")
+
+        result = await db_session.execute(
+            select(HumanEscalation).where(HumanEscalation.run_id == run.id)
+        )
+        escalation = result.scalar_one()
+        assert escalation.sla_deadline is not None
+        # SQLite returns offset-naive datetimes; compare without tz info
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        # Should be at least 3 hours and 55 minutes in the future
+        assert (escalation.sla_deadline - now) > timedelta(hours=3, minutes=55)
+
+
+# ─── Stuck Run Recovery Tests ─────────────────────────────────────────────────
+
+class TestStuckRunRecovery:
+    @pytest.mark.asyncio
+    async def test_recover_stuck_runs(self, db_session, test_workflow, test_user):
+        from datetime import timedelta
+        # Create a run that appears stuck (updated_at > 2 hours ago)
+        run = ValidationRun(
+            workflow_id=test_workflow.id,
+            trigger_event="stuck_test",
+            input_data={},
+            status=WorkflowRunStatus.running,
+            triggered_by=test_user.id,
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        # Manually back-date updated_at to simulate a stuck run
+        run.updated_at = datetime.now(timezone.utc) - timedelta(hours=3)
+        await db_session.commit()
+
+        result = await _recover_stuck_runs_async(db=db_session)
+        assert result["recovered_count"] >= 1
+
+        # Re-fetch run after commit in recovery task detached it
+        run_result = await db_session.execute(
+            select(ValidationRun).where(ValidationRun.id == run.id)
+        )
+        run = run_result.scalar_one()
+        assert run.status == WorkflowRunStatus.failed
+
+        escalation_result = await db_session.execute(
+            select(HumanEscalation).where(HumanEscalation.run_id == run.id)
+        )
+        escalation = escalation_result.scalar_one()
+        assert escalation.escalation_reason == "Stuck run detected by recovery task"
+        assert escalation.status == EscalationStatus.pending
+
+    @pytest.mark.asyncio
+    async def test_recover_stuck_runs_ignores_recent_runs(self, db_session, test_workflow, test_user):
+        run = ValidationRun(
+            workflow_id=test_workflow.id,
+            trigger_event="not_stuck_test",
+            input_data={},
+            status=WorkflowRunStatus.running,
+            triggered_by=test_user.id,
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        result = await _recover_stuck_runs_async(db=db_session)
+        assert result["recovered_count"] == 0
+
+        # Re-fetch run after commit in recovery task detached it
+        run_result = await db_session.execute(
+            select(ValidationRun).where(ValidationRun.id == run.id)
+        )
+        run = run_result.scalar_one()
+        assert run.status == WorkflowRunStatus.running
