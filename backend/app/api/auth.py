@@ -167,6 +167,18 @@ async def login(
 
     audit = AuditLogger(db)
 
+    # Check lockout BEFORE incrementing failed login count
+    if user and user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        await audit.log_login(
+            user_id=user.id,
+            success=False,
+            request=request,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail=f"Account locked. Try again after {user.locked_until.isoformat()}",
+        )
+
     if not user or not verify_password(payload.password, user.hashed_password):
         if user:
             user.failed_login_count += 1
@@ -180,13 +192,6 @@ async def login(
             request=request,
         )
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # Check lockout
-    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=403,
-            detail=f"Account locked. Try again after {user.locked_until.isoformat()}",
-        )
 
     # Reset failed login count
     user.failed_login_count = 0
@@ -232,6 +237,12 @@ async def verify_mfa(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account deactivated")
+
+    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=403, detail="Account locked")
 
     if not user.mfa_secret:
         raise HTTPException(status_code=400, detail="MFA not configured for this user")
@@ -379,6 +390,17 @@ async def logout(
     if session_id:
         await SessionManager.destroy_session(session_id)
 
+    # Revoke the refresh token from the cookie
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if refresh_token:
+        token_hash = hash_token(refresh_token)
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=datetime.now(timezone.utc))
+        )
+        await db.commit()
+
     # Clear refresh token cookie
     _clear_refresh_cookie(response)
 
@@ -444,6 +466,7 @@ async def revoke_session(
     session_id: str,
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Revoke a specific session. Users can only revoke their own sessions."""
     session = await SessionManager.get_session(session_id)
@@ -454,6 +477,14 @@ async def revoke_session(
 
     await SessionManager.destroy_session(session_id)
 
+    # Revoke all refresh tokens for this user as defense
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == current_user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
     audit = AuditLogger(db)
     await audit.log(
         action_type=AuditActionEnum.user_logout,
@@ -463,8 +494,6 @@ async def revoke_session(
         metadata={"event": "session_revoked", "session_id": session_id},
     )
 
-    # Also revoke the refresh token associated with this session
-    # (We don't have a direct mapping, but we revoke all non-current tokens as defense)
     logger.info("session_revoked", session_id=session_id, user_id=str(current_user.id))
     return {"message": "Session revoked"}
 
@@ -560,34 +589,35 @@ async def accept_invite(
     db: AsyncSession = Depends(get_db),
 ):
     """Accept an invite token and create a user account."""
-    result = await db.execute(
-        select(UserInvite).where(
-            UserInvite.token == payload.token,
-            UserInvite.used_at.is_(None),
-            UserInvite.expires_at > datetime.now(timezone.utc),
+    async with db.begin():
+        result = await db.execute(
+            select(UserInvite).where(
+                UserInvite.token == payload.token,
+                UserInvite.used_at.is_(None),
+                UserInvite.expires_at > datetime.now(timezone.utc),
+            ).with_for_update()
         )
-    )
-    invite = result.scalar_one_or_none()
-    if not invite:
-        raise HTTPException(status_code=400, detail="Invalid or expired invite token")
+        invite = result.scalar_one_or_none()
+        if not invite:
+            raise HTTPException(status_code=400, detail="Invalid or expired invite token")
 
-    # Create user from invite (allow name override from payload)
-    user = User(
-        email=invite.email,
-        email_hash=invite.email_hash,
-        name=payload.name.strip() if payload.name else invite.name,
-        role=invite.role,
-        hashed_password=get_password_hash(payload.password),
-        permissions=invite.permissions,
-        is_active=True,
-    )
-    db.add(user)
-    await db.flush()
+        # Create user from invite (allow name override from payload)
+        user = User(
+            email=invite.email,
+            email_hash=invite.email_hash,
+            name=payload.name.strip() if payload.name else invite.name,
+            role=invite.role,
+            hashed_password=get_password_hash(payload.password),
+            permissions=invite.permissions,
+            is_active=True,
+        )
+        db.add(user)
+        await db.flush()
 
-    # Mark invite as used
-    invite.used_at = datetime.now(timezone.utc)
-    invite.used_by_user_id = user.id
-    await db.commit()
+        # Mark invite as used
+        invite.used_at = datetime.now(timezone.utc)
+        invite.used_by_user_id = user.id
+
     await db.refresh(user)
 
     audit = AuditLogger(db)

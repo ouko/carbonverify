@@ -13,6 +13,7 @@ class Permission(str, PyEnum):
     USERS_UPDATE = "users:update"
     USERS_DELETE = "users:delete"
     USERS_MANAGE_PERMISSIONS = "users:manage_permissions"
+    USERS_MANAGE_ROLES = "users:manage_roles"
     USERS_MANAGE_SESSIONS = "users:manage_sessions"
 
     # Project management
@@ -142,6 +143,7 @@ ROLE_PERMISSIONS: dict[str, List[Permission]] = {
         Permission.USERS_UPDATE,
         Permission.USERS_DELETE,
         Permission.USERS_MANAGE_PERMISSIONS,
+        Permission.USERS_MANAGE_ROLES,
         Permission.USERS_MANAGE_SESSIONS,
         Permission.PROJECTS_DELETE,
         Permission.DATA_SOURCES_DELETE,

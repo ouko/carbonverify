@@ -176,6 +176,13 @@ async def update_user(
 
     update_data = payload.model_dump(exclude_unset=True)
 
+    if "role" in update_data:
+        if user.id == current_user.id:
+            raise HTTPException(status_code=400, detail="Cannot change your own role")
+        from app.permissions import has_permission
+        if not has_permission(current_user.role.value, current_user.permissions or [], "users:manage_roles"):
+            raise HTTPException(status_code=403, detail="Permission denied: users:manage_roles")
+
     # If email is being updated, recompute hash and check uniqueness
     if "email" in update_data:
         from app.core.encryption import compute_searchable_hash
@@ -259,6 +266,7 @@ async def reactivate_user(
     user.is_active = True
     user.failed_login_count = 0
     user.locked_until = None
+    user.password_reset_required = True
     await db.commit()
     await db.refresh(user)
 
@@ -309,6 +317,10 @@ async def grant_permission(
     all_perms = list_all_permissions()
     if payload.permission not in all_perms:
         raise HTTPException(status_code=400, detail=f"Unknown permission: {payload.permission}")
+
+    from app.permissions import has_permission
+    if not has_permission(current_user.role.value, current_user.permissions or [], payload.permission):
+        raise HTTPException(status_code=403, detail="You cannot grant a permission you do not possess")
 
     perms = list(user.permissions or [])
     if payload.permission not in perms:

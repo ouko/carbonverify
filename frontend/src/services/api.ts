@@ -27,6 +27,8 @@ api.interceptors.request.use((config) => {
 // Endpoints that should never trigger a token refresh on 401
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout', '/auth/mfa']
 
+let refreshPromise: Promise<any> | null = null
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -61,8 +63,24 @@ api.interceptors.response.use(
       }
 
       (originalRequest as any)._retry = true
+
+      // If a refresh is already in flight, wait for it instead of starting a new one
+      if (refreshPromise) {
+        try {
+          await refreshPromise
+          const token = useAuthStore.getState().accessToken
+          originalRequest.headers.Authorization = `Bearer ${token}`
+          return api(originalRequest)
+        } catch {
+          useAuthStore.getState().logout()
+          window.location.href = '/login'
+          return Promise.reject(error)
+        }
+      }
+
+      refreshPromise = axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
       try {
-        const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+        const res = await refreshPromise
         const { access_token } = res.data
         useAuthStore.getState().setAccessToken(access_token)
         originalRequest.headers.Authorization = `Bearer ${access_token}`
@@ -71,6 +89,8 @@ api.interceptors.response.use(
         useAuthStore.getState().logout()
         window.location.href = '/login'
         return Promise.reject(error)
+      } finally {
+        refreshPromise = null
       }
     }
 

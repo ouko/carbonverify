@@ -40,6 +40,7 @@ class ProjectStatusEnum(str, PyEnum):
     submitted = "submitted"
     verified = "verified"
     monitoring = "monitoring"
+    rejected = "rejected"
 
 
 class SourceTypeEnum(str, PyEnum):
@@ -225,6 +226,7 @@ class User(Base):
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
     permissions: Mapped[dict] = mapped_column(JSONB, default=dict)  # explicit granular permissions {granted: [], revoked: []}
+    password_reset_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -294,11 +296,12 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     developer: Mapped["Developer"] = relationship("Developer", back_populates="projects")
-    data_sources: Mapped[List["DataSource"]] = relationship("DataSource", back_populates="project")
-    calculation_runs: Mapped[List["CalculationRun"]] = relationship("CalculationRun", back_populates="project")
-    reports: Mapped[List["Report"]] = relationship("Report", back_populates="project")
-    file_uploads: Mapped[List["FileUpload"]] = relationship("FileUpload", back_populates="project")
-    agent_runs: Mapped[List["AgentRun"]] = relationship("AgentRun", back_populates="project")
+    data_sources: Mapped[List["DataSource"]] = relationship("DataSource", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
+    calculation_runs: Mapped[List["CalculationRun"]] = relationship("CalculationRun", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
+    reports: Mapped[List["Report"]] = relationship("Report", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
+    file_uploads: Mapped[List["FileUpload"]] = relationship("FileUpload", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
+    agent_runs: Mapped[List["AgentRun"]] = relationship("AgentRun", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
+    enumerators: Mapped[List["Enumerator"]] = relationship("Enumerator", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
     orchestrator_events: Mapped[List["OrchestratorEvent"]] = relationship("OrchestratorEvent", back_populates="project")
 
 
@@ -536,6 +539,8 @@ class Enumerator(Base):
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
+    project: Mapped["Project"] = relationship("Project", back_populates="enumerators")
+
 
 class WhatsAppConversation(Base):
     __tablename__ = "whatsapp_conversations"
@@ -608,6 +613,7 @@ class AuditActionEnum(str, PyEnum):
     report_approved = "report_approved"
     vvb_submitted = "vvb_submitted"
     vvb_responded = "vvb_responded"
+    registry_polled = "registry_polled"
     methodology_updated = "methodology_updated"
     user_login = "user_login"
     user_logout = "user_logout"
@@ -712,6 +718,7 @@ class DSRTypeEnum(str, PyEnum):
 class DSRStatusEnum(str, PyEnum):
     received = "received"
     under_review = "under_review"
+    in_progress = "in_progress"
     fulfilled = "fulfilled"
     rejected = "rejected"
     escalated = "escalated"

@@ -169,6 +169,12 @@ async def validate_refresh_token(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account deactivated")
+
+    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+        raise HTTPException(status_code=403, detail="Account locked")
+
     return user, token_record
 
 
