@@ -285,7 +285,7 @@ async def run_project_calculation(
         leakage_assessment=leakage_result,
         methodology_compliance_score=methodology_result["compliance_score"],
         confidence_score=fnrb_result["confidence_score"],
-        status="draft",
+        status=CalculationStatusEnum.draft,
     )
     db.add(calc_run)
     await db.commit()
@@ -315,7 +315,7 @@ async def run_project_calculation(
         "leakage": leakage_result,
         "methodology_validation": methodology_result,
         "uncertainty": uncertainty_result,
-        "status": "draft",
+        "status": CalculationStatusEnum.draft,
         "message": "Calculation completed. Awaiting human approval before issuance.",
     }
 
@@ -379,10 +379,10 @@ async def approve_calculation(
     if not ds_result.scalars().first():
         raise HTTPException(status_code=400, detail="No validated data sources for this project")
 
-    if calc.status.value == "approved":
+    if calc.status == CalculationStatusEnum.approved:
         raise HTTPException(status_code=400, detail="Calculation already approved")
 
-    calc.status = "approved"
+    calc.status = CalculationStatusEnum.approved
     calc.approved_by = current_user.id
     await db.commit()
     await db.refresh(calc)
@@ -399,7 +399,7 @@ async def approve_calculation(
 
     return {
         "calculation_run_id": calc_id,
-        "status": "approved",
+        "status": CalculationStatusEnum.approved,
         "approved_by": current_user.id,
         "approved_at": calc.created_at.isoformat(),
         "message": "Calculation approved for report generation and submission.",

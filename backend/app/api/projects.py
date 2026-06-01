@@ -9,7 +9,7 @@ from app.models import Project, User, AuditActionEnum, ProjectStatusEnum
 from app.security.audit_logging import AuditLogger
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut
 from app.auth.dependencies import require_operator, require_viewer
-from app.security.project_auth import require_project_access
+from app.security.project_auth import require_project_access, get_user_developer_id
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -41,9 +41,14 @@ async def list_projects(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    current_user: User = Depends(require_viewer),
 ):
-    result = await db.execute(select(Project).offset(skip).limit(limit))
+    stmt = select(Project)
+    developer_id = await get_user_developer_id(current_user, db)
+    if developer_id:
+        stmt = stmt.where(Project.developer_id == developer_id)
+    stmt = stmt.offset(skip).limit(limit)
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 

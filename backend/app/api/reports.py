@@ -303,9 +303,9 @@ async def submit_report_to_registry(
 
     # Update report status
     if registry_result.get("success"):
-        report.status = "submitted"
+        report.status = ReportStatusEnum.submitted
     else:
-        report.status = "draft"
+        report.status = ReportStatusEnum.draft
         report.draft_content = report.draft_content or {}
         report.draft_content["registry_submission_error"] = registry_result.get("error")
 
