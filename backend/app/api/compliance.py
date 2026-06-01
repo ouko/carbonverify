@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.database import get_db
+from app.schemas import SubjectTypeEnum
 from app.models import (
     User, ConsentRecord, ConsentTypeEnum, DataSubjectRequest,
     DSRTypeEnum, DSRStatusEnum, BreachNotification, BreachStatusEnum,
@@ -664,7 +665,7 @@ async def terms_of_service():
 
 class ErasureRequest(BaseModel):
     subject_id: str
-    subject_type: str  # enumerator | household | developer | user
+    subject_type: str
     reason: Optional[str] = None
 
 
@@ -680,13 +681,18 @@ async def request_erasure(
     Creates a DSR record and schedules cascading deletion via Celery.
     Actual deletion is async to handle S3, Redis, and audit log cleanup.
     """
+    VALID_SUBJECT_TYPES = {"enumerator", "household", "developer", "user"}
+    if payload.subject_type not in VALID_SUBJECT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid subject_type")
+
+    sla_deadline = datetime.now(timezone.utc) + timedelta(days=settings.DSR_RESPONSE_SLA_DAYS)
     dsr = DataSubjectRequest(
         subject_id=payload.subject_id,
         subject_type=payload.subject_type,
         request_type=DSRTypeEnum.erasure,
         status=DSRStatusEnum.received,
-        requested_by=current_user.id,
-        details={"reason": payload.reason, "automated": True},
+        description=payload.reason,
+        sla_deadline=sla_deadline,
     )
     db.add(dsr)
     await db.commit()

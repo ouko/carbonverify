@@ -2,10 +2,18 @@ import uuid
 import re
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
+from enum import Enum as PyEnum
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
 
 # ─── Shared ───────────────────────────────────────────────────────────────────
+
+class SubjectTypeEnum(str, PyEnum):
+    enumerator = "enumerator"
+    household = "household"
+    developer = "developer"
+    user = "user"
+
 
 class ORMBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)

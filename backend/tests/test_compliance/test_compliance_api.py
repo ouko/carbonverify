@@ -197,3 +197,34 @@ class TestMethodologyVersioning:
         assert list_resp.status_code == 200
         versions = list_resp.json()
         assert any(v["version"] == "4.2.1" for v in versions)
+
+
+class TestErasureAPI:
+    @pytest.mark.asyncio
+    async def test_erasure_request_invalid_subject_type(self, authenticated_client):
+        client, user = authenticated_client
+        response = await client.post(
+            "/compliance/erasure",
+            json={
+                "subject_id": "test-123",
+                "subject_type": "invalid_type",
+                "reason": "Testing invalid type",
+            },
+        )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_erasure_request_valid_subject_type(self, authenticated_client):
+        client, user = authenticated_client
+        response = await client.post(
+            "/compliance/erasure",
+            json={
+                "subject_id": "test-123",
+                "subject_type": "user",
+                "reason": "Testing valid type",
+            },
+        )
+        assert response.status_code == 202
+        data = response.json()
+        assert data["status"] == "received"
+        assert "dsr_id" in data
