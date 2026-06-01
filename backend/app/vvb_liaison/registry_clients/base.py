@@ -1,6 +1,6 @@
 """Base registry client with retry logic and error handling."""
 
-import time
+import asyncio
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 
@@ -44,7 +44,7 @@ class BaseRegistryClient(ABC):
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.timeout = timeout
-        self.client = httpx.Client(timeout=timeout, follow_redirects=True)
+        self.client = httpx.AsyncClient(timeout=timeout, follow_redirects=True)
     
     def _get_headers(self) -> Dict[str, str]:
         headers = {
@@ -55,7 +55,7 @@ class BaseRegistryClient(ABC):
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
     
-    def _request(
+    async def _request(
         self,
         method: str,
         endpoint: str,
@@ -68,7 +68,7 @@ class BaseRegistryClient(ABC):
         
         for attempt in range(self.max_retries):
             try:
-                response = self.client.request(
+                response = await self.client.request(
                     method=method,
                     url=url,
                     headers=self._get_headers(),
@@ -102,7 +102,22 @@ class BaseRegistryClient(ABC):
                     error=str(e),
                 )
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay * (2 ** attempt))
+                    await asyncio.sleep(self.retry_delay * (2 ** attempt))
+                
+            except RegistryAPIError as e:
+                if e.status_code >= 500:
+                    last_error = e
+                    logger.warning(
+                        "registry_request_retry",
+                        url=url,
+                        attempt=attempt + 1,
+                        max_retries=self.max_retries,
+                        error=str(e),
+                    )
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(self.retry_delay * (2 ** attempt))
+                else:
+                    raise
                 
             except RegistryAuthenticationError:
                 raise
@@ -115,26 +130,26 @@ class BaseRegistryClient(ABC):
         
         raise RegistryClientError(f"Max retries exceeded: {last_error}")
     
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return self._request("GET", endpoint, params=params)
+    async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return await self._request("GET", endpoint, params=params)
     
-    def post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return self._request("POST", endpoint, json_data=json_data)
+    async def post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return await self._request("POST", endpoint, json_data=json_data)
     
-    def close(self):
-        self.client.close()
+    async def close(self):
+        await self.client.aclose()
     
     @abstractmethod
-    def submit_monitoring_report(self, project_id: str, report_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def submit_monitoring_report(self, project_id: str, report_data: Dict[str, Any]) -> Dict[str, Any]:
         """Submit a monitoring report to the registry."""
         pass
     
     @abstractmethod
-    def get_project_status(self, project_id: str) -> Dict[str, Any]:
+    async def get_project_status(self, project_id: str) -> Dict[str, Any]:
         """Get current project verification status."""
         pass
     
     @abstractmethod
-    def get_verification_history(self, project_id: str) -> Dict[str, Any]:
+    async def get_verification_history(self, project_id: str) -> Dict[str, Any]:
         """Get verification history for a project."""
         pass

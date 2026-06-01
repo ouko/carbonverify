@@ -23,7 +23,7 @@ class VerraRegistryClient(BaseRegistryClient):
             retry_delay=2.0,
         )
     
-    def submit_monitoring_report(
+    async def submit_monitoring_report(
         self,
         project_id: str,
         report_data: Dict[str, Any],
@@ -44,7 +44,7 @@ class VerraRegistryClient(BaseRegistryClient):
         }
         
         try:
-            result = self.post(f"/projects/{project_id}/monitoring-reports", json_data=payload)
+            result = await self.post(f"/projects/{project_id}/monitoring-reports", json_data=payload)
             logger.info("verra_report_submitted", project_id=project_id, report_id=result.get("id"))
             return {
                 "success": True,
@@ -63,12 +63,12 @@ class VerraRegistryClient(BaseRegistryClient):
                 "status": "failed",
             }
     
-    def get_project_status(self, project_id: str) -> Dict[str, Any]:
+    async def get_project_status(self, project_id: str) -> Dict[str, Any]:
         """Get current project status from Verra."""
         logger.info("polling_verra_project", project_id=project_id)
         
         try:
-            result = self.get(f"/projects/{project_id}")
+            result = await self.get(f"/projects/{project_id}")
             return {
                 "success": True,
                 "registry": "verra",
@@ -87,10 +87,10 @@ class VerraRegistryClient(BaseRegistryClient):
                 "error": str(e),
             }
     
-    def get_verification_history(self, project_id: str) -> Dict[str, Any]:
+    async def get_verification_history(self, project_id: str) -> Dict[str, Any]:
         """Get verification history from Verra."""
         try:
-            result = self.get(f"/projects/{project_id}/verification-history")
+            result = await self.get(f"/projects/{project_id}/verification-history")
             return {
                 "success": True,
                 "registry": "verra",

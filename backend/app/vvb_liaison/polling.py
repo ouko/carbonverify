@@ -30,15 +30,15 @@ class RegistryPoller:
             "kenya_national": KenyaNationalRegistryClient(api_key=kenya_api_key),
         }
     
-    def poll_project(self, registry: str, project_id: str) -> Dict[str, Any]:
+    async def poll_project(self, registry: str, project_id: str) -> Dict[str, Any]:
         """Poll a single registry for project status."""
         client = self.clients.get(registry)
         if not client:
             return {"success": False, "error": f"Unknown registry: {registry}"}
         
-        return client.get_project_status(project_id)
+        return await client.get_project_status(project_id)
     
-    def poll_all_registries(self, project_registrations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def poll_all_registries(self, project_registrations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         Poll all registered projects across all registries.
         
@@ -54,7 +54,7 @@ class RegistryPoller:
             
             logger.info("polling_project", registry=registry, project_id=project_id)
             
-            result = self.poll_project(registry, project_id)
+            result = await self.poll_project(registry, project_id)
             result["project_id"] = project_id
             result["registry"] = registry
             result["previous_status"] = last_status
@@ -137,10 +137,10 @@ class RegistryPoller:
             "days_pending": days_pending,
         }
     
-    def close(self):
+    async def close(self):
         """Close all registry clients."""
         for client in self.clients.values():
-            client.close()
+            await client.close()
 
 
 def generate_follow_up_email(

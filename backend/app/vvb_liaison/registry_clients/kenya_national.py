@@ -28,7 +28,7 @@ class KenyaNationalRegistryClient(BaseRegistryClient):
             retry_delay=2.0,
         )
     
-    def submit_monitoring_report(
+    async def submit_monitoring_report(
         self,
         project_id: str,
         report_data: Dict[str, Any],
@@ -43,7 +43,7 @@ class KenyaNationalRegistryClient(BaseRegistryClient):
             "note": "This registry is in development. Integration will be enabled once the API is published.",
         }
     
-    def get_project_status(self, project_id: str) -> Dict[str, Any]:
+    async def get_project_status(self, project_id: str) -> Dict[str, Any]:
         """Get project status from Kenya National Registry."""
         return {
             "success": False,
@@ -52,7 +52,7 @@ class KenyaNationalRegistryClient(BaseRegistryClient):
             "status": "not_implemented",
         }
     
-    def get_verification_history(self, project_id: str) -> Dict[str, Any]:
+    async def get_verification_history(self, project_id: str) -> Dict[str, Any]:
         """Get verification history from Kenya National Registry."""
         return {
             "success": False,

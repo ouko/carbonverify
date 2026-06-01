@@ -2,6 +2,8 @@
 
 from datetime import datetime, timezone, date
 
+import pytest
+
 from app.reports.citations import get_citations_for_calculation, auto_cite_number, build_citation_index
 from app.reports.cross_references import validate_report_cross_references
 from app.reports.quality_gates import run_quality_gates
@@ -172,14 +174,16 @@ class TestVvbAutoResponder:
 
 
 class TestRegistryPolling:
-    def test_poller_initialization(self):
+    @pytest.mark.asyncio
+    async def test_poller_initialization(self):
         poller = RegistryPoller()
         assert "verra" in poller.clients
         assert "gold_standard" in poller.clients
         assert "kenya_national" in poller.clients
-        poller.close()
+        await poller.close()
 
-    def test_follow_up_needed_escalation(self):
+    @pytest.mark.asyncio
+    async def test_follow_up_needed_escalation(self):
         from datetime import timedelta
         poller = RegistryPoller()
         result = poller.check_follow_up_needed(
@@ -188,9 +192,10 @@ class TestRegistryPolling:
         )
         assert result["action"] == "escalate"
         assert result["urgency"] == "high"
-        poller.close()
+        await poller.close()
 
-    def test_follow_up_needed_wait(self):
+    @pytest.mark.asyncio
+    async def test_follow_up_needed_wait(self):
         from datetime import timedelta
         poller = RegistryPoller()
         result = poller.check_follow_up_needed(
@@ -198,9 +203,10 @@ class TestRegistryPolling:
             current_status="under_review",
         )
         assert result["action"] == "wait"
-        poller.close()
+        await poller.close()
 
-    def test_no_follow_up_for_approved(self):
+    @pytest.mark.asyncio
+    async def test_no_follow_up_for_approved(self):
         from datetime import timedelta
         poller = RegistryPoller()
         result = poller.check_follow_up_needed(
@@ -208,4 +214,4 @@ class TestRegistryPolling:
             current_status="approved",
         )
         assert result["action"] == "none"
-        poller.close()
+        await poller.close()

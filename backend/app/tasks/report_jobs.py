@@ -3,14 +3,21 @@
 from datetime import datetime, timezone
 from sqlalchemy import select
 
+import redis
+from app.config import get_settings
 from app.tasks.celery_app import celery_app
 from app.database import AsyncSessionLocal
-from app.models import Report, Project, CalculationRun, DataSource, HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum
+from app.models import Report, Project, CalculationRun, DataSource, HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum, AuditActionEnum
+from app.security.audit_logging import AuditLogger
 from app.reports.generator import generate_report
 from app.vvb_liaison.polling import RegistryPoller, generate_follow_up_email
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+settings = get_settings()
+
+POLL_REGISTRY_LOCK_KEY = "lock:poll_registry_statuses"
+POLL_REGISTRY_LOCK_TTL = 600  # 10 minutes
 
 
 def run_async(coro):
@@ -136,8 +143,33 @@ def poll_registry_statuses():
     """Poll all registries for project status updates."""
     logger.info("task_poll_registries_started")
 
+    # Acquire distributed lock via Redis
+    try:
+        redis_client = redis.from_url(
+            settings.REDIS_URL,
+            socket_connect_timeout=5,
+            socket_keepalive=True,
+            health_check_interval=30,
+            retry_on_timeout=True,
+        )
+        acquired = redis_client.set(
+            POLL_REGISTRY_LOCK_KEY,
+            "1",
+            nx=True,
+            ex=POLL_REGISTRY_LOCK_TTL,
+        )
+        if not acquired:
+            logger.info("task_poll_registries_lock_held", lock_key=POLL_REGISTRY_LOCK_KEY)
+            return {"locked": True, "message": "Another instance is already polling"}
+    except redis.RedisError as exc:
+        logger.error("task_poll_registries_lock_error", error=str(exc))
+        # Proceed without lock if Redis is unavailable
+        acquired = False
+        redis_client = None
+
     async def _poll():
         async with AsyncSessionLocal() as db:
+            audit = AuditLogger(db)
             # Get all reports with status "submitted"
             result = await db.execute(
                 select(Report).where(Report.status == "submitted")
@@ -155,7 +187,7 @@ def poll_registry_statuses():
                 registry = "verra" if "VM" in report.template_type.value else "gold_standard"
                 project_id = str(report.project_id)
 
-                status_result = poller.poll_project(registry, project_id)
+                status_result = await poller.poll_project(registry, project_id)
 
                 if status_result.get("success") and status_result.get("status_changed"):
                     changes += 1
@@ -166,7 +198,23 @@ def poll_registry_statuses():
                         "approved": "vvb_approved",
                         "rejected": "rejected",
                     }
+                    old_status = report.status
                     report.status = status_mapping.get(new_status, "submitted")
+
+                    await audit.log(
+                        action_type=AuditActionEnum.registry_polled,
+                        actor_id=None,
+                        actor_type="system",
+                        target_type="report",
+                        target_id=report.id,
+                        metadata={
+                            "event": "status_change",
+                            "registry": registry,
+                            "project_id": project_id,
+                            "from_status": old_status.value if hasattr(old_status, "value") else str(old_status),
+                            "to_status": report.status.value if hasattr(report.status, "value") else str(report.status),
+                        },
+                    )
 
                     # Add to review queue if rejected
                     if report.status == "rejected":
@@ -178,14 +226,36 @@ def poll_registry_statuses():
                             status=QueueStatusEnum.pending,
                         )
                         db.add(review_item)
+                elif not status_result.get("success"):
+                    await audit.log(
+                        action_type=AuditActionEnum.registry_polled,
+                        actor_id=None,
+                        actor_type="system",
+                        target_type="report",
+                        target_id=report.id,
+                        metadata={
+                            "event": "registry_failure",
+                            "registry": registry,
+                            "project_id": project_id,
+                            "error": status_result.get("error"),
+                        },
+                    )
 
             await db.commit()
-            poller.close()
+            await poller.close()
 
             logger.info("task_poll_registries_completed", checked=len(submitted_reports), changes=changes)
             return {"checked": len(submitted_reports), "changes": changes}
 
-    return run_async(_poll())
+    try:
+        result = run_async(_poll())
+    finally:
+        if redis_client and acquired:
+            try:
+                redis_client.delete(POLL_REGISTRY_LOCK_KEY)
+            except redis.RedisError as exc:
+                logger.error("task_poll_registries_unlock_error", error=str(exc))
+    return result
 
 
 @celery_app.task

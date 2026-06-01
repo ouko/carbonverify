@@ -26,11 +26,11 @@ async def poll_registry(
 ):
     """Manually poll a registry for project status."""
     poller = RegistryPoller()
-    result = poller.poll_project(registry, str(project_id))
-    poller.close()
+    result = await poller.poll_project(registry, str(project_id))
+    await poller.close()
     audit = AuditLogger(db)
     await audit.log(
-        action_type=AuditActionEnum.vvb_submitted,
+        action_type=AuditActionEnum.registry_polled,
         actor_id=current_user.id,
         target_type="project",
         target_id=project_id,
@@ -59,31 +59,18 @@ async def draft_vvb_response(
     project = proj_result.scalar_one_or_none()
     calc_run = calc_result.scalar_one_or_none()
 
+    if not project or not calc_run:
+        raise HTTPException(status_code=400, detail="Project or calculation data missing")
+
     project_data = {
-        "name": project.name if project else "Unknown",
-        "kpt_sample_size": 35,
-        "kpt_duration_weeks": 3,
-        "thermal_efficiency": 0.30,
-        "baseline_efficiency": 0.10,
-        "lab_test_type": "WBT",
-        "test_lab": "Test Lab",
-        "usage_rate": 0.85,
-        "usage_monitoring_method": "field_training",
-        "stacking_rate": 0.05,
+        "name": project.name,
     }
 
     calc_data = {
-        "fNRB_value": calc_run.fNRB_value if calc_run else 0.30,
-        "source_reference": "Spatial interpolation",
-        "uncertainty_range": {"lower": 0.20, "upper": 0.40, "std_dev": 0.10},
-        "emissions_reduction_tco2e": calc_run.emissions_reduction_tCO2e if calc_run else 0,
-        "leakage_tco2e": 0.03,
-        "leakage_assessment": {"leakage_as_pct_of_baseline": 2.5, "buffer_recommendation_pct": 10},
-        "monte_carlo": {
-            "n_iterations": 10000,
-            "uncertainty_95ci": {"lower": 1000, "upper": 1500},
-            "conservative_estimate_tco2e": 1000,
-        },
+        "fNRB_value": calc_run.fNRB_value,
+        "emissions_reduction_tco2e": calc_run.emissions_reduction_tCO2e,
+        "uncertainty_95CI": calc_run.uncertainty_95CI,
+        "leakage_assessment": calc_run.leakage_assessment,
     }
 
     response = draft_clarification_response(
