@@ -8,8 +8,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import LoginPage from './pages/LoginPage';
 
-// Invite acceptance page (public, but checks invite token)
+// Public pages
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage').then(m => ({ default: m.default })));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(m => ({ default: m.default })));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(m => ({ default: m.default })));
 
 // Core dashboard pages (eager — visited on every login)
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.default })));
@@ -59,6 +61,8 @@ function App() {
       <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<InviteAcceptPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><DashboardPage /></Suspense>} />

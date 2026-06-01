@@ -228,6 +228,8 @@ class User(Base):
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
     permissions: Mapped[dict] = mapped_column(JSONB, default=dict)  # explicit granular permissions {granted: [], revoked: []}
     password_reset_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    password_reset_token_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    password_reset_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

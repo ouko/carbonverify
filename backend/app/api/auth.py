@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import hashlib
 import json
 import secrets
 
@@ -13,7 +14,7 @@ from sqlalchemy import select, update, and_
 from app.core.encryption import compute_searchable_hash
 from app.database import get_db
 from app.models import User, RefreshToken, UserInvite, UserRoleEnum, AuditActionEnum
-from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
+from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
 from app.auth.security import (
     verify_password,
     get_password_hash,
@@ -30,6 +31,7 @@ from app.auth.mfa import (
 from app.auth.sessions import SessionManager
 from app.auth.dependencies import validate_refresh_token, get_current_user, require_admin
 from app.security.audit_logging import AuditLogger
+from app.services.email import get_email_service
 from app.config import get_settings
 from app.core.logging import get_logger
 
@@ -565,6 +567,108 @@ async def change_password(
 
     logger.info("password_changed", user_id=str(current_user.id))
     return {"message": "Password updated successfully"}
+
+
+@limiter.limit("5/minute")
+@router.post("/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request a password reset email. Always returns 200 to prevent email enumeration."""
+    email_hash = compute_searchable_hash(payload.email)
+    result = await db.execute(select(User).where(User.email_hash == email_hash))
+    user = result.scalar_one_or_none()
+
+    if user and user.is_active:
+        # Generate reset token and store hash
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        user.password_reset_token_hash = token_hash
+        user.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        await db.commit()
+
+        # Build reset link
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
+        if not settings.FRONTEND_URL:
+            reset_url = f"/reset-password?token={raw_token}"
+
+        # Send email
+        try:
+            email_service = get_email_service()
+            await email_service.send_email(
+                to=user.email,
+                subject="CarbonVerify — Password Reset Request",
+                body_text=f"Click the link to reset your password: {reset_url}\n\nThis link expires in 1 hour.",
+                body_html=f"""
+                <p>Hello {user.name},</p>
+                <p>You requested a password reset for your CarbonVerify account.</p>
+                <p><a href="{reset_url}">Reset your password</a></p>
+                <p>This link expires in 1 hour.</p>
+                <p>If you did not request this, please ignore this email.</p>
+                """,
+            )
+            logger.info("password_reset_email_sent", user_id=str(user.id))
+        except Exception as e:
+            logger.error("password_reset_email_failed", user_id=str(user.id), error=str(e))
+            # Don't leak failure to client
+
+    # Always return same response to prevent enumeration
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@limiter.limit("10/minute")
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset password using a valid reset token."""
+    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+
+    result = await db.execute(
+        select(User).where(
+            User.password_reset_token_hash == token_hash,
+            User.password_reset_expires_at > datetime.now(timezone.utc),
+            User.is_active == True,
+        )
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    # Update password and clear reset fields
+    user.hashed_password = get_password_hash(payload.new_password)
+    user.password_reset_token_hash = None
+    user.password_reset_expires_at = None
+    user.password_reset_required = False
+    user.failed_login_count = 0
+    user.locked_until = None
+    await db.commit()
+
+    # Revoke all sessions and refresh tokens for security
+    await SessionManager.destroy_all_user_sessions(str(user.id))
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_updated,
+        actor_id=user.id,
+        target_type="user",
+        target_id=user.id,
+        metadata={"event": "password_reset_via_token"},
+    )
+
+    logger.info("password_reset_complete", user_id=str(user.id))
+    return {"message": "Password has been reset. Please log in with your new password."}
 
 
 @limiter.limit("10/minute")

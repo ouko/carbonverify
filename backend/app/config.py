@@ -87,6 +87,16 @@ class Settings(BaseSettings):
     # Comma-separated list of user agents for rotation; falls back to default if empty
     SCRAPER_USER_AGENTS: str = ""
 
+    # Email — AWS SES is preferred; SMTP is fallback
+    EMAIL_PROVIDER: str = "ses"  # "ses" or "smtp"
+    AWS_SES_FROM_EMAIL: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_TLS: bool = True
+
 
 @lru_cache()
 def get_settings() -> Settings:

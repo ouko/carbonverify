@@ -118,20 +118,29 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full mt-2 group"
-            >
-              {loading ? (
-                <div className="h-5 w-5 rounded-full border-[2.5px] border-white/30 border-t-white animate-spin" />
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </>
-              )}
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary group"
+              >
+                {loading ? (
+                  <div className="h-5 w-5 rounded-full border-[2.5px] border-white/30 border-t-white animate-spin" />
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
           </form>
 
           {/* Footer */}

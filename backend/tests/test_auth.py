@@ -118,6 +118,71 @@ class TestRefresh:
         assert response.status_code == 401
 
 
+class TestForgotPassword:
+    @pytest.mark.asyncio
+    async def test_forgot_password_existing_user(self, client, test_user):
+        response = await client.post("/auth/forgot-password", json={
+            "email": "test@carbonverify.io",
+        })
+        assert response.status_code == 200
+        # Should return same message regardless of whether user exists
+        assert "reset link has been sent" in response.json()["message"]
+
+    @pytest.mark.asyncio
+    async def test_forgot_password_nonexistent_user(self, client):
+        response = await client.post("/auth/forgot-password", json={
+            "email": "nonexistent@carbonverify.io",
+        })
+        assert response.status_code == 200
+        # Same message to prevent enumeration
+        assert "reset link has been sent" in response.json()["message"]
+
+
+class TestResetPassword:
+    @pytest.mark.asyncio
+    async def test_reset_password_success(self, client, test_user, db_session):
+        # Set a reset token on the user
+        import secrets
+        import hashlib
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        test_user.password_reset_token_hash = token_hash
+        test_user.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        await db_session.commit()
+
+        response = await client.post("/auth/reset-password", json={
+            "token": raw_token,
+            "new_password": "Newpassword123!",
+        })
+        assert response.status_code == 200
+        assert "Password has been reset" in response.json()["message"]
+
+    @pytest.mark.asyncio
+    async def test_reset_password_invalid_token(self, client):
+        response = await client.post("/auth/reset-password", json={
+            "token": "invalid-token",
+            "new_password": "Newpassword123!",
+        })
+        assert response.status_code == 400
+        assert "Invalid or expired reset token" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_reset_password_weak_password(self, client, test_user, db_session):
+        import secrets
+        import hashlib
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        test_user.password_reset_token_hash = token_hash
+        test_user.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        await db_session.commit()
+
+        response = await client.post("/auth/reset-password", json={
+            "token": raw_token,
+            "new_password": "weak",
+        })
+        assert response.status_code == 422
+
+
 class TestLogout:
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="Event loop closed issue with httpx cookie handling in tests")
