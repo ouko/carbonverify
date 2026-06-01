@@ -3,7 +3,7 @@ import re
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from enum import Enum as PyEnum
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 
 
 # ─── Shared ───────────────────────────────────────────────────────────────────
@@ -168,6 +168,13 @@ class ProjectBase(BaseModel):
 class ProjectCreate(ProjectBase):
     developer_id: uuid.UUID
 
+    @model_validator(mode='after')
+    def check_dates(self):
+        if self.crediting_period_start and self.crediting_period_end:
+            if self.crediting_period_end <= self.crediting_period_start:
+                raise ValueError("crediting_period_end must be after crediting_period_start")
+        return self
+
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
@@ -176,6 +183,15 @@ class ProjectUpdate(BaseModel):
     confidence_threshold: Optional[float] = None
     brokerage_enabled: Optional[bool] = None
     tokenization_enabled: Optional[bool] = None
+    crediting_period_start: Optional[date] = None
+    crediting_period_end: Optional[date] = None
+
+    @model_validator(mode='after')
+    def check_dates(self):
+        if self.crediting_period_start and self.crediting_period_end:
+            if self.crediting_period_end <= self.crediting_period_start:
+                raise ValueError("crediting_period_end must be after crediting_period_start")
+        return self
 
 
 class ProjectOut(ProjectBase, ORMBase):

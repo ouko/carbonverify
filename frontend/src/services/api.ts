@@ -21,6 +21,10 @@ api.interceptors.request.use((config) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  const sessionId = useAuthStore.getState().sessionId
+  if (sessionId && config.headers) {
+    config.headers['x-session-id'] = sessionId
+  }
   return config
 })
 
@@ -81,8 +85,8 @@ api.interceptors.response.use(
       refreshPromise = axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
       try {
         const res = await refreshPromise
-        const { access_token } = res.data
-        useAuthStore.getState().setAccessToken(access_token)
+        const { access_token, session_id } = res.data
+        useAuthStore.getState().setAccessToken(access_token, session_id)
         originalRequest.headers.Authorization = `Bearer ${access_token}`
         return api(originalRequest)
       } catch {

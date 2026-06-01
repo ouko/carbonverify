@@ -9,7 +9,9 @@ interface AuthState {
   isLoading: boolean
   mfaRequired: boolean
   mfaTempToken: string | null
-  setAccessToken: (access: string) => void
+  sessionId: string | null
+  setAccessToken: (access: string, sessionId?: string) => void
+  setSessionId: (sessionId: string | null) => void
   setUser: (user: User | null) => void
   login: (email: string, password: string) => Promise<void>
   verifyMFA: (totpCode: string) => Promise<void>
@@ -24,10 +26,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isLoading: true,
   mfaRequired: false,
   mfaTempToken: null,
+  sessionId: null,
 
-  setAccessToken: (access) => {
-    set({ accessToken: access, isAuthenticated: true })
+  setAccessToken: (access, sessionId) => {
+    set({ accessToken: access, isAuthenticated: true, sessionId: sessionId ?? null })
   },
+
+  setSessionId: (sessionId) => set({ sessionId }),
 
   setUser: (user) => set({ user }),
 
@@ -37,8 +42,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ mfaRequired: true, mfaTempToken: res.data.temp_token, isLoading: false })
       return
     }
-    const { access_token } = res.data
-    set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null })
+    const { access_token, session_id } = res.data
+    set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null, sessionId: session_id ?? null })
     const me = await api.get<User>('/users/me')
     set({ user: me.data, isLoading: false })
   },
@@ -47,8 +52,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const { mfaTempToken } = get()
     if (!mfaTempToken) throw new Error('No MFA temp token available')
     const res = await api.post('/auth/mfa/verify', { temp_token: mfaTempToken, totp_code: totpCode }, { withCredentials: true })
-    const { access_token } = res.data
-    set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null })
+    const { access_token, session_id } = res.data
+    set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null, sessionId: session_id ?? null })
     const me = await api.get<User>('/users/me')
     set({ user: me.data, isLoading: false })
   },
@@ -69,8 +74,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     api
       .post('/auth/refresh', {}, { withCredentials: true })
       .then((res) => {
-        const { access_token } = res.data
-        set({ accessToken: access_token, isAuthenticated: true })
+        const { access_token, session_id } = res.data
+        set({ accessToken: access_token, isAuthenticated: true, sessionId: session_id ?? null })
         return api.get<User>('/users/me')
       })
       .then((me) => {

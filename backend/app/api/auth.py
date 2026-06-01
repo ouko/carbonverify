@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import json
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
@@ -41,6 +42,34 @@ settings = get_settings()
 MAX_FAILED_LOGINS = 5
 LOCKOUT_DURATION_MINUTES = 30
 REFRESH_COOKIE_NAME = "refresh_token"
+
+
+def _get_login_email_key(request: Request) -> str:
+    """Rate limit key based on login email address."""
+    try:
+        body = getattr(request, "_body", None)
+        if body:
+            data = json.loads(body)
+            email = data.get("email")
+            if email:
+                return f"login:{email}"
+    except Exception:
+        pass
+    return ""
+
+
+def _get_mfa_temp_token_key(request: Request) -> str:
+    """Rate limit key based on MFA temp token."""
+    try:
+        body = getattr(request, "_body", None)
+        if body:
+            data = json.loads(body)
+            temp_token = data.get("temp_token")
+            if temp_token:
+                return f"mfa:{temp_token}"
+    except Exception:
+        pass
+    return ""
 
 
 def _get_device_fingerprint(request: Request) -> str:
@@ -127,6 +156,7 @@ async def register(
 
 
 @limiter.limit("10/minute")
+@limiter.limit("5/minute", key_func=_get_login_email_key)
 @router.post("/login")
 async def login(
     payload: LoginRequest,
@@ -200,7 +230,7 @@ async def login(
     await db.commit()
 
     # Check MFA requirement
-    if user.mfa_enabled and is_mfa_required(user.role.value):
+    if user.mfa_enabled:
         # Issue temporary token valid for 5 minutes for MFA step
         temp_token = create_access_token(
             str(user.id),
@@ -218,6 +248,7 @@ async def login(
 
 
 @limiter.limit("10/minute")
+@limiter.limit("5/minute", key_func=_get_mfa_temp_token_key)
 @router.post("/mfa/verify")
 async def verify_mfa(
     payload: MFAVerifyRequest,
@@ -252,7 +283,7 @@ async def verify_mfa(
         await audit.log_login(user_id=user.id, success=False, request=request, mfa_used=True)
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
 
-    return await _issue_tokens(user, request, response, db, mfa_used=True)
+    return await _issue_tokens(user, request, response, db, mfa_used=True, mfa_verified=True)
 
 
 @limiter.limit("5/minute")
@@ -282,6 +313,7 @@ async def setup_mfa(
 class MFAConfirmRequest(BaseModel):
     secret: str
     totp_code: str
+    current_password: str
 
 
 @limiter.limit("10/minute")
@@ -293,6 +325,9 @@ async def confirm_mfa(
     db: AsyncSession = Depends(get_db),
 ):
     """Confirm MFA setup with secret and verification code."""
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
     if not verify_totp(payload.secret, payload.totp_code):
         raise HTTPException(status_code=400, detail="Invalid TOTP code")
 
@@ -375,7 +410,14 @@ async def refresh(
     )
 
     # Issue new tokens
-    return await _issue_tokens(user, request, response, db, is_refresh=True)
+    old_session_id = request.headers.get("x-session-id")
+    mfa_verified = False
+    if old_session_id:
+        old_session = await SessionManager.get_session(old_session_id)
+        if old_session:
+            mfa_verified = old_session.get("mfa_verified", False)
+
+    return await _issue_tokens(user, request, response, db, is_refresh=True, mfa_verified=mfa_verified)
 
 
 @router.post("/logout")
@@ -640,6 +682,7 @@ async def _issue_tokens(
     db: AsyncSession,
     mfa_used: bool = False,
     is_refresh: bool = False,
+    mfa_verified: bool = False,
 ) -> Token:
     """Issue access and refresh tokens, create session and refresh token record."""
     access_token = create_access_token(str(user.id))
@@ -661,6 +704,7 @@ async def _issue_tokens(
         device_fingerprint=str(_get_device_fingerprint(request)),
         ip_address=_get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
+        extra_data={"mfa_verified": mfa_verified},
     )
 
     await db.commit()

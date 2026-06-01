@@ -72,6 +72,7 @@ class SessionManager:
         device_fingerprint: Optional[str] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
+        extra_data: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Create a new session and return the session ID."""
         session_id = str(uuid.uuid4())
@@ -84,6 +85,8 @@ class SessionManager:
             "ip_address": ip_address,
             "user_agent": user_agent,
         }
+        if extra_data:
+            session_data.update(extra_data)
 
         r = _get_redis()
         pipe = r.pipeline()

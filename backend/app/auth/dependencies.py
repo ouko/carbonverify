@@ -194,12 +194,19 @@ async def require_mfa_if_enabled(
     request: Request = None,
 ) -> User:
     """
-    Enforce MFA for roles that require it.
+    Enforce MFA for users who have MFA enabled.
 
     In the login flow, this is checked after password validation.
     For API access, the access token is only issued after MFA verification.
     """
-    if user.mfa_enabled and is_mfa_required(user.role.value):
-        # MFA should have been verified during login; token issuance is gated
-        pass
+    if user.mfa_enabled:
+        session_id = request.headers.get("x-session-id") if request else None
+        if session_id:
+            session = await SessionManager.get_session(session_id)
+            if session and session.get("mfa_verified"):
+                return user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="MFA verification required",
+        )
     return user

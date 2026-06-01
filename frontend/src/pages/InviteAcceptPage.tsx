@@ -4,6 +4,25 @@ import { api } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
+function validatePassword(password: string): string | null {
+  if (password.length < 12) {
+    return 'Password must be at least 12 characters.';
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter.';
+  }
+  if (!/[a-z]/.test(password)) {
+    return 'Password must contain at least one lowercase letter.';
+  }
+  if (!/\d/.test(password)) {
+    return 'Password must contain at least one digit.';
+  }
+  if (!/[@$!%*?&]/.test(password)) {
+    return 'Password must contain at least one special character (@$!%*?&).';
+  }
+  return null;
+}
+
 export default function InviteAcceptPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -31,8 +50,9 @@ export default function InviteAcceptPage() {
       setError('Invite token is missing from the URL.');
       return;
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (!name.trim()) {
@@ -124,11 +144,11 @@ export default function InviteAcceptPage() {
               id="password"
               type="password"
               required
-              minLength={8}
+              minLength={12}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input-modern w-full"
-              placeholder="Min 8 characters"
+              placeholder="Min 12 characters"
             />
           </div>
 
@@ -140,7 +160,7 @@ export default function InviteAcceptPage() {
               id="confirmPassword"
               type="password"
               required
-              minLength={8}
+              minLength={12}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="input-modern w-full"
