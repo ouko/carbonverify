@@ -281,8 +281,24 @@ S3_BUCKET=my-bucket ./scripts/backup-db.sh
 For fastest iteration, run PostgreSQL + Redis in Docker and the backend/frontend directly:
 
 ```bash
+# One-time setup
+./scripts/setup-local.sh
+
+# Start everything
+./scripts/start-local.sh
+
+# Check status
+./scripts/status-local.sh
+
+# Stop everything
+./scripts/stop-local.sh
+```
+
+Or start components manually:
+
+```bash
 # 1. Start infrastructure
-docker-compose up -d db redis
+docker-compose -f docker-compose.yml -f docker-compose.local.yml up -d db redis
 
 # 2. Backend (terminal 1)
 cd backend

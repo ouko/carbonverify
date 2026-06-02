@@ -183,6 +183,24 @@ pytest tests/ -v
 # 264 tests covering calculation engine, reports, VVB pipeline, lead intelligence, auth, admin
 ```
 
+### Local Development Scripts
+
+Convenience scripts in `scripts/` for hybrid local development:
+
+| Script | Purpose |
+|--------|---------|
+| `./scripts/setup-local.sh` | One-time first setup: installs deps, starts Docker infra, runs migrations, seeds demo data |
+| `./scripts/start-local.sh` | Starts everything (Docker infra + backend + frontend + Celery) |
+| `./scripts/start-local.sh --infra` | Start only Docker infra (db + redis) |
+| `./scripts/start-local.sh --app` | Start only backend/frontend/Celery (assumes infra is running) |
+| `./scripts/stop-local.sh` | Stops everything |
+| `./scripts/stop-local.sh --app` | Stop only backend/frontend/Celery |
+| `./scripts/stop-local.sh --infra` | Stop only Docker infra |
+| `./scripts/status-local.sh` | Shows what's running, ports, health checks, and recent logs |
+| `./scripts/seed-local.sh` | Truncates all data and re-runs the demo seed script |
+
+Logs are written to `.local-logs/` and PIDs are tracked in `.local-dev.pids`.
+
 ---
 
 ## Project Structure

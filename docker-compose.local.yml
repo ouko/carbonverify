@@ -1,0 +1,14 @@
+# Docker Compose override for local hybrid development
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.local.yml up -d db redis
+#
+# This exposes PostgreSQL and Redis to the host so the backend/frontend
+# can connect directly while running outside containers.
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6380:6379"
