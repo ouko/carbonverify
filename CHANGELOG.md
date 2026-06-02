@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Celery Beat leader election** — `LeaderElectionScheduler` in `app/tasks/beat_scheduler.py` fixed: `self.app.main_name` (non-existent attribute) changed to `self.app.main`. Beat scheduler now acquires Redis lock successfully and processes scheduled tasks.
+- **Demo seed script (`scripts/seed_demo_data.py`)** — Multiple runtime failures fixed so the script completes end-to-end:
+  - `seed_field_data`, `seed_human_escalations`, and `seed_admin_portfolio` were defined *after* `if __name__ == "__main__"`, causing `NameError` at runtime. Moved all seed functions before the entrypoint block.
+  - `SurveyResponse` and `SupportTicket` require `conversation_id` (FK to `whatsapp_conversations`). Added `WhatsAppConversation` creation inside `seed_field_data` and referenced those IDs.
+  - `SupportTicket.project_id` is `NOT NULL`; removed the `random.random() > 0.3 else None` branch that violated the constraint.
+  - `EscalationLevel` enum values corrected — `low`/`medium`/`high`/`critical` do not exist; the actual enum uses `l1_operator`/`l2_engineer`/`l3_architect`/`executive`. Updated `seed_human_escalations` to use `list(EscalationLevel)`.
+  - `human_escalations.run_id` has a FK to `validation_runs.id`; random UUIDs violated the constraint. Added dummy `ValidationWorkflow` + `ValidationRun` creation inside `seed_human_escalations` so escalation records reference real runs.
+- **PostgreSQL enum mismatch** — Added missing `in_progress` value to `dsr_status` enum (was in Python `DSRStatusEnum` but absent from DB), preventing `seed_compliance()` from failing with `InvalidTextRepresentationError`.
+
 ### Security
 - **Protected `/metrics` endpoint** — Now requires admin authentication (was publicly accessible)
 - **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, invite accept, OAuth login/callback/link/unlink, and file uploads (previously unprotected from brute-force)

@@ -275,3 +275,55 @@ S3_BUCKET=my-bucket ./scripts/backup-db.sh
 - **CDM scraping**: ✅ Working reliably. Returns real registered projects from Kenya.
 - **Vite chunk size**: ✅ Resolved. Code-splitting + manual vendor chunks reduced main entry chunk to ~29KB.
 - **React Router v6 → v7**: Future flags enabled in `main.tsx` to suppress console warnings.
+
+## Local Development (Hybrid Mode)
+
+For fastest iteration, run PostgreSQL + Redis in Docker and the backend/frontend directly:
+
+```bash
+# 1. Start infrastructure
+docker-compose up -d db redis
+
+# 2. Backend (terminal 1)
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+
+# 3. Frontend (terminal 2)
+cd frontend
+npm run dev
+
+# 4. Celery (terminal 3)
+cd backend
+source .venv/bin/activate
+celery -A app.tasks.celery_app worker --loglevel=info
+celery -A app.tasks.celery_app beat --loglevel=info
+```
+
+**CORS fix for local dev:** Do **not** set `VITE_API_URL` in `frontend/.env.local`. Leave it empty (or remove the file) so the Vite dev server proxies API requests to `localhost:8000` via same-origin, avoiding CORS preflight issues. The `vite.config.ts` proxy routes (`/auth`, `/projects`, `/calculations`, etc.) handle this automatically.
+
+**Browser extensions:** MetaMask and some other extensions inject scripts into `localhost` pages that can break API requests with `net::ERR_FAILED`. Use an incognito/private window if you see unexplained network failures.
+
+### Demo Data Seeding
+
+After migrations, seed comprehensive demo data:
+
+```bash
+cd backend
+source .venv/bin/activate
+python -m scripts.seed_demo_data
+```
+
+**Demo accounts** (password: `DemoPass123!`):
+- `admin@carbonverify.demo` — Admin
+- `operator@carbonverify.demo` — Operator
+- `developer@carbonverify.demo` — Developer
+- `viewer@carbonverify.demo` — Viewer
+- `buyer@carbonverify.demo` — Buyer
+- `seller@carbonverify.demo` — Seller
+- `compliance@carbonverify.demo` — Compliance Officer
+- `field@carbonverify.demo` — Field Manager
+
+The seed script creates: 6 projects, 20+ data sources, 8+ calculations, 3 reports, 12 review queue items, 34 agent runs, 39 orchestrator events, 43 audit logs, compliance data (breaches, DSRs, consent), brokerage listings/transactions, 25 leads, field data (enumerators, surveys, tickets), and validation engine data.
+
+If re-running the seed script after a partial failure, truncate tables first (the script does not skip existing records and will hit unique constraints on `buyer_profiles.user_id` and `users.email_hash`).

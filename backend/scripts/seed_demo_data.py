@@ -49,6 +49,8 @@ from app.models import (
     ConflictOfInterest,
     ConsentRecord,
     ConsentTypeEnum,
+    ConversationFlowEnum,
+    ConversationStateEnum,
     CorporatePortfolio,
     DataSource,
     DataSubjectRequest,
@@ -91,6 +93,7 @@ from app.models import (
     User,
     UserRoleEnum,
     ValidationStatusEnum,
+    WhatsAppConversation,
 )
 from app.auth.security import get_password_hash
 from app.core.encryption import compute_searchable_hash
@@ -1069,10 +1072,6 @@ async def seed_all() -> None:
             print(f"   • {u.email}  ({u.role.value})")
 
 
-if __name__ == "__main__":
-    asyncio.run(seed_all())
-
-
 async def seed_field_data(db: AsyncSession, projects: list[Project], users: list[User]) -> None:
     """Create enumerators, survey responses, and support tickets for the Field dashboard."""
     field_projects = [p for p in projects if p.status in (ProjectStatusEnum.data_collection, ProjectStatusEnum.monitoring, ProjectStatusEnum.verified)]
@@ -1102,11 +1101,29 @@ async def seed_field_data(db: AsyncSession, projects: list[Project], users: list
 
     await db.flush()
 
+    # Create WhatsApp conversations needed for survey_responses and support_tickets
+    conversations: list[WhatsAppConversation] = []
+    for enum in enumerators:
+        conv = WhatsAppConversation(
+            project_id=enum.project_id,
+            phone_number=enum.phone_number,
+            flow_type=random.choice(list(ConversationFlowEnum)),
+            state=random.choice(list(ConversationStateEnum)),
+            assigned_enumerator_id=enum.id,
+            created_at=days_ago(random.randint(0, 7)),
+        )
+        db.add(conv)
+        conversations.append(conv)
+
+    await db.flush()
+
     surveys: list[SurveyResponse] = []
     for enum in enumerators:
+        conv = next((c for c in conversations if c.assigned_enumerator_id == enum.id), None)
         for _ in range(random.randint(3, 15)):
             survey = SurveyResponse(
                 project_id=enum.project_id,
+                conversation_id=conv.id if conv else random.choice(conversations).id,
                 enumerator_id=enum.id,
                 household_id=f"HH-{random.randint(1000, 9999)}",
                 stove_id=f"STV-{random.randint(100, 999)}",
@@ -1126,7 +1143,8 @@ async def seed_field_data(db: AsyncSession, projects: list[Project], users: list
     tickets: list[SupportTicket] = []
     for _ in range(random.randint(3, 8)):
         ticket = SupportTicket(
-            project_id=random.choice(field_projects).id if random.random() > 0.3 else None,
+            project_id=random.choice(field_projects).id,
+            conversation_id=random.choice(conversations).id,
             phone_number=f"+2547{random.randint(10, 99)}{random.randint(100000, 999999)}",
             issue_type=random.choice(["stove_broken", "cant_sync", "wrong_data", "other"]),
             description=random.choice([
@@ -1149,7 +1167,43 @@ async def seed_field_data(db: AsyncSession, projects: list[Project], users: list
 
 async def seed_human_escalations(db: AsyncSession, projects: list[Project], users: list[User]) -> None:
     """Create human escalation records for the VVB Pipeline."""
-    from app.validation_engine.models import HumanEscalation, EscalationLevel, EscalationStatus
+    from app.validation_engine.models import (
+        HumanEscalation, EscalationLevel, EscalationStatus,
+        ValidationRun, ValidationWorkflow, WorkflowRunStatus,
+    )
+
+    # Create a dummy validation workflow
+    workflow = ValidationWorkflow(
+        name="Demo Validation Workflow",
+        version="1.0.0",
+        description="Auto-generated workflow for demo escalations",
+        active=True,
+        workflow_graph={"steps": []},
+        graph_hash="a" * 64,
+        sla_seconds=3600,
+        human_gates_required=True,
+        created_at=days_ago(random.randint(30, 180)),
+    )
+    db.add(workflow)
+    await db.flush()
+
+    # Create some validation runs
+    runs: list[ValidationRun] = []
+    for _ in range(random.randint(6, 12)):
+        run = ValidationRun(
+            workflow_id=workflow.id,
+            project_id=random.choice(projects).id if projects else None,
+            triggered_by=random.choice(users).id if users else None,
+            trigger_event=random.choice(["data_uploaded", "calculation_completed", "report_submitted", "vvb_feedback"]),
+            status=random.choice(list(WorkflowRunStatus)),
+            input_data={},
+            output_data={},
+            created_at=days_ago(random.randint(1, 30)),
+        )
+        db.add(run)
+        runs.append(run)
+
+    await db.flush()
 
     reasons = [
         "VVB requested clarification on baseline fuel consumption methodology",
@@ -1169,10 +1223,10 @@ async def seed_human_escalations(db: AsyncSession, projects: list[Project], user
         resolved_at = days_ago(random.randint(0, 3)) if status == EscalationStatus.resolved else None
 
         esc = HumanEscalation(
-            run_id=uuid.uuid4(),  # dummy run reference
+            run_id=random.choice(runs).id,
             escalation_reason=random.choice(reasons),
             severity_score=rand_float(0.3, 0.95),
-            level=random.choice([EscalationLevel.low, EscalationLevel.medium, EscalationLevel.high, EscalationLevel.critical]),
+            level=random.choice(list(EscalationLevel)),
             status=status,
             assigned_to=random.choice(users).id if status != EscalationStatus.pending else None,
             human_decision="approved_with_conditions" if status == EscalationStatus.resolved else None,
@@ -1226,3 +1280,7 @@ async def seed_admin_portfolio(db: AsyncSession, users: list[User], tokens: list
 
     await db.flush()
     print("✅ Seeded admin portfolio holdings")
+
+
+if __name__ == "__main__":
+    asyncio.run(seed_all())

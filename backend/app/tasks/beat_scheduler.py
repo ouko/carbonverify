@@ -29,7 +29,7 @@ class LeaderElectionScheduler(Scheduler):
             health_check_interval=30,
             retry_on_timeout=True,
         )
-        self._lock_identifier = f"{self.app.main_name}:{time.time()}"
+        self._lock_identifier = f"{self.app.main}:{time.time()}"
         self._is_leader = False
 
     def tick(self, *args, **kwargs):

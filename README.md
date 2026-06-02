@@ -124,6 +124,21 @@ docker-compose up --build
 | ClamAV | `cv-clamav` | — | Virus scanning for uploads |
 | Frontend | `cv-frontend` | 5173 | Vite dev server |
 
+### Demo Accounts
+
+After running `python -m scripts.seed_demo_data`, log in with any of these accounts (all use password `DemoPass123!`):
+
+| Email | Role |
+|-------|------|
+| `admin@carbonverify.demo` | Admin |
+| `operator@carbonverify.demo` | Operator |
+| `developer@carbonverify.demo` | Developer |
+| `viewer@carbonverify.demo` | Viewer |
+| `buyer@carbonverify.demo` | Buyer |
+| `seller@carbonverify.demo` | Seller |
+| `compliance@carbonverify.demo` | Compliance |
+| `field@carbonverify.demo` | Field Manager |
+
 ### Local Backend Development
 
 ```bash
@@ -142,6 +157,9 @@ playwright install chromium
 # Run migrations
 alembic upgrade head
 
+# Seed demo data
+python -m scripts.seed_demo_data
+
 # Start server
 uvicorn app.main:app --reload --port 8000
 ```
@@ -153,6 +171,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+**CORS note:** Do not set `VITE_API_URL` in `frontend/.env.local`. The Vite dev server proxies API calls to `localhost:8000` automatically via `vite.config.ts`. Setting a direct API URL causes CORS issues because the backend and frontend run on different origins locally.
 
 ### Running Tests
 
