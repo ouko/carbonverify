@@ -18,6 +18,32 @@ RETENTION_DAYS="${RETENTION_DAYS:-30}"
 # Ensure backup directory exists
 mkdir -p "$BACKUP_DIR"
 
+# Find working docker-compose (handles stale standalone binaries on macOS)
+find_docker_compose() {
+  local project_root="${1:-$PROJECT_ROOT}"
+  if command -v docker-compose >/dev/null 2>&1; then
+    local test_output
+    test_output=$(cd "$project_root" && docker-compose ps 2>&1) || true
+    if ! echo "$test_output" | grep -q "client version 1.43 is too old"; then
+      echo "docker-compose"
+      return
+    fi
+  fi
+  for path in /usr/local/Cellar/docker-compose/*/bin/docker-compose /opt/homebrew/Cellar/docker-compose/*/bin/docker-compose; do
+    if [[ -x "$path" ]]; then
+      local test_output
+      test_output=$(cd "$project_root" && "$path" ps 2>&1) || true
+      if ! echo "$test_output" | grep -q "client version 1.43 is too old"; then
+        echo "$path"
+        return
+      fi
+    fi
+  done
+  echo ""
+}
+
+DOCKER_COMPOSE=$(find_docker_compose "$PROJECT_ROOT")
+
 echo "[backup] Starting PostgreSQL backup: $BACKUP_FILE"
 
 # Source environment from .env if present
@@ -37,9 +63,9 @@ if [ -n "$DB_PASS" ]; then
 fi
 
 # Run pg_dump (inside db container if docker-compose, else locally)
-if command -v docker-compose &> /dev/null && docker-compose ps db &> /dev/null; then
+if [[ -n "$DOCKER_COMPOSE" ]] && $DOCKER_COMPOSE ps db &> /dev/null; then
   echo "[backup] Using docker-compose db container"
-  docker-compose exec -T db pg_dump \
+  $DOCKER_COMPOSE exec -T db pg_dump \
     --host=localhost \
     --username="$DB_USER" \
     --dbname="$DB_NAME" \

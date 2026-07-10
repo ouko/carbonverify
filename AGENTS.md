@@ -20,7 +20,7 @@ It also includes a **Lead Intelligence Engine** that scrapes carbon registries (
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Query v5, Zustand, React Router v6, Recharts, Lucide |
-| **Backend** | FastAPI, Python 3.14, SQLAlchemy 2.0 (async), Alembic, Pydantic v2, Celery |
+| **Backend** | FastAPI, Python 3.11, SQLAlchemy 2.0 (async), Alembic, Pydantic v2, Celery |
 | **Database** | PostgreSQL 15 |
 | **Cache/Queue** | Redis |
 | **Scraping** | Playwright (Chromium), playwright-stealth, BeautifulSoup4, lxml |

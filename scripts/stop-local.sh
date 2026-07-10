@@ -24,6 +24,36 @@ log_info()  { echo -e "${GREEN}[INFO]${RESET}  $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 log_error() { echo -e "${RED}[ERROR]${RESET} $*"; }
 
+# Find working docker-compose (handles stale standalone binaries on macOS)
+find_docker_compose() {
+  local project_root="${1:-$PROJECT_ROOT}"
+  if command -v docker-compose >/dev/null 2>&1; then
+    local test_output
+    test_output=$(cd "$project_root" && docker-compose ps 2>&1) || true
+    if ! echo "$test_output" | grep -q "client version 1.43 is too old"; then
+      echo "docker-compose"
+      return
+    fi
+  fi
+  for path in /usr/local/Cellar/docker-compose/*/bin/docker-compose /opt/homebrew/Cellar/docker-compose/*/bin/docker-compose; do
+    if [[ -x "$path" ]]; then
+      local test_output
+      test_output=$(cd "$project_root" && "$path" ps 2>&1) || true
+      if ! echo "$test_output" | grep -q "client version 1.43 is too old"; then
+        echo "$path"
+        return
+      fi
+    fi
+  done
+  echo ""
+}
+
+DOCKER_COMPOSE=$(find_docker_compose "$PROJECT_ROOT")
+if [[ -z "$DOCKER_COMPOSE" ]]; then
+  log_error "No working docker-compose found"
+  exit 1
+fi
+
 cd "$PROJECT_ROOT"
 
 STOP_INFRA=true
@@ -85,7 +115,7 @@ fi
 # ------------------------------------------------------------------
 if [[ "$STOP_INFRA" == true ]]; then
   log_info "Stopping Docker infrastructure..."
-  docker-compose -f docker-compose.yml -f docker-compose.local.yml down --volumes=false 2>/dev/null || true
+  $DOCKER_COMPOSE -f docker-compose.yml -f docker-compose.local.yml down --volumes=false 2>/dev/null || true
   log_info "Infrastructure stopped"
 fi
 

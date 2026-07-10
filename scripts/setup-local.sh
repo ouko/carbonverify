@@ -29,6 +29,36 @@ log_info()  { echo -e "${BLUE}[INFO]${RESET}  $*"; }
 log_ok()    { echo -e "${GREEN}[OK]${RESET}    $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 
+# Find working docker-compose (handles stale standalone binaries on macOS)
+find_docker_compose() {
+  local project_root="${1:-$PROJECT_ROOT}"
+  if command -v docker-compose >/dev/null 2>&1; then
+    local test_output
+    test_output=$(cd "$project_root" && docker-compose ps 2>&1) || true
+    if ! echo "$test_output" | grep -q "client version 1.43 is too old"; then
+      echo "docker-compose"
+      return
+    fi
+  fi
+  for path in /usr/local/Cellar/docker-compose/*/bin/docker-compose /opt/homebrew/Cellar/docker-compose/*/bin/docker-compose; do
+    if [[ -x "$path" ]]; then
+      local test_output
+      test_output=$(cd "$project_root" && "$path" ps 2>&1) || true
+      if ! echo "$test_output" | grep -q "client version 1.43 is too old"; then
+        echo "$path"
+        return
+      fi
+    fi
+  done
+  echo ""
+}
+
+DOCKER_COMPOSE=$(find_docker_compose "$PROJECT_ROOT")
+if [[ -z "$DOCKER_COMPOSE" ]]; then
+  log_warn "No working docker-compose found"
+  exit 1
+fi
+
 cd "$PROJECT_ROOT"
 
 log_info "CarbonVerify Local Setup"
@@ -39,7 +69,7 @@ echo ""
 # ------------------------------------------------------------------
 log_info "Checking prerequisites..."
 
-for cmd in docker docker-compose python3 npm uv; do
+for cmd in docker python3 npm uv; do
   if command -v "$cmd" >/dev/null 2>&1; then
     log_ok "$cmd found"
   else
@@ -54,8 +84,23 @@ done
 log_info "Setting up backend..."
 cd "$PROJECT_ROOT/backend"
 
+# Prefer Python 3.11/3.12 — 3.14 lacks wheels for pinned dependencies
+PYTHON_BIN="python3"
+if command -v python3.11 >/dev/null 2>&1; then
+  PYTHON_BIN="python3.11"
+elif command -v python3.12 >/dev/null 2>&1; then
+  PYTHON_BIN="python3.12"
+fi
+
+PYTHON_VERSION=$($PYTHON_BIN --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+if [[ "$PYTHON_VERSION" == "3.14" || "$PYTHON_VERSION" == "3.15" ]]; then
+  log_warn "Python $PYTHON_VERSION is not supported (missing wheels for pinned dependencies)"
+  log_warn "Install Python 3.11 or 3.12 and ensure it is in PATH"
+  exit 1
+fi
+
 if [[ ! -d ".venv" ]]; then
-  uv venv
+  uv venv --python "$PYTHON_BIN"
 fi
 source .venv/bin/activate
 uv pip install -r requirements.txt
@@ -92,7 +137,7 @@ fi
 # ------------------------------------------------------------------
 log_info "Starting Docker infrastructure..."
 cd "$PROJECT_ROOT"
-docker-compose -f docker-compose.yml -f docker-compose.local.yml up -d db redis
+$DOCKER_COMPOSE -f docker-compose.yml -f docker-compose.local.yml up -d db redis
 
 log_info "Waiting for PostgreSQL to be ready..."
 until docker exec cv-db pg_isready -U carbonverify -d carbonverify >/dev/null 2>&1; do
@@ -122,7 +167,7 @@ log_ok "Migrations applied"
 # 7. Seed demo data
 # ------------------------------------------------------------------
 log_info "Seeding demo data..."
-python -m scripts.seed_demo_data
+"$PROJECT_ROOT/scripts/seed-local.sh" --yes
 log_ok "Demo data seeded"
 
 # ------------------------------------------------------------------

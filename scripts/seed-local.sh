@@ -7,6 +7,7 @@
 #
 # Usage:
 #   ./scripts/seed-local.sh
+#   ./scripts/seed-local.sh --yes   # Skip confirmation prompt
 #
 
 set -euo pipefail
@@ -25,6 +26,13 @@ log_ok()    { echo -e "${GREEN}[OK]${RESET}    $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 log_error() { echo -e "${RED}[ERROR]${RESET} $*"; }
 
+AUTO_YES=false
+for arg in "$@"; do
+  case "$arg" in
+    --yes|-y) AUTO_YES=true ;;
+  esac
+done
+
 cd "$PROJECT_ROOT/backend"
 source .venv/bin/activate
 
@@ -33,13 +41,15 @@ source "$PROJECT_ROOT/.env.local"
 set +a
 
 echo ""
-log_warn "This will DELETE all existing data and re-seed with demo data."
-read -p "Are you sure? [y/N] " -n 1 -r
-echo ""
+if [[ "$AUTO_YES" != true ]]; then
+  log_warn "This will DELETE all existing data and re-seed with demo data."
+  read -p "Are you sure? [y/N] " -n 1 -r
+  echo ""
 
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  log_info "Aborted."
-  exit 0
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    log_info "Aborted."
+    exit 0
+  fi
 fi
 
 log_info "Truncating data tables..."
