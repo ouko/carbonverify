@@ -287,7 +287,8 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     developer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("developers.id", ondelete="CASCADE"), nullable=False)
     methodology: Mapped[MethodologyEnum] = mapped_column(
-        Enum(MethodologyEnum, name="methodology"), nullable=False
+        Enum(MethodologyEnum, name="methodology", values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
     )
     crediting_period_start: Mapped[date] = mapped_column(Date, nullable=False)
     crediting_period_end: Mapped[date] = mapped_column(Date, nullable=False)
@@ -651,7 +652,8 @@ class AuditLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     action_type: Mapped[AuditActionEnum] = mapped_column(
-        Enum(AuditActionEnum, name="audit_action_type"), nullable=False
+        Enum(AuditActionEnum, name="audit_action_type", values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
     )
     actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     actor_type: Mapped[str] = mapped_column(String(20), default="user")  # user | agent | system
