@@ -1,5 +1,6 @@
 """WhatsApp Business API webhook and bot endpoints."""
 
+import asyncio
 import hmac
 import hashlib
 
@@ -303,10 +304,10 @@ async def get_active_conversations(
     _: str = Depends(require_admin),
 ):
     """Get list of active WhatsApp conversations from Redis."""
-    phones = conversation_state.get_active_conversations(pattern)
+    phones = await asyncio.to_thread(conversation_state.get_active_conversations, pattern)
     conversations = []
     for phone in phones:
-        state = conversation_state.get_state(phone)
+        state = await asyncio.to_thread(conversation_state.get_state, phone)
         conversations.append({
             "phone_number": phone,
             "flow": state.get("flow"),

@@ -5,6 +5,8 @@ from typing import Optional, List, Dict, Any
 from enum import Enum as PyEnum
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 
+from app.models import SourceTypeEnum
+
 
 # ─── Shared ───────────────────────────────────────────────────────────────────
 
@@ -236,7 +238,7 @@ class FileUploadResponse(BaseModel):
 # ─── Data Sources ─────────────────────────────────────────────────────────────
 
 class DataSourceBase(BaseModel):
-    source_type: str
+    source_type: SourceTypeEnum
     schema_version: str
     raw_data: Dict[str, Any] = {}
     processed_data: Dict[str, Any] = {}

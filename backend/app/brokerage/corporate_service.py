@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone, date
 from typing import Optional, Dict, Any, List
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -255,7 +256,7 @@ class CorporateService:
         )
         token = token_result.scalar_one_or_none()
         if not token:
-            raise ValueError("Token not found")
+            raise HTTPException(status_code=404, detail="Token not found")
 
         calc_result = await self.db.execute(
             select(CalculationRun).where(CalculationRun.id == token.calculation_run_id)

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Any, Dict
+import asyncio
 import uuid
 
 from app.database import get_db
@@ -204,7 +205,8 @@ async def run_project_calculation(
     assessment_year = params.get("assessment_year", project.crediting_period_start.year if project.crediting_period_start else 2024)
 
     # ─── Step 1: fNRB Calculation ─────────────────────────────────────────────
-    fnrb_result = calculate_fnrb(
+    fnrb_result = await asyncio.to_thread(
+        calculate_fnrb,
         project_location=project_location,
         assessment_year=assessment_year,
         fuel_type=fuel_type,
@@ -212,12 +214,14 @@ async def run_project_calculation(
     )
 
     # ─── Step 2: Leakage Assessment ───────────────────────────────────────────
-    leakage_result = assess_leakage(
+    leakage_result = await asyncio.to_thread(
+        assess_leakage,
         baseline_emissions_tco2e=0.0,
     )
 
     # ─── Step 3: Emissions Quantification ─────────────────────────────────────
-    emissions_result = quantify_emissions(
+    emissions_result = await asyncio.to_thread(
+        quantify_emissions,
         stove_usage_data=params.get("stove_usage_data", {"hours_per_day": 3.5, "events_per_day": 2}),
         fuel_consumption_kg_per_day=params.get("fuel_consumption_kg_per_day", 2.5),
         thermal_efficiency=params.get("thermal_efficiency", 0.30),
@@ -231,7 +235,8 @@ async def run_project_calculation(
     )
 
     # Update leakage with actual baseline
-    leakage_result = assess_leakage(
+    leakage_result = await asyncio.to_thread(
+        assess_leakage,
         baseline_emissions_tco2e=emissions_result["baseline_emissions"]["total_tco2e_per_year"],
     )
     emissions_result["net_reductions"]["leakage_tco2e"] = leakage_result["total_leakage_tco2e"]
@@ -257,13 +262,15 @@ async def run_project_calculation(
         "kpt_fuel_consumption_kg": params.get("kpt_fuel_consumption_kg", 12.5),
         "household_count": params.get("household_count", 1000),
     }
-    methodology_result = validate_methodology(
+    methodology_result = await asyncio.to_thread(
+        validate_methodology,
         methodology=project.methodology.value,
         project_data=methodology_project_data,
     )
 
     # ─── Step 5: Uncertainty Analysis ─────────────────────────────────────────
-    uncertainty_result = run_full_uncertainty_analysis(
+    uncertainty_result = await asyncio.to_thread(
+        run_full_uncertainty_analysis,
         fuel_consumption_kg_per_day=params.get("fuel_consumption_kg_per_day", 2.5),
         fuel_type=fuel_type,
         household_count=params.get("household_count", 1000),

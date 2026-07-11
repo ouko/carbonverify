@@ -56,7 +56,7 @@ export default function ProjectsPage() {
             Manage and track your carbon credit verification projects
           </p>
         </div>
-        <button onClick={() => navigate('/projects/new')} className="btn-primary text-sm">
+        <button onClick={() => navigate('/projects/create')} className="btn-primary text-sm">
           <Plus className="w-4 h-4" />
           New Project
         </button>

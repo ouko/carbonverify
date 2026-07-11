@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_operator
 from app.core.logging import get_logger
 from app.database import get_db
 from app.models import User, AuditActionEnum
@@ -62,7 +62,7 @@ async def create_workflow(
     request: Request,
     payload: WorkflowCreateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_operator),
 ):
     """Create a new validation workflow definition."""
     graph_hash = _compute_graph_hash(payload.workflow_graph)
@@ -223,7 +223,7 @@ async def trigger_run(
     request: Request,
     payload: RunTriggerRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_operator),
 ):
     """Trigger a new validation workflow run."""
     # Validate workflow exists

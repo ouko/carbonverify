@@ -90,7 +90,25 @@ class HttpRequestExecutor:
 
 
 class DatabaseQueryExecutor:
-    """Execute database query steps."""
+    """Execute read-only database query steps."""
+
+    # Reject any query that is not a plain SELECT. This prevents SQL injection
+    # through user-supplied workflow graphs.
+    _FORBIDDEN_KEYWORDS = (
+        r"\b(insert|update|delete|drop|create|alter|truncate|replace|merge|copy|exec|execute|call|grant|revoke)\b"
+    )
+
+    @classmethod
+    def _validate_query(cls, query: str) -> None:
+        normalized = " ".join(query.split())
+        upper = normalized.upper()
+        if ";" in upper:
+            raise RuntimeError("Multi-statement queries are not allowed")
+        if not upper.startswith("SELECT"):
+            raise RuntimeError("Only SELECT queries are allowed in workflow database steps")
+        import re
+        if re.search(cls._FORBIDDEN_KEYWORDS, upper):
+            raise RuntimeError("Query contains forbidden SQL keywords")
 
     async def execute(
         self,
@@ -99,6 +117,7 @@ class DatabaseQueryExecutor:
         run: ValidationRun,
     ) -> Dict[str, Any]:
         cfg = DatabaseQueryConfig.model_validate(config)
+        self._validate_query(cfg.query)
 
         from app.database import AsyncSessionLocal
         started = time.monotonic()

@@ -115,17 +115,18 @@ async def get_due_diligence_package(
         select(CorporatePortfolio).where(CorporatePortfolio.user_id == current_user.id)
     )
     portfolio = portfolio_result.scalar_one_or_none()
+    if not portfolio:
+        raise HTTPException(status_code=403, detail="You do not hold this token")
 
-    if portfolio:
-        holding_result = await db.execute(
-            select(PortfolioHolding).where(
-                PortfolioHolding.portfolio_id == portfolio.id,
-                PortfolioHolding.token_id == token_id,
-            )
+    holding_result = await db.execute(
+        select(PortfolioHolding).where(
+            PortfolioHolding.portfolio_id == portfolio.id,
+            PortfolioHolding.token_id == token_id,
         )
-        holding = holding_result.scalar_one_or_none()
-        if not holding:
-            raise HTTPException(status_code=403, detail="You do not hold this token")
+    )
+    holding = holding_result.scalar_one_or_none()
+    if not holding:
+        raise HTTPException(status_code=403, detail="You do not hold this token")
 
     service = CorporateService(db)
     package = await service.get_due_diligence_package(token_id)

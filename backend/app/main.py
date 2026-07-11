@@ -1,7 +1,10 @@
 """CarbonVerify FastAPI application entry point."""
 
+from typing import Any
+
 from fastapi import FastAPI, Request, Depends
 from fastapi.exceptions import RequestValidationError, ValidationException
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -201,29 +204,48 @@ app.include_router(api_keys_router)
 app.include_router(oauth_router)
 
 
+def _json_safe(value: Any) -> Any:
+    """Recursively convert bytes and other non-JSON-serializable values."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_json_safe(v) for v in value)
+    if isinstance(value, set):
+        return sorted(_json_safe(v) for v in value)
+    if isinstance(value, BaseModel):
+        return value.model_dump()
+    return value
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    safe_errors = _json_safe(exc.errors())
     logger.warning(
         "request_validation_error",
         request_id=getattr(request.state, "request_id", None),
-        errors=exc.errors(),
+        errors=safe_errors,
     )
     return JSONResponse(
         status_code=422,
-        content={"detail": "Invalid request", "errors": exc.errors()},
+        content={"detail": "Invalid request", "errors": safe_errors},
     )
 
 
 @app.exception_handler(ValidationException)
 async def pydantic_validation_exception_handler(request: Request, exc: ValidationException):
+    safe_errors = _json_safe(exc.errors())
     logger.warning(
         "pydantic_validation_error",
         request_id=getattr(request.state, "request_id", None),
-        errors=exc.errors(),
+        errors=safe_errors,
     )
     return JSONResponse(
         status_code=422,
-        content={"detail": "Invalid request", "errors": exc.errors()},
+        content={"detail": "Invalid request", "errors": safe_errors},
     )
 
 

@@ -67,7 +67,7 @@ export default function DashboardPage() {
             Overview of your carbon credit verification pipeline
           </p>
         </div>
-        <button onClick={() => navigate('/projects/new')} className="btn-primary text-sm">
+        <button onClick={() => navigate('/projects/create')} className="btn-primary text-sm">
           <ArrowUpRight className="w-4 h-4" />
           New Project
         </button>

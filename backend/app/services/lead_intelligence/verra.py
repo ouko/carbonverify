@@ -200,7 +200,7 @@ def _scrape_verra_with_playwright(country: str) -> List[Dict[str, Any]]:
                         "days_in_status": None,
                     })
 
-        context.close()
+        page.context.close()
     except Exception as exc:
         logger.error("verra_playwright_failed", error=str(exc))
 
@@ -261,7 +261,7 @@ class VerraScraper(BaseRegistryScraper):
             )
             page.wait_for_timeout(5000)
             html = page.content()
-            context.close()
+            page.context.close()
             if "Project Search" in html or "Verified Carbon Standard" in html:
                 return {"status": "healthy", "message": "Verra registry reachable via Playwright"}
         except Exception as exc:

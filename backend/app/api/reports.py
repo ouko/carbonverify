@@ -16,7 +16,10 @@ from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
 from app.vvb_liaison.registry_clients.gold_standard import GoldStandardRegistryClient
 from app.vvb_liaison.auto_responder import draft_clarification_response
 from app.tasks.report_jobs import generate_report_async
+from app.config import get_settings
 from app.core.logging import get_logger
+
+settings = get_settings()
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -291,13 +294,17 @@ async def submit_report_to_registry(
 
     # Submit to registry
     if registry == "verra":
-        client = VerraRegistryClient()
-        registry_result = client.submit_monitoring_report(str(report.project_id), report_data)
-        client.close()
+        client = VerraRegistryClient(api_key=settings.VERRA_API_KEY or None)
+        try:
+            registry_result = await client.submit_monitoring_report(str(report.project_id), report_data)
+        finally:
+            await client.close()
     elif registry == "gold_standard":
-        client = GoldStandardRegistryClient()
-        registry_result = client.submit_monitoring_report(str(report.project_id), report_data)
-        client.close()
+        client = GoldStandardRegistryClient(api_key=settings.GOLD_STANDARD_API_KEY or None)
+        try:
+            registry_result = await client.submit_monitoring_report(str(report.project_id), report_data)
+        finally:
+            await client.close()
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported registry: {registry}")
 

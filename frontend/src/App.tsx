@@ -7,6 +7,7 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import LoginPage from './pages/LoginPage';
+import MFAPage from './pages/MFAPage';
 
 // Public pages
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage').then(m => ({ default: m.default })));
@@ -61,6 +62,7 @@ function App() {
     <ErrorBoundary>
       <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/mfa" element={<MFAPage />} />
             <Route path="/register" element={<InviteAcceptPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -76,7 +78,7 @@ function App() {
               </Route>
               <Route element={<ProtectedRoute requiredRole="operator" />}>
                 <Route element={<Layout />}>
-                  <Route path="/projects/new" element={<Suspense fallback={<LoadingSpinner />}><ProjectCreatePage /></Suspense>} />
+                  <Route path="/projects/create" element={<Suspense fallback={<LoadingSpinner />}><ProjectCreatePage /></Suspense>} />
                   <Route path="/data-sources" element={<Suspense fallback={<LoadingSpinner />}><DataSourcesPage /></Suspense>} />
                   <Route path="/data-sources/:id" element={<Suspense fallback={<LoadingSpinner />}><DataSourceDetailPage /></Suspense>} />
                   <Route path="/calculations" element={<Suspense fallback={<LoadingSpinner />}><CalculationsPage /></Suspense>} />

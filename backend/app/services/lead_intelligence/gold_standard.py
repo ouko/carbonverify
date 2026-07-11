@@ -162,7 +162,7 @@ def _scrape_gold_standard_with_playwright(country: str) -> List[Dict[str, Any]]:
                         "days_in_status": None,
                     })
 
-        context.close()
+        page.context.close()
     except Exception as exc:
         logger.error("gold_standard_playwright_failed", error=str(exc))
 
@@ -256,7 +256,7 @@ class GoldStandardScraper(BaseRegistryScraper):
             )
             page.wait_for_timeout(5000)
             html = page.content()
-            context.close()
+            page.context.close()
             if "project" in html.lower():
                 return {"status": "healthy", "message": "Gold Standard registry reachable via Playwright"}
         except Exception as exc:

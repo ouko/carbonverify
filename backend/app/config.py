@@ -91,7 +91,9 @@ class Settings(BaseSettings):
     LEAD_SCRAPER_MAX_RETRIES: int = 3
     LEAD_SCRAPER_RETRY_DELAY: int = 5
 
-    # Kenya National Carbon Registry
+    # Carbon registry API keys
+    VERRA_API_KEY: str = ""
+    GOLD_STANDARD_API_KEY: str = ""
     KENYA_NATIONAL_REGISTRY_BASE_URL: str = ""  # e.g. https://api.kenyacarbonregistry.go.ke/v1
     KENYA_NATIONAL_REGISTRY_API_KEY: str = ""
     PROXY_URL: str = ""  # HTTP proxy for scraper (e.g., http://proxy:8080)

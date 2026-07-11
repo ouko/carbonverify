@@ -50,7 +50,11 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/')
+      if (useAuthStore.getState().mfaRequired) {
+        navigate('/mfa')
+      } else {
+        navigate('/')
+      }
     } catch (err: any) {
       // Show actual API error message if available
       const msg = err?.response?.data?.detail || err?.message || 'Invalid email or password'

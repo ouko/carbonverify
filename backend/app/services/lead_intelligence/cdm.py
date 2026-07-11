@@ -180,7 +180,7 @@ def _scrape_cdm_with_playwright(country: str) -> List[Dict[str, Any]]:
 
         html = page.content()
         final_url = page.url
-        context.close()
+        page.context.close()
 
         logger.info("cdm_playwright_page_fetched", url=final_url, html_length=len(html))
 
@@ -216,7 +216,7 @@ class CDMScraper(BaseRegistryScraper):
             )
             page.wait_for_timeout(3000)
             has_form = page.query_selector('form[name=searchform]') is not None
-            context.close()
+            page.context.close()
 
             if has_form:
                 return {"status": "healthy", "message": "CDM registry reachable via Playwright"}

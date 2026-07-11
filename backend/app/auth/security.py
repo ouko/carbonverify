@@ -5,7 +5,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from app.config import get_settings
 
 settings = get_settings()
@@ -65,7 +66,7 @@ def decode_token(token: str) -> Optional[dict]:
         try:
             payload = jwt.decode(token, secret, algorithms=[settings.ALGORITHM])
             return payload
-        except JWTError:
+        except PyJWTError:
             continue
     return None
 

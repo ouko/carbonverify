@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import json
 from typing import Dict, Any
@@ -88,11 +89,12 @@ async def receive_iot_webhook(
     logger.info("iot_webhook_received", project_id=str(project_id), payload_keys=list(payload.keys()))
 
     # Process IoT payload
-    processing_result = process_iot_webhook(payload)
+    processing_result = await asyncio.to_thread(process_iot_webhook, payload)
     normalized = processing_result["normalized"]
 
     # Run validation engine
-    validation = run_full_validation(
+    validation = await asyncio.to_thread(
+        run_full_validation,
         data=processing_result,
         data_type="iot",
         project_confidence_threshold=project.confidence_threshold,
