@@ -70,8 +70,9 @@ class LeaderElectionScheduler(Scheduler):
             return False
         except redis.RedisError as exc:
             logger.error("celery_beat_lock_error", error=str(exc))
-            # If Redis is down, assume leadership to avoid total scheduling loss
-            return True
+            # Fail closed: if Redis is unreachable we cannot verify leadership.
+            # Returning False prevents duplicate scheduled tasks during a partition.
+            return False
 
     def close(self):
         try:

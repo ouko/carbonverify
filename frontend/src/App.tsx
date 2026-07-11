@@ -68,23 +68,31 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><DashboardPage /></Suspense>} />
                 <Route path="/projects" element={<Suspense fallback={<LoadingSpinner />}><ProjectsPage /></Suspense>} />
-                <Route path="/projects/new" element={<Suspense fallback={<LoadingSpinner />}><ProjectCreatePage /></Suspense>} />
                 <Route path="/projects/:id" element={<Suspense fallback={<LoadingSpinner />}><ProjectDetailPage /></Suspense>} />
-                <Route path="/data-sources" element={<Suspense fallback={<LoadingSpinner />}><DataSourcesPage /></Suspense>} />
-                <Route path="/data-sources/:id" element={<Suspense fallback={<LoadingSpinner />}><DataSourceDetailPage /></Suspense>} />
-                <Route path="/calculations" element={<Suspense fallback={<LoadingSpinner />}><CalculationsPage /></Suspense>} />
-                <Route path="/calculations/:id" element={<Suspense fallback={<LoadingSpinner />}><CalculationDetailPage /></Suspense>} />
-                <Route path="/reports" element={<Suspense fallback={<LoadingSpinner />}><ReportsPage /></Suspense>} />
-                <Route path="/reports/:id" element={<Suspense fallback={<LoadingSpinner />}><ReportDetailPage /></Suspense>} />
-                <Route path="/review-queue" element={<Suspense fallback={<LoadingSpinner />}><ReviewQueuePage /></Suspense>} />
-                <Route path="/field" element={<Suspense fallback={<LoadingSpinner />}><FieldDashboardPage /></Suspense>} />
-                <Route path="/security" element={<Suspense fallback={<LoadingSpinner />}><SecuritySettingsPage /></Suspense>} />
-                <Route path="/audit" element={<Suspense fallback={<LoadingSpinner />}><AuditLogPage /></Suspense>} />
-                <Route path="/compliance" element={<Suspense fallback={<LoadingSpinner />}><ComplianceDashboardPage /></Suspense>} />
                 <Route path="/brokerage" element={<Suspense fallback={<LoadingSpinner />}><BrokeragePage /></Suspense>} />
                 <Route path="/tokenization" element={<Suspense fallback={<LoadingSpinner />}><TokenizationPage /></Suspense>} />
                 <Route path="/corporate" element={<Suspense fallback={<LoadingSpinner />}><CorporateDashboardPage /></Suspense>} />
                 <Route path="/leads" element={<Suspense fallback={<LoadingSpinner />}><LeadsPage /></Suspense>} />
+              </Route>
+              <Route element={<ProtectedRoute requiredRole="operator" />}>
+                <Route element={<Layout />}>
+                  <Route path="/projects/new" element={<Suspense fallback={<LoadingSpinner />}><ProjectCreatePage /></Suspense>} />
+                  <Route path="/data-sources" element={<Suspense fallback={<LoadingSpinner />}><DataSourcesPage /></Suspense>} />
+                  <Route path="/data-sources/:id" element={<Suspense fallback={<LoadingSpinner />}><DataSourceDetailPage /></Suspense>} />
+                  <Route path="/calculations" element={<Suspense fallback={<LoadingSpinner />}><CalculationsPage /></Suspense>} />
+                  <Route path="/calculations/:id" element={<Suspense fallback={<LoadingSpinner />}><CalculationDetailPage /></Suspense>} />
+                  <Route path="/reports" element={<Suspense fallback={<LoadingSpinner />}><ReportsPage /></Suspense>} />
+                  <Route path="/reports/:id" element={<Suspense fallback={<LoadingSpinner />}><ReportDetailPage /></Suspense>} />
+                  <Route path="/review-queue" element={<Suspense fallback={<LoadingSpinner />}><ReviewQueuePage /></Suspense>} />
+                  <Route path="/field" element={<Suspense fallback={<LoadingSpinner />}><FieldDashboardPage /></Suspense>} />
+                </Route>
+              </Route>
+              <Route element={<ProtectedRoute requiredRole="admin" />}>
+                <Route element={<Layout />}>
+                  <Route path="/security" element={<Suspense fallback={<LoadingSpinner />}><SecuritySettingsPage /></Suspense>} />
+                  <Route path="/audit" element={<Suspense fallback={<LoadingSpinner />}><AuditLogPage /></Suspense>} />
+                  <Route path="/compliance" element={<Suspense fallback={<LoadingSpinner />}><ComplianceDashboardPage /></Suspense>} />
+                </Route>
               </Route>
               <Route element={<Suspense fallback={<LoadingSpinner />}><CommandLayout /></Suspense>}>
                 <Route path="/command-center/inbox" element={<Suspense fallback={<LoadingSpinner />}><InboxPage /></Suspense>} />

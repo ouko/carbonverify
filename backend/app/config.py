@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     LOG_LEVEL: str = "INFO"
     FRONTEND_URL: str = ""
+    TRUSTED_PROXIES: str = ""  # comma-separated list of IPs/CIDRs
 
     # Celery
     CELERY_BROKER_URL: str = ""

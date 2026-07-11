@@ -43,9 +43,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return
     }
     const { access_token, session_id } = res.data
-    set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null, sessionId: session_id ?? null })
+    // Set the token in the client first so /users/me can use it.
+    set({ accessToken: access_token, sessionId: session_id ?? null, mfaRequired: false, mfaTempToken: null })
     const me = await api.get<User>('/users/me')
-    set({ user: me.data, isLoading: false })
+    set({ user: me.data, isAuthenticated: true, isLoading: false })
   },
 
   verifyMFA: async (totpCode) => {
@@ -53,9 +54,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!mfaTempToken) throw new Error('No MFA temp token available')
     const res = await api.post('/auth/mfa/verify', { temp_token: mfaTempToken, totp_code: totpCode }, { withCredentials: true })
     const { access_token, session_id } = res.data
-    set({ accessToken: access_token, isAuthenticated: true, mfaRequired: false, mfaTempToken: null, sessionId: session_id ?? null })
+    set({ accessToken: access_token, sessionId: session_id ?? null, mfaRequired: false, mfaTempToken: null })
     const me = await api.get<User>('/users/me')
-    set({ user: me.data, isLoading: false })
+    set({ user: me.data, isAuthenticated: true, isLoading: false })
   },
 
   logout: async () => {
@@ -75,11 +76,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       .post('/auth/refresh', {}, { withCredentials: true })
       .then((res) => {
         const { access_token, session_id } = res.data
-        set({ accessToken: access_token, isAuthenticated: true, sessionId: session_id ?? null })
+        if (!access_token) throw new Error('Invalid refresh response')
+        set({ accessToken: access_token, sessionId: session_id ?? null })
         return api.get<User>('/users/me')
       })
       .then((me) => {
-        set({ user: me.data, isLoading: false })
+        set({ user: me.data, isAuthenticated: true, isLoading: false })
       })
       .catch(() => {
         set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false })

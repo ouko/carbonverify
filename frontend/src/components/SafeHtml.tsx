@@ -6,6 +6,13 @@ interface SafeHtmlProps {
   tag?: keyof JSX.IntrinsicElements;
 }
 
+// Force rel="noopener noreferrer" on any link that opens in a new tab.
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+    node.setAttribute('rel', 'noopener noreferrer');
+  }
+});
+
 /**
  * Render HTML safely by sanitizing through DOMPurify.
  * Use this for any user-generated or untrusted HTML content.

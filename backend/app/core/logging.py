@@ -152,10 +152,20 @@ class StructLogger:
         return self._logger.isEnabledFor(level)
 
 
+class RequestIDFilter(logging.Filter):
+    """Inject the current async-context request_id into every log record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        from app.core.request_context import get_request_id
+        record.request_id = get_request_id() or "unknown"
+        return True
+
+
 def configure_logging() -> None:
     """Configure root logger for structured JSON output."""
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JSONFormatter())
+    handler.addFilter(RequestIDFilter())
 
     root_logger = logging.getLogger()
     root_logger.handlers = []

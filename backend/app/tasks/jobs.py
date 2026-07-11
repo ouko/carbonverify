@@ -137,6 +137,12 @@ def process_uploaded_file(self, upload_id: str):
                 upload.validation_errors = [f"Malware detected: {scan_result.signature}"]
                 await db.commit()
                 return {"error": "malware detected"}
+            if scan_result.status == ScanStatus.error:
+                logger.error("processing_rejected_scan_error", upload_id=upload_id, message=scan_result.message)
+                upload.status = FileUploadStatusEnum.failed
+                upload.validation_errors = [f"Virus scan unavailable: {scan_result.message or 'ClamAV unreachable'}"]
+                await db.commit()
+                return {"error": "virus scan unavailable"}
 
             detected_type = upload.detected_type.value
             processing_result = None

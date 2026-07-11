@@ -43,7 +43,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.11"
 
       - name: Install dependencies
         working-directory: ./backend
@@ -58,7 +58,7 @@ jobs:
 
       - name: Type check with mypy
         working-directory: ./backend
-        run: mypy app/ --ignore-missing-imports || true
+        run: mypy app/ --ignore-missing-imports
 
       - name: Run tests
         working-directory: ./backend

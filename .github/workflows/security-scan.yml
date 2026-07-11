@@ -19,7 +19,7 @@ jobs:
 
       - name: Build and start services
         run: |
-          docker compose -f docker-compose.yml up -d --build
+          docker compose -f docker-compose.production.yml -f docker-compose.security-scan.yml up -d --build
           sleep 30
 
       - name: ZAP Baseline Scan
@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and start services
         run: |
-          docker compose -f docker-compose.yml up -d --build
+          docker compose -f docker-compose.production.yml -f docker-compose.security-scan.yml up -d --build
           sleep 30
 
       - name: ZAP API Scan
@@ -83,12 +83,12 @@ jobs:
       - name: Run Safety check
         run: |
           cd backend
-          safety check -r requirements.txt || true
+          safety check -r requirements.txt
 
       - name: Run Bandit
         run: |
           cd backend
-          bandit -r app/ -f json -o bandit-report.json || true
+          bandit -r app/ -f json -o bandit-report.json
 
       - name: Upload Bandit report
         uses: actions/upload-artifact@v4

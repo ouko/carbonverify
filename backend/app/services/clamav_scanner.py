@@ -1,7 +1,8 @@
-"""ClamAV virus scanning with graceful fallback.
+"""ClamAV virus scanning.
 
 Scans file buffers using a local clamd socket. If ClamAV is unreachable,
-logs a warning and returns a safe fallback so uploads are not blocked.
+returns ScanStatus.error; callers must reject the upload rather than
+silently skipping malware scanning.
 """
 
 import asyncio

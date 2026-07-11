@@ -39,6 +39,8 @@ spec:
             - "app.tasks.celery_app"
             - "beat"
             - "--loglevel=info"
+            - "--scheduler"
+            - "app.tasks.beat_scheduler.LeaderElectionScheduler"
           envFrom:
             - configMapRef:
                 name: carbonverify-config

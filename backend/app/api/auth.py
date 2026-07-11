@@ -7,7 +7,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.core.client_ip import get_client_ip as _get_client_ip_helper
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_
 
@@ -39,7 +39,15 @@ from app.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
-limiter = Limiter(key_func=get_remote_address)
+def _auth_rate_limit_key(request: Request) -> str:
+    trusted = set()
+    raw = getattr(settings, "TRUSTED_PROXIES", "")
+    if raw:
+        trusted = {p.strip() for p in raw.split(",") if p.strip()}
+    return _get_client_ip_helper(request, trusted)
+
+
+limiter = Limiter(key_func=_auth_rate_limit_key)
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
 
@@ -85,12 +93,12 @@ def _get_device_fingerprint(request: Request) -> str:
 
 
 def _get_client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    if request.client:
-        return request.client.host
-    return "unknown"
+    from app.core.client_ip import get_client_ip as _get_ip
+    trusted = set()
+    raw = getattr(settings, "TRUSTED_PROXIES", "")
+    if raw:
+        trusted = {p.strip() for p in raw.split(",") if p.strip()}
+    return _get_ip(request, trusted)
 
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:

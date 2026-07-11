@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Production Readiness
+- **Python runtime pinned to 3.11** — Reverted experimental Python 3.14 target; backend `Dockerfile`, CI workflow, and documentation now use Python 3.11 for stability
+- **Backend Dockerfile hardened** — Uses `python:3.11-slim`, adds explicit `CMD`, fixes healthcheck path, and creates a non-root user
+- **Frontend Dockerfile and build context fixed** — Dockerfile now builds from the repository root so backend-relative paths resolve correctly; `.dockerignore` excludes build artifacts and dependency caches
+- **Production Docker Compose rewritten** — `docker-compose.production.yml` is now a standalone hardened stack with Redis auth/persistence, nginx reverse proxy, resource limits, and no dev mounts
+- **Nginx reverse proxy hardened** — `infrastructure/nginx/nginx.conf` proxies all backend routes, serves the SPA fallback, enforces `client_max_body_size 50m`, and adds CSP/HSTS headers
+- **Kubernetes manifests corrected** — Added `frontend-deployment.yaml`, fixed `kustomization.yaml`, `network-policy.yaml` DNS/egress rules, `backup-cronjob.yaml` secret references, `ingress.yaml` rate-limit annotations, `hpa.yaml` memory metric, and aligned `celery-beat-deployment.yaml` with the leader-election scheduler
+- **Backend reliability hardening** — Global exception handlers, structured JSON logging, proxy-aware rate limiting, fail-closed encryption and webhook security in production, and safe ClamAV/Redis/SIEM degradation paths
+- **Frontend hardening** — Authentication only succeeds after `/users/me` validates; API refresh response is validated; role-based route guards enforce `AdminRoute`; admin nav aligned with guards; `SafeHtml` forces `noopener noreferrer`
+- **CI/CD hardened** — GitHub Actions use Python 3.11; mypy, safety, and bandit are no longer allowed to fail; security scan uses the production compose stack
+- **Environment template sanitized** — `.env.example` stripped of weak defaults and completed with all variables from `config.py`
+
 ### Fixed
 - **Celery Beat leader election** — `LeaderElectionScheduler` in `app/tasks/beat_scheduler.py` fixed: `self.app.main_name` (non-existent attribute) changed to `self.app.main`. Beat scheduler now acquires Redis lock successfully and processes scheduled tasks.
 - **Demo seed script (`scripts/seed_demo_data.py`)** — Multiple runtime failures fixed so the script completes end-to-end:

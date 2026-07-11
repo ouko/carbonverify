@@ -198,10 +198,10 @@ cp .env.example .env
 # Edit .env with production values
 
 # Start everything
-docker-compose -f docker-compose.yml -f docker-compose.production.yml up -d
+docker-compose -f docker-compose.production.yml up -d
 ```
 
-Use **Traefik** or **Caddy** as reverse proxy with automatic HTTPS.
+The production compose includes an nginx reverse proxy with CSP/HSTS headers and serves the built SPA directly; no separate Traefik/Caddy layer is required unless you want automatic HTTPS, in which case place it in front of nginx.
 
 ---
 

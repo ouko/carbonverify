@@ -215,6 +215,7 @@ infrastructure/k8s/
 │   ├── configmap.yaml
 │   ├── secrets.yaml
 │   ├── app-deployment.yaml
+│   ├── frontend-deployment.yaml
 │   ├── celery-worker-deployment.yaml
 │   ├── celery-beat-deployment.yaml
 │   ├── ingress.yaml

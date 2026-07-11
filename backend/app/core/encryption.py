@@ -12,6 +12,17 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 
+class EncryptionConfigurationError(Exception):
+    """Raised when encryption is required but not properly configured."""
+
+    pass
+
+
+def _encryption_required() -> bool:
+    """Encryption is mandatory in production and staging; lenient in dev/test."""
+    return settings.ENVIRONMENT in ("production", "staging")
+
+
 def compute_searchable_hash(value: str, key_hex: Optional[str] = None) -> str:
     """Create a deterministic HMAC-SHA256 hash for searchable encrypted fields.
 
@@ -20,7 +31,11 @@ def compute_searchable_hash(value: str, key_hex: Optional[str] = None) -> str:
     """
     raw_key = key_hex or settings.ENCRYPTION_KEY_HEX
     if not raw_key:
-        # Fallback: return raw SHA-256 (deterministic but not keyed)
+        if _encryption_required():
+            raise EncryptionConfigurationError(
+                "ENCRYPTION_KEY_HEX is required in production/staging to compute keyed searchable hashes"
+            )
+        # Fallback only in dev/test: return raw SHA-256 (deterministic but not keyed)
         return hashlib.sha256(value.lower().encode("utf-8")).hexdigest()
     key_bytes = bytes.fromhex(raw_key)
     return hmac.new(key_bytes, value.lower().encode("utf-8"), hashlib.sha256).hexdigest()
@@ -38,6 +53,10 @@ class FieldEncryption:
     def __init__(self, key_hex: Optional[str] = None):
         raw_key = key_hex or settings.ENCRYPTION_KEY_HEX
         if not raw_key:
+            if _encryption_required():
+                raise EncryptionConfigurationError(
+                    "ENCRYPTION_KEY_HEX is required in production/staging for PII field encryption"
+                )
             logger.warning("field_encryption_no_key")
             self._fernet = None
             return
@@ -50,6 +69,8 @@ class FieldEncryption:
             self._fernet = Fernet(base64.urlsafe_b64encode(key_bytes))
         except Exception as exc:
             logger.error("field_encryption_init_failed", error=str(exc))
+            if _encryption_required():
+                raise EncryptionConfigurationError(f"Invalid ENCRYPTION_KEY_HEX: {exc}") from exc
             self._fernet = None
 
     @property
@@ -67,7 +88,7 @@ class FieldEncryption:
             return token.decode("utf-8")
         except Exception as exc:
             logger.error("field_encryption_encrypt_failed", error=str(exc))
-            return plaintext
+            raise
 
     def decrypt(self, ciphertext: Optional[str]) -> Optional[str]:
         """Decrypt an encrypted string value."""
@@ -80,7 +101,7 @@ class FieldEncryption:
             return plaintext.decode("utf-8")
         except Exception as exc:
             logger.error("field_encryption_decrypt_failed", error=str(exc))
-            return ciphertext
+            raise
 
 
 # Global instance

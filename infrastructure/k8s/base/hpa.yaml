@@ -17,12 +17,6 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 80
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 60
@@ -50,13 +44,12 @@ spec:
   minReplicas: 2
   maxReplicas: 8
   metrics:
-    - type: External
-      external:
-        metric:
-          name: celery_queue_length
+    - type: Resource
+      resource:
+        name: cpu
         target:
-          type: AverageValue
-          averageValue: "10"
+          type: Utilization
+          averageUtilization: 70
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 60

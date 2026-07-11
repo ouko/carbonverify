@@ -31,7 +31,7 @@ It also includes a **Lead Intelligence Engine** that scrapes carbon registries (
 | **Load Testing** | k6 (auth stress, API soak, upload tests) |
 | **Secrets** | JWT dual-secret rotation, field-level encryption key rotation |
 | **Compliance** | SOC2 controls mapping, security audit checklist, GDPR erasure |
-| **Deployment** | Vercel (frontend), Railway/Render/AWS (backend) — see `docs/DEPLOYMENT.md` |
+| **Deployment** | Docker Compose production stack (`docker-compose.production.yml`) or Kubernetes (`infrastructure/k8s/`) — see `docs/DEPLOYMENT.md` and `infrastructure/docs/DEPLOYMENT.md` |
 
 ---
 

@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.logging import get_logger
+from app.core import request_context
 
 logger = get_logger(__name__)
 
@@ -26,6 +27,8 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         # Store on request state for access in routes
         request.state.request_id = request_id
+        # Store in async context for structured logging
+        request_context.set_request_id(request_id)
 
         response = await call_next(request)
         response.headers[REQUEST_ID_HEADER] = request_id
@@ -34,4 +37,4 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 def get_request_id(request: Request) -> str:
     """Get the request ID from the current request."""
-    return getattr(request.state, "request_id", "unknown")
+    return getattr(request.state, "request_id", request_context.get_request_id() or "unknown")

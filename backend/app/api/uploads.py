@@ -86,6 +86,9 @@ async def upload_file(
     if scan_result.status == ScanStatus.infected:
         logger.warning("upload_rejected_malware", filename=filename, signature=scan_result.signature)
         raise HTTPException(status_code=400, detail=f"File rejected: malware detected ({scan_result.signature})")
+    if scan_result.status == ScanStatus.error:
+        logger.error("upload_rejected_scan_error", filename=filename, message=scan_result.message)
+        raise HTTPException(status_code=503, detail="Virus scanner unavailable; upload rejected for safety")
 
     # Compute hash
     file_hash = compute_sha256(file_bytes)

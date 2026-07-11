@@ -1,0 +1,12 @@
+# Docker Compose override for security scanning in CI.
+# Builds production-like images but exposes the API port so ZAP can reach it.
+# Usage: docker-compose -f docker-compose.production.yml -f docker-compose.security-scan.yml up -d --build
+
+services:
+  app:
+    ports:
+      - "8000:8000"
+
+  nginx:
+    ports:
+      - "80:80"

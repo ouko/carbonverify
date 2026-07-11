@@ -41,22 +41,30 @@ spec:
   policyTypes:
     - Egress
   egress:
+    # DNS resolution (required even for cluster-local names)
     - to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              app: postgres
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL — adjust CIDR if using managed RDS/Cloud SQL
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 5432
+    # Redis — adjust CIDR if using managed ElastiCache/Memorystore
     - to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              app: redis
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 6379
+    # External HTTPS APIs (S3, SES, registry APIs, Radix, SIEM, etc.)
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -77,18 +85,22 @@ spec:
     - Egress
   egress:
     - to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              app: postgres
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 5432
     - to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              app: redis
+        - ipBlock:
+            cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
           port: 6379
@@ -98,3 +110,36 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: carbonverify-beat-egress
+  namespace: carbonverify
+spec:
+  podSelector:
+    matchLabels:
+      app: carbonverify-celery-beat
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 6379

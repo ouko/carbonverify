@@ -1,6 +1,6 @@
 # CarbonVerify
 
-[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://react.dev/)
 [![License](https://img.shields.io/badge/license-Proprietary-lightgrey.svg)]()
@@ -72,7 +72,7 @@
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, React Query v5, Zustand, React Router v6, Recharts, Lucide icons |
-| **Backend** | FastAPI, Python 3.14, SQLAlchemy 2.0, Alembic, Pydantic v2, Celery |
+| **Backend** | FastAPI, Python 3.11, SQLAlchemy 2.0, Alembic, Pydantic v2, Celery |
 | **Database** | PostgreSQL 15 (JSONB, UUID, ARRAY) |
 | **Cache / Queue** | Redis |
 | **PDF** | WeasyPrint (HTML → PDF) |
@@ -87,20 +87,20 @@
 
 - [Docker](https://docs.docker.com/get-docker/) + Docker Compose
 - [Node.js](https://nodejs.org/) 18+ (for local frontend dev)
-- [Python](https://www.python.org/) 3.14+ + [uv](https://github.com/astral-sh/uv) (for local backend dev)
+- [Python](https://www.python.org/) 3.11+ + [uv](https://github.com/astral-sh/uv) (for local backend dev)
 - [Playwright](https://playwright.dev/) browsers (for lead scraping):
   ```bash
   cd backend && source .venv/bin/activate && playwright install chromium
   ```
 
-### Docker Compose (Recommended)
+### Docker Compose (Local Development)
 
 ```bash
 # 1. Clone and enter the project
 git clone https://github.com/ouko/carbonverify.git
 cd carbonverify
 
-# 2. Environment
+# 2. Environment — copy and fill in all required secrets (no weak defaults are shipped)
 cp .env.example .env
 
 # 3. Start all services
@@ -110,6 +110,27 @@ docker-compose up --build
 # Frontend:  http://localhost:5173
 # API Docs:  http://localhost:8000/docs
 # API Base:  http://localhost:8000
+```
+
+### Production Deployment
+
+For a hardened production stack, use `docker-compose.production.yml`. It adds:
+
+- An nginx reverse proxy on port `80`/`443` that serves the static SPA and proxies `/api` and `/docs` to the backend
+- Redis authentication and AOF persistence
+- Resource limits and restart policies on all services
+- No host-source mounts or dev servers
+
+```bash
+cp .env.example .env
+# Set strong values for: SECRET_KEY, REDIS_PASSWORD, ENCRYPTION_KEY_HEX, database credentials, etc.
+docker-compose -f docker-compose.production.yml up --build -d
+```
+
+Run migrations once the database is healthy:
+
+```bash
+docker-compose -f docker-compose.production.yml exec app alembic upgrade head
 ```
 
 ### Services
@@ -122,7 +143,8 @@ docker-compose up --build
 | Celery Worker | `cv-celery-worker` | — | Async task processing |
 | Celery Beat | `cv-celery-beat` | — | Scheduled tasks |
 | ClamAV | `cv-clamav` | — | Virus scanning for uploads |
-| Frontend | `cv-frontend` | 5173 | Vite dev server |
+| Frontend | `cv-frontend` | 5173 | Vite dev server (development compose only) |
+| nginx | `cv-nginx` | 80/443 | Reverse proxy + static SPA host (production compose only) |
 
 ### Demo Accounts
 
@@ -180,7 +202,7 @@ npm run dev
 cd backend
 source .venv/bin/activate
 pytest tests/ -v
-# 264 tests covering calculation engine, reports, VVB pipeline, lead intelligence, auth, admin
+# 350 tests covering calculation engine, reports, VVB pipeline, lead intelligence, auth, admin, uploads, security, compliance, tokenization, brokerage, and more
 ```
 
 ### Local Development Scripts
@@ -485,21 +507,23 @@ pytest tests/ -v
 
 ### Docker Compose (Production-oriented)
 
-The included `docker-compose.yml` defines services with health checks:
+The production compose (`docker-compose.production.yml`) defines services with health checks, resource limits, and an nginx reverse proxy:
 
 ```yaml
 services:
   db:       # PostgreSQL 15
-  redis:    # Redis 7
+  redis:    # Redis 7 (auth + AOF persistence)
   app:      # FastAPI (depends on db, redis)
   celery-worker:  # Task worker
-  celery-beat:    # Scheduled tasks
-  frontend:       # Vite production preview
+  celery-beat:    # Scheduled tasks (leader-election scheduler)
+  clamav:         # Virus scanning for uploads
+  frontend:       # Nginx-served static SPA build
+  nginx:          # Reverse proxy + CSP/HSTS headers
 ```
 
 Run migrations on first deploy:
 ```bash
-docker-compose exec app alembic upgrade head
+docker-compose -f docker-compose.production.yml exec app alembic upgrade head
 ```
 
 ### Environment Variables

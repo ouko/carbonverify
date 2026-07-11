@@ -42,9 +42,10 @@ async def check_replay_protection(
         return result is not None  # True if key was set (fresh), False if already existed
     except Exception as exc:
         logger.error("replay_protection_error", error=str(exc))
-        # Fail open if Redis is unavailable — better to accept a potential replay
-        # than to drop legitimate webhooks
-        return True
+        # In production/staging, fail closed to prevent replay attacks during
+        # a Redis outage. In development, fail open to avoid dropping test
+        # webhooks when Redis is not running.
+        return getattr(settings, "ENVIRONMENT", "production") not in ("production", "staging")
 
 
 def compute_hmac_signature(payload: bytes, secret: str) -> str:

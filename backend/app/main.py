@@ -1,12 +1,7 @@
 """CarbonVerify FastAPI application entry point."""
 
-# Monkey-patch asyncio.iscoroutinefunction before slowapi imports
-# to suppress Python 3.14 DeprecationWarning (slowapi uses the deprecated API)
-import asyncio
-import inspect
-asyncio.iscoroutinefunction = inspect.iscoroutinefunction
-
 from fastapi import FastAPI, Request, Depends
+from fastapi.exceptions import RequestValidationError, ValidationException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -16,12 +11,16 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 import prometheus_client
+import logging
 
 from app.config import get_settings
-from app.core.logging import get_logger
+from app.core.logging import configure_logging, get_logger
 from app.core.request_id import RequestIDMiddleware
+from app.core.client_ip import get_client_ip
+from app.core import request_context
 from app.database import engine
 from app.auth.dependencies import get_current_user, require_admin
+from app.security.siem_streaming import get_siem_streamer
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
 from app.api.projects import router as projects_router
@@ -52,15 +51,37 @@ settings = get_settings()
 logger = get_logger(__name__)
 
 
+def _parse_trusted_proxies(raw: str) -> set[str]:
+    """Parse a comma-separated list of trusted proxy IPs/CIDRs."""
+    if not raw:
+        return set()
+    return {p.strip() for p in raw.split(",") if p.strip()}
+
+
+TRUSTED_PROXIES = _parse_trusted_proxies(settings.TRUSTED_PROXIES)
+
+
+def _proxy_aware_key_func(request: Request) -> str:
+    """Rate-limit key that respects trusted reverse proxies."""
+    return get_client_ip(request, TRUSTED_PROXIES)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_logging()
+    request_context.set_trusted_proxies(TRUSTED_PROXIES)
     logger.info("app_startup", environment=settings.ENVIRONMENT)
-    yield
-    logger.info("app_shutdown")
-    await engine.dispose()
+    siem = get_siem_streamer()
+    await siem.start()
+    try:
+        yield
+    finally:
+        logger.info("app_shutdown")
+        await siem.stop()
+        await engine.dispose()
 
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=_proxy_aware_key_func)
 
 app = FastAPI(
     title="CarbonVerify API",
@@ -100,6 +121,8 @@ async def add_security_headers(request: Request, call_next):
 
 @app.middleware("http")
 async def request_size_limit(request: Request, call_next):
+    # Apply the limit to Content-Length; chunked uploads without a length header
+    # are handled by server-level timeouts and streaming instead.
     content_length = request.headers.get("content-length")
     if content_length:
         max_size = 50 * 1024 * 1024 if request.url.path.startswith("/uploads") else 10 * 1024 * 1024
@@ -123,7 +146,7 @@ async def request_size_limit(request: Request, call_next):
 if settings.ENVIRONMENT != "test":
     allowed_hosts = ["carbonverify.io", "*.carbonverify.io"]
     if settings.ENVIRONMENT == "development":
-        allowed_hosts.extend(["localhost", "127.0.0.1", "*"])
+        allowed_hosts.extend(["localhost", "127.0.0.1"])
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=allowed_hosts,
@@ -139,7 +162,6 @@ if settings.ENVIRONMENT == "development":
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://127.0.0.1:3000",
-        "http://192.168.1.97:5173",
     ])
 
 app.add_middleware(
@@ -177,6 +199,45 @@ app.include_router(validation_engine_router)
 app.include_router(admin_router)
 app.include_router(api_keys_router)
 app.include_router(oauth_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(
+        "request_validation_error",
+        request_id=getattr(request.state, "request_id", None),
+        errors=exc.errors(),
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Invalid request", "errors": exc.errors()},
+    )
+
+
+@app.exception_handler(ValidationException)
+async def pydantic_validation_exception_handler(request: Request, exc: ValidationException):
+    logger.warning(
+        "pydantic_validation_error",
+        request_id=getattr(request.state, "request_id", None),
+        errors=exc.errors(),
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Invalid request", "errors": exc.errors()},
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.exception(
+        "unhandled_exception",
+        request_id=getattr(request.state, "request_id", None),
+        path=str(request.url.path),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 @app.get("/metrics")

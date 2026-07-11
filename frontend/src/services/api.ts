@@ -86,6 +86,9 @@ api.interceptors.response.use(
       try {
         const res = await refreshPromise
         const { access_token, session_id } = res.data
+        if (!access_token) {
+          throw new Error('Invalid refresh response')
+        }
         useAuthStore.getState().setAccessToken(access_token, session_id)
         originalRequest.headers.Authorization = `Bearer ${access_token}`
         return api(originalRequest)

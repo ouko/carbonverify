@@ -18,6 +18,7 @@ from sqlalchemy import select
 from app.models import AuditLog, AuditActionEnum
 from app.blockchain.radix_client import AuditTrailAnchor
 from app.security.siem_streaming import get_siem_streamer
+from app.core.client_ip import get_client_ip
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -288,16 +289,13 @@ class AuditLogger:
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP from request, respecting proxies."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip
-    if request.client:
-        return request.client.host
-    return "unknown"
+    """Extract client IP from request, respecting configured trusted proxies."""
+    from app.config import get_settings
+    trusted = set()
+    raw = getattr(get_settings(), "TRUSTED_PROXIES", "")
+    if raw:
+        trusted = {p.strip() for p in raw.split(",") if p.strip()}
+    return get_client_ip(request, trusted)
 
 
 def audit_log(
