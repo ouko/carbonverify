@@ -223,6 +223,8 @@ Convenience scripts in `scripts/` for hybrid local development:
 
 Logs are written to `.local-logs/` and PIDs are tracked in `.local-dev.pids`.
 
+> **Note on Redis port in hybrid mode:** `docker-compose.local.yml` exposes Redis to the host on port `6380` (mapped to container port `6379`). Make sure `.env.local` and `backend/.env` use `redis://localhost:6380/0` for `REDIS_URL`, `CELERY_BROKER_URL`, and `CELERY_RESULT_BACKEND`.
+
 ---
 
 ## Project Structure
@@ -557,6 +559,9 @@ See `.env.example` for all required variables. Key ones:
 | `CLAMAV_HOST` | ClamAV daemon hostname (e.g., `clamav`) |
 | `CLAMAV_PORT` | ClamAV daemon TCP port (default `3310`) |
 | `CLAMAV_SOCKET_PATH` | Unix socket path for ClamAV (alternative to host/port) |
+| `VERRA_API_KEY` | Verra registry API key (used by VVB liaison and lead scraper) |
+| `GOLD_STANDARD_API_KEY` | Gold Standard registry API key (used by VVB liaison and lead scraper) |
+| `KENYA_NATIONAL_REGISTRY_API_KEY` | Kenya National Carbon Registry API key |
 
 ---
 

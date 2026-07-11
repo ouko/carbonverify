@@ -232,7 +232,7 @@ The production compose includes an nginx reverse proxy with CSP/HSTS headers and
 - [ ] Prometheus `/metrics` endpoint accessible
 - [ ] Logs aggregated (CloudWatch, Datadog, or Grafana)
 - [ ] Alertmanager configured for critical alerts
-- [ ] Health check endpoint (`/health`) monitored
+- [ ] Health check endpoint (`/health/`) monitored
 
 ### Domain & SSL
 - [ ] Domain DNS points to your platform
@@ -277,6 +277,9 @@ The production compose includes an nginx reverse proxy with CSP/HSTS headers and
 | `CLAMAV_SOCKET_PATH` | `/tmp/clamd.socket` | ClamAV Unix socket (alt to TCP) |
 | `CELERY_BROKER_URL` | `redis://...` | Celery queue |
 | `CELERY_RESULT_BACKEND` | `redis://...` | Celery results |
+| `VERRA_API_KEY` | `...` | Verra registry API key |
+| `GOLD_STANDARD_API_KEY` | `...` | Gold Standard registry API key |
+| `KENYA_NATIONAL_REGISTRY_API_KEY` | `...` | Kenya National Carbon Registry API key |
 
 ---
 

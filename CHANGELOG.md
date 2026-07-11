@@ -30,6 +30,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `human_escalations.run_id` has a FK to `validation_runs.id`; random UUIDs violated the constraint. Added dummy `ValidationWorkflow` + `ValidationRun` creation inside `seed_human_escalations` so escalation records reference real runs.
 - **PostgreSQL enum mismatch** — Added missing `in_progress` value to `dsr_status` enum (was in Python `DSRStatusEnum` but absent from DB), preventing `seed_compliance()` from failing with `InvalidTextRepresentationError`.
 
+### Fixed (continued)
+- **Validation error handler JSON serialization** — `RequestValidationError` and `ValidationException` handlers in `app/main.py` now recursively convert `bytes` (and other non-JSON values) to JSON-safe types, preventing 500s on malformed form/json payloads
+- **Corporate due-diligence access control** — `/corporate/due-diligence/{token_id}` now returns 403 for users without a portfolio or without holding the token; `CorporateService.get_due_diligence_package` raises 404 instead of an unhandled `ValueError`
+- **Data source enum validation** — `source_type` is now validated against `SourceTypeEnum` at the API layer, returning 422 instead of a DB 500 on invalid input
+- **K8s health probes** — `app-deployment.yaml` liveness/readiness paths aligned with the canonical FastAPI route (`/health/`)
+- **Local Redis port mismatch** — `.env.local` and `backend/.env` now point to `localhost:6380` to match `docker-compose.local.yml`
+- **Registry client API keys** — `reports.py` registry submission now awaits async client calls and passes `VERRA_API_KEY` / `GOLD_STANDARD_API_KEY`; `.env.example`, `README.md`, and `docs/DEPLOYMENT.md` document the new variables
+
 ### Security
 - **Protected `/metrics` endpoint** — Now requires admin authentication (was publicly accessible)
 - **Rate limiting on sensitive auth endpoints** — Added `@limiter` to MFA setup/verify/confirm/disable, change-password, admin invite, invite accept, OAuth login/callback/link/unlink, and file uploads (previously unprotected from brute-force)
