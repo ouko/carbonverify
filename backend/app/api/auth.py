@@ -17,6 +17,7 @@ from app.models import User, RefreshToken, UserInvite, UserRoleEnum, AuditAction
 from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, MFAConfirmResponse, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
 from app.auth.security import (
     verify_password,
+    verify_and_update_password,
     get_password_hash,
     create_access_token,
     create_refresh_token,
@@ -225,31 +226,39 @@ async def login(
             detail=f"Account locked. Try again after {user.locked_until.isoformat()}",
         )
 
-    if not user or not verify_password(payload.password, user.hashed_password):
-        if user:
-            user.failed_login_count += 1
-            if user.failed_login_count >= MAX_FAILED_LOGINS:
-                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
-                logger.warning("account_locked", user_id=str(user.id), failed_count=user.failed_login_count)
-                # Send account lockout email
-                try:
-                    email_service = get_email_service()
-                    await email_service.send_email(
-                        to=user.email,
-                        subject="CarbonVerify — Account Locked",
-                        body_text=f"Hi {user.name},\n\nYour account has been temporarily locked due to too many failed login attempts.\n\nYou can try again after {user.locked_until.isoformat()}.\n\nIf you did not attempt to log in, please change your password immediately.\n",
-                        body_html=f"""
-                        <p>Hi {user.name},</p>
-                        <p>Your account has been temporarily locked due to too many failed login attempts.</p>
-                        <p>You can try again after <strong>{user.locked_until.isoformat()}</strong>.</p>
-                        <p>If you did not attempt to log in, please change your password immediately.</p>
-                        """,
-                    )
-                except Exception as e:
-                    logger.error("lockout_email_failed", user_id=str(user.id), error=str(e))
-            await db.commit()
+    if not user:
         await audit.log_login(
-            user_id=user.id if user else None,
+            user_id=None,
+            success=False,
+            request=request,
+        )
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    valid, new_hash = verify_and_update_password(payload.password, user.hashed_password)
+    if not valid:
+        user.failed_login_count += 1
+        if user.failed_login_count >= MAX_FAILED_LOGINS:
+            user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+            logger.warning("account_locked", user_id=str(user.id), failed_count=user.failed_login_count)
+            # Send account lockout email
+            try:
+                email_service = get_email_service()
+                await email_service.send_email(
+                    to=user.email,
+                    subject="CarbonVerify — Account Locked",
+                    body_text=f"Hi {user.name},\n\nYour account has been temporarily locked due to too many failed login attempts.\n\nYou can try again after {user.locked_until.isoformat()}.\n\nIf you did not attempt to log in, please change your password immediately.\n",
+                    body_html=f"""
+                    <p>Hi {user.name},</p>
+                    <p>Your account has been temporarily locked due to too many failed login attempts.</p>
+                    <p>You can try again after <strong>{user.locked_until.isoformat()}</strong>.</p>
+                    <p>If you did not attempt to log in, please change your password immediately.</p>
+                    """,
+                )
+            except Exception as e:
+                logger.error("lockout_email_failed", user_id=str(user.id), error=str(e))
+        await db.commit()
+        await audit.log_login(
+            user_id=user.id,
             success=False,
             request=request,
         )
@@ -259,6 +268,9 @@ async def login(
     user.failed_login_count = 0
     user.locked_until = None
     user.last_login_at = datetime.now(timezone.utc)
+    if new_hash:
+        user.hashed_password = new_hash
+        logger.info("password_hash_upgraded", user_id=str(user.id), rounds=settings.BCRYPT_ROUNDS)
     await db.commit()
 
     # Check MFA requirement

@@ -167,7 +167,7 @@ fi
 mkdir -p "$LOG_DIR"
 
 # ---- Backend ----
-log_info "Starting FastAPI backend on http://localhost:8000 ..."
+log_info "Starting FastAPI backend on http://localhost:8001 ..."
 cd "$PROJECT_ROOT/backend"
 source .venv/bin/activate
 
@@ -178,7 +178,7 @@ else
   log_warn "Migration failed (may already be up-to-date). See $LOG_DIR/migrate.log"
 fi
 
-nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload \
+nohup uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload \
   >"$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "backend:$BACKEND_PID" >> "$PIDFILE"
@@ -221,9 +221,9 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║         CarbonVerify is running locally                      ║${RESET}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════════════╣${RESET}"
 echo -e "${GREEN}║${RESET}  Frontend:     http://localhost:5173                         ${GREEN}║${RESET}"
-echo -e "${GREEN}║${RESET}  API Docs:     http://localhost:8000/docs                    ${GREEN}║${RESET}"
-echo -e "${GREEN}║${RESET}  API Base:     http://localhost:8000                         ${GREEN}║${RESET}"
-echo -e "${GREEN}║${RESET}  Health:       http://localhost:8000/health/                 ${GREEN}║${RESET}"
+echo -e "${GREEN}║${RESET}  API Docs:     http://localhost:8001/docs                    ${GREEN}║${RESET}"
+echo -e "${GREEN}║${RESET}  API Base:     http://localhost:8001                         ${GREEN}║${RESET}"
+echo -e "${GREEN}║${RESET}  Health:       http://localhost:8001/health/                 ${GREEN}║${RESET}"
 echo -e "${GREEN}╠══════════════════════════════════════════════════════════════╣${RESET}"
 echo -e "${GREEN}║${RESET}  PostgreSQL:   localhost:5432                                ${GREEN}║${RESET}"
 echo -e "${GREEN}║${RESET}  Redis:        localhost:6380                                ${GREEN}║${RESET}"

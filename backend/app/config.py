@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Password hashing
+    BCRYPT_ROUNDS: int = 12  # OWASP recommends >= 10; tune per environment
+
     # MFA
     MFA_ISSUER_NAME: str = "CarbonVerify"
     MFA_REQUIRED_ROLES: str = "admin,operator"  # comma-separated

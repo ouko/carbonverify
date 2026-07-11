@@ -15,12 +15,6 @@ router = APIRouter(prefix="/health", tags=["health"])
 
 @router.get("/", response_model=HealthCheck)
 async def health_check(request: Request, db: AsyncSession = Depends(get_db)):
-    # Use the shared app-level limiter so rate-limit state and exception
-    # handling are consistent with the rest of the application.
-    limiter = getattr(request.app.state, "limiter", None)
-    if limiter is not None:
-        await limiter._check(request, "120/minute", "health")
-
     db_status = "ok"
     redis_status = "ok"
 

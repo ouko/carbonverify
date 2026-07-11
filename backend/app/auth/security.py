@@ -9,11 +9,20 @@ from jose import JWTError, jwt
 from app.config import get_settings
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=settings.BCRYPT_ROUNDS,
+)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def verify_and_update_password(plain_password: str, hashed_password: str) -> tuple[bool, Optional[str]]:
+    """Verify password and return a new hash if the cost rounds differ from config."""
+    return pwd_context.verify_and_update(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
