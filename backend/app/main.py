@@ -157,6 +157,7 @@ if settings.ENVIRONMENT != "test":
 
 # Production CORS: tighten in production, allow local dev
 allow_origins = [settings.FRONTEND_URL] if settings.FRONTEND_URL else []
+allow_origin_regex = None
 if settings.ENVIRONMENT == "development":
     allow_origins.extend([
         "http://localhost:5173",
@@ -166,10 +167,17 @@ if settings.ENVIRONMENT == "development":
         "http://127.0.0.1:5174",
         "http://127.0.0.1:3000",
     ])
+    # Vite advertises Network URLs on local NICs; allow any local dev origin
+    # while keeping credentials enabled. This regex matches localhost, loopback,
+    # and RFC 1918 private IPv4 addresses with any port.
+    allow_origin_regex = (
+        r"^http://(localhost|127\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[01])\.\d+\.\d+):\d+$"
+    )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-API-Key", "X-Requested-With", "Accept", "Origin"],
