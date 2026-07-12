@@ -1,7 +1,7 @@
 import uuid
 import re
 from datetime import datetime, date
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from enum import Enum as PyEnum
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
 
@@ -879,3 +879,41 @@ class SessionOut(BaseModel):
     last_active: Optional[str] = None
     created_at: Optional[str] = None
     current: bool = False
+
+
+# ─── AI-Generated Custom Methodology Schemas ───────────────────────────────────
+
+class GeneratedMethodologyBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    sector: str = Field(..., min_length=1, max_length=100)
+    activity_description: str = Field(..., min_length=10)
+    boundaries: dict = Field(default_factory=dict)
+    data_sources: list = Field(default_factory=list)
+
+
+class GeneratedMethodologyCreate(GeneratedMethodologyBase):
+    project_id: uuid.UUID
+
+
+class GeneratedMethodologyOut(GeneratedMethodologyBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    gap_analysis: Optional[dict] = None
+    methodology: Optional[dict] = None
+    quantification_scaffold: Optional[dict] = None
+    status: str
+    rejection_reason: Optional[str] = None
+    reviewed_by: Optional[uuid.UUID] = None
+    reviewed_at: Optional[datetime] = None
+    created_by: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class GeneratedMethodologyStatusUpdate(BaseModel):
+    status: Literal[
+        "draft", "under_review", "approved", "rejected", "revision_requested"
+    ]
+    rejection_reason: Optional[str] = Field(None, max_length=2000)

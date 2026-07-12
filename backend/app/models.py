@@ -865,6 +865,53 @@ class MethodologyVersion(Base):
     )
 
 
+# ─── AI-Generated Custom Methodologies ─────────────────────────────────────────
+
+class GeneratedMethodology(Base):
+    __tablename__ = "generated_methodologies"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sector: Mapped[str] = mapped_column(String(100), nullable=False)
+    activity_description: Mapped[str] = mapped_column(Text, nullable=False)
+    boundaries_json: Mapped[dict] = mapped_column(JSONB, default=dict)
+    data_sources_json: Mapped[list] = mapped_column(JSONB, default=list)
+    gap_analysis_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    methodology_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    quantification_scaffold_json: Mapped[Optional[dict]] = mapped_column(
+        JSONB, nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft")
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 # ─── Brokerage & Tokenization ─────────────────────────────────────────────────
 
 class ListingStatusEnum(str, PyEnum):
