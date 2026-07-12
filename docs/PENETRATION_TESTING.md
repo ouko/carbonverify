@@ -94,7 +94,7 @@ cd backend && safety check -r requirements.txt
 
 ## Bug Bounty Program (Year 2+)
 
-**Planned Launch:** Q2 2025
+**Planned Launch:** TBD (not yet launched)
 
 **Scope:**
 - API endpoints (`/api/v1/*`)

@@ -185,12 +185,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security Hardening
 - **Docker Compose** — Removed exposed DB/Redis ports to host, removed default password fallbacks, added dev-only volume mount comments
-- **Dockerfile** — Updated to Python 3.14-slim, added non-root `appuser` (UID 1000), added `HEALTHCHECK` instruction
+- **Dockerfile** — Uses `python:3.11-slim`, added non-root `appuser` (UID 1000), added `HEALTHCHECK` instruction
 - **Security headers** — Removed deprecated `X-XSS-Protection`, added `Permissions-Policy`, added `TrustedHostMiddleware` (skipped in test env)
 - **Config validation** — `SECRET_KEY` now requires min 32 chars, removed insecure defaults for `ENVIRONMENT` (was "development"), `S3_BUCKET_NAME`, `DATABASE_URL`, `REDIS_URL`
 - **PyPDF2 → pypdf** — Migrated from deprecated PyPDF2 to maintained `pypdf` library
 - **Circuit breakers wired** — `@with_circuit_breaker("kimi_api")` on `KimiAPIClient.chat_completion()`, `@with_circuit_breaker("whatsapp_meta")` on `WhatsAppMetaAPI.send_text_message()`
-- **Slowapi deprecation fix** — Monkey-patched `asyncio.iscoroutinefunction = inspect.iscoroutinefunction` before slowapi imports to suppress Python 3.14 warnings
+- **Slowapi deprecation fix** — Monkey-patched `asyncio.iscoroutinefunction = inspect.iscoroutinefunction` before slowapi imports to suppress deprecation warnings
 
 ### Testing & QA
 - **React Router test wrapper** — `renderWithRouter()` utility with v7 future flags (`v7_startTransition`, `v7_relativeSplatPath`) eliminates console warnings in tests
@@ -234,7 +234,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Login form autocomplete — added `autoComplete="email"` and `autoComplete="current-password"` attributes
 
 ### Changed
-- Updated Python requirement from 3.11+ to 3.14
+- Pinned Python runtime to 3.11 for stability
 - Added `playwright`, `playwright-stealth`, `beautifulsoup4`, `lxml`, `curl_cffi` to backend dependencies
 - Expanded `LeadProjectStatusEnum` with `under_certification` and `request_for_issuance` values
 - FastAPI route ordering: `/scraper-history` now defined before `/{lead_id}` to avoid UUID collision

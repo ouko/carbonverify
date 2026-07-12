@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: frontend
-          image: <ECR_REGISTRY>/carbonverify-frontend:latest
+          image: carbonverify-frontend:latest
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -37,7 +37,7 @@ spec:
               drop:
                 - ALL
           ports:
-            - containerPort: 80
+            - containerPort: 8080
               name: http
           resources:
             requests:
@@ -49,7 +49,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /index.html
-              port: 80
+              port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
@@ -57,7 +57,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /index.html
-              port: 80
+              port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
@@ -75,8 +75,8 @@ spec:
   selector:
     app: carbonverify-frontend
   ports:
-    - port: 80
-      targetPort: 80
+    - port: 8080
+      targetPort: 8080
       name: http
 ---
 apiVersion: policy/v1

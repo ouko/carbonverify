@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   sessionId: null,
 
   setAccessToken: (access, sessionId) => {
-    set({ accessToken: access, isAuthenticated: true, sessionId: sessionId ?? null })
+    set({ accessToken: access, sessionId: sessionId ?? null })
   },
 
   setSessionId: (sessionId) => set({ sessionId }),
@@ -45,8 +45,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const { access_token, session_id } = res.data
     // Set the token in the client first so /users/me can use it.
     set({ accessToken: access_token, sessionId: session_id ?? null, mfaRequired: false, mfaTempToken: null })
-    const me = await api.get<User>('/users/me')
-    set({ user: me.data, isAuthenticated: true, isLoading: false })
+    try {
+      const me = await api.get<User>('/users/me')
+      set({ user: me.data, isAuthenticated: true, isLoading: false })
+    } catch {
+      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false })
+      throw new Error('Failed to fetch user profile')
+    }
   },
 
   verifyMFA: async (totpCode) => {
@@ -55,8 +60,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const res = await api.post('/auth/mfa/verify', { temp_token: mfaTempToken, totp_code: totpCode }, { withCredentials: true })
     const { access_token, session_id } = res.data
     set({ accessToken: access_token, sessionId: session_id ?? null, mfaRequired: false, mfaTempToken: null })
-    const me = await api.get<User>('/users/me')
-    set({ user: me.data, isAuthenticated: true, isLoading: false })
+    try {
+      const me = await api.get<User>('/users/me')
+      set({ user: me.data, isAuthenticated: true, isLoading: false })
+    } catch {
+      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false })
+      throw new Error('Failed to fetch user profile')
+    }
   },
 
   logout: async () => {

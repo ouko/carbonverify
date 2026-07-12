@@ -63,5 +63,9 @@ patches:
         value: 12
 
 images:
-  - name: <ECR_REGISTRY>/carbonverify-app
+  - name: carbonverify-app
+    newName: <REGISTRY>/carbonverify-app
+    newTag: v1.2.0
+  - name: carbonverify-frontend
+    newName: <REGISTRY>/carbonverify-frontend
     newTag: v1.2.0

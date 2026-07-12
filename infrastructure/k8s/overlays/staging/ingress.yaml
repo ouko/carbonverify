@@ -2,25 +2,22 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: carbonverify-ingress
-  namespace: carbonverify
+  namespace: carbonverify-staging
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/limit-rps: "2"
-    nginx.ingress.kubernetes.io/limit-rpm: "100"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    nginx.ingress.kubernetes.io/limit-rps: "4"
+    nginx.ingress.kubernetes.io/limit-rpm: "200"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - api.carbonverify.io
-        - app.carbonverify.io
-      secretName: carbonverify-tls
+        - staging-api.carbonverify.io
+        - staging-app.carbonverify.io
+      secretName: carbonverify-staging-tls
   rules:
-    - host: api.carbonverify.io
+    - host: staging-api.carbonverify.io
       http:
         paths:
           - path: /
@@ -30,7 +27,7 @@ spec:
                 name: carbonverify-app
                 port:
                   number: 8000
-    - host: app.carbonverify.io
+    - host: staging-app.carbonverify.io
       http:
         paths:
           - path: /

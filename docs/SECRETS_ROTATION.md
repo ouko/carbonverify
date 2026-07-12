@@ -43,31 +43,17 @@ CarbonVerify uses several cryptographic secrets that must be rotated periodicall
 
 ### Implementation
 
-The auth module supports dual-secret validation. Update `backend/app/auth/jwt.py`:
-
-```python
-from app.config import settings
-
-def decode_token(token: str) -> dict:
-    for secret in [settings.SECRET_KEY, settings.SECRET_KEY_PREVIOUS]:
-        if not secret:
-            continue
-        try:
-            return jwt.decode(token, secret, algorithms=[ALGORITHM])
-        except jwt.InvalidSignatureError:
-            continue
-    raise jwt.InvalidTokenError("Invalid token signature")
-```
+Dual-secret JWT validation is already implemented in `backend/app/auth/security.py` (`decode_token`). It tries `SECRET_KEY`, then `SECRET_KEY_PREVIOUS` if set.
 
 ---
 
 ## PII Encryption Key (`ENCRYPTION_KEY_HEX`)
 
-### ⚠️ Requires Downtime
+### ⚠️ Not Yet Implemented
 
-Field-level encryption uses Fernet. Rotating the key requires re-encrypting all encrypted columns.
+Field-level encryption uses Fernet. Rotating the key requires re-encrypting all encrypted columns. Dual-key (`ENCRYPTION_KEY_HEX_PREVIOUS`) support and an automated rotation script are **not yet implemented**.
 
-### Rotation Procedure
+### Planned Rotation Procedure
 
 1. **Schedule maintenance window** (expect 5–30 minutes depending on data volume)
 
@@ -76,74 +62,36 @@ Field-level encryption uses Fernet. Rotating the key requires re-encrypting all 
    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().hex())"
    ```
 
-3. **Set dual-key mode**:
-   - `ENCRYPTION_KEY_HEX` = new key
-   - `ENCRYPTION_KEY_HEX_PREVIOUS` = old key
+3. Add `ENCRYPTION_KEY_HEX_PREVIOUS` support to `backend/app/config.py` and the encryption helpers.
 
-4. **Run rotation migration**:
-   ```bash
-   cd backend
-   python -m app.scripts.rotate_encryption_key
-   ```
+4. **Run rotation migration** against all encrypted columns.
 
-5. **Verify**:
-   - Sample a few users and verify PII fields decrypt correctly
-   - Check application logs for decryption errors
+5. **Verify** decryption, then remove the previous key.
 
-6. **Remove old key**:
-   - Unset `ENCRYPTION_KEY_HEX_PREVIOUS`
-
-### Rotation Script
-
-Create `backend/app/scripts/rotate_encryption_key.py`:
-
-```python
-import asyncio
-from sqlalchemy import select, update
-from app.database import async_session_maker
-from app.models import User, Developer
-from app.core.encryption import FieldEncryption
-
-async def rotate():
-    old_cipher = FieldEncryption(key_hex=settings.ENCRYPTION_KEY_HEX_PREVIOUS)
-    new_cipher = FieldEncryption(key_hex=settings.ENCRYPTION_KEY_HEX)
-
-    async with async_session_maker() as session:
-        # Rotate User emails
-        result = await session.execute(select(User))
-        for user in result.scalars():
-            plaintext = old_cipher.decrypt(user.email)
-            user.email = new_cipher.encrypt(plaintext)
-        await session.commit()
-        print(f"Rotated {len(result.scalars().all())} user emails")
-
-if __name__ == "__main__":
-    asyncio.run(rotate())
-```
+> Track this as a pre-production task if encrypted PII columns contain live data.
 
 ---
 
 ## IoT Webhook API Key (`IOT_WEBHOOK_API_KEY`)
 
-### Rotation Procedure (Zero-Downtime)
+### ⚠️ Not Yet Implemented
+
+Dual-key (`IOT_WEBHOOK_KEY_PREVIOUS`) validation for IoT webhooks is **not yet implemented**. Rotation requires updating all devices and replacing the single key in the backend, causing a brief outage until every device is updated.
+
+### Planned Rotation Procedure
 
 1. **Generate new key**:
    ```bash
    python -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-2. **Update devices**:
-   - Deploy new key to all IoT devices
-   - Devices should support dual-key validation during transition
+2. **Update devices** with the new key.
 
-3. **Update backend**:
-   - Set `IOT_WEBHOOK_API_KEY` to new value
-   - Set `IOT_WEBHOOK_API_KEY_PREVIOUS` to old value
-   - Deploy
+3. **Update backend** `IOT_WEBHOOK_API_KEY` to the new value and deploy.
 
-4. **Wait 24 hours** for all devices to reconnect
+4. **Monitor** for rejected requests from devices still using the old key.
 
-5. **Remove old key**
+> Implement `IOT_WEBHOOK_KEY_PREVIOUS` dual-key validation before scaling the IoT fleet.
 
 ---
 

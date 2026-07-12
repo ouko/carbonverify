@@ -30,8 +30,9 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/', timeout=4)" || exit 1
 
-# Default: run migrations then start Gunicorn with Uvicorn workers.
+# Default: start Gunicorn with Uvicorn workers.
+# Run migrations as a one-shot job or init container before deploying the app.
 # Override in compose for Celery workers/beat.
-CMD ["sh", "-c", "alembic upgrade head && gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --access-logfile - --error-logfile - --timeout 60 --keep-alive 5 --max-requests 10000"]
+CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--timeout", "60", "--keep-alive", "5", "--max-requests", "10000"]

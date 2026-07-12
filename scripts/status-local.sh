@@ -58,13 +58,13 @@ echo ""
 echo -e "${BLUE}Ports${RESET}"
 echo "─────"
 
-for port in 5432 6380 8000 5173; do
+for port in 5432 6380 8001 5173; do
   if lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
     service=""
     case $port in
       5432) service="PostgreSQL" ;;
       6380) service="Redis" ;;
-      8000) service="FastAPI" ;;
+      8001) service="FastAPI" ;;
       5173) service="Vite Frontend" ;;
     esac
     log_ok "Port $port — $service"
@@ -77,8 +77,8 @@ echo ""
 echo -e "${BLUE}Health Checks${RESET}"
 echo "─────────────"
 
-if curl -s http://localhost:8000/health/ >/dev/null 2>&1; then
-  HEALTH=$(curl -s http://localhost:8000/health/ 2>/dev/null)
+if curl -s http://localhost:8001/health/ >/dev/null 2>&1; then
+  HEALTH=$(curl -s http://localhost:8001/health/ 2>/dev/null)
   log_ok "Backend health: $HEALTH"
 else
   log_error "Backend health check failed"

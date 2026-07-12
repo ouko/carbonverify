@@ -16,15 +16,15 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
-# Stage 2: Serve with nginx
-FROM nginx:alpine
+# Stage 2: Serve with unprivileged nginx
+FROM nginxinc/nginx-unprivileged:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY infrastructure/nginx/nginx.conf /etc/nginx/nginx.conf
 
-EXPOSE 80
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -q --spider http://localhost/index.html || exit 1
+    CMD wget -q --spider http://localhost:8080/index.html || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

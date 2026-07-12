@@ -19,14 +19,27 @@ kubectl apply -k infrastructure/k8s/overlays/staging/
 
 ### 2. Create Audit Test Account
 
+Self-registration always creates a `viewer` account. To create an admin audit account, use the admin invite flow while logged in as an existing admin:
+
 ```bash
-curl -X POST https://staging.carbonverify.io/auth/register \
+# 1. Log in as an existing admin
+curl -X POST https://staging.carbonverify.io/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "existing-admin@carbonverify.io", "password": "..."}'
+
+# 2. Send an admin invite
+curl -X POST https://staging.carbonverify.io/auth/admin/invite \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "security-audit@carbonverify.io", "role": "admin"}'
+
+# 3. Accept the invite (use the token from the invite email/response)
+curl -X POST https://staging.carbonverify.io/auth/invite/accept \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "security-audit@carbonverify.io",
+    "token": "$INVITE_TOKEN",
     "password": "AuditPass123!",
-    "name": "Security Audit",
-    "role": "admin"
+    "name": "Security Audit"
   }'
 ```
 
@@ -99,7 +112,7 @@ safety check -r backend/requirements.txt --json -o safety-report.json
 | 1 | Brute force protection | Burp Suite Intruder | Account locks after 5 failed attempts |
 | 2 | JWT secret strength | `jwt_tool.py` | HS256 with ≥32 byte random key |
 | 3 | Refresh token storage | Browser DevTools | Token in httpOnly cookie, NOT localStorage |
-| 4 | Password complexity | Manual test | Rejects passwords <8 chars, no uppercase, no special char |
+| 4 | Password complexity | Manual test | Rejects passwords <12 chars, missing uppercase, lowercase, digit, or special char |
 | 5 | Session timeout | Wait 30 min + test | Auto-logout after inactivity |
 | 6 | RBAC enforcement | API calls as viewer | Viewer cannot access admin endpoints (403) |
 | 7 | WebSocket auth | wscat without token | Connection rejected with code 1008 |

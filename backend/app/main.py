@@ -217,7 +217,7 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, set):
         return sorted(_json_safe(v) for v in value)
     if isinstance(value, BaseModel):
-        return value.model_dump()
+        return value.model_dump(mode="json")
     return value
 
 

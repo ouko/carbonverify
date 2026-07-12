@@ -83,19 +83,19 @@ This document describes the complete infrastructure, deployment procedures, and 
 ### Quick Start
 
 ```bash
-cd infrastructure
+cd ..
 
 # Copy environment file
-cp ../.env.example .env
+cp .env.example .env
 # Edit .env with your values
 
 # Start all services
 docker-compose up --build
 
 # Access URLs:
-# - Frontend:    http://localhost:5173
-# - API:         http://localhost:8000
-# - API Docs:    http://localhost:8000/docs
+# - Frontend:    http://localhost            # nginx serves the production SPA on port 80
+# - API:         http://localhost            # proxied via nginx
+# - API Docs:    http://localhost/docs       # proxied via nginx
 # - Nginx Proxy: http://localhost
 ```
 
@@ -233,8 +233,8 @@ infrastructure/k8s/
 ```bash
 # Update image tags
 cd infrastructure/k8s/overlays/staging
-kustomize edit set image <ECR_REGISTRY>/carbonverify-app=123456789012.dkr.ecr.us-east-1.amazonaws.com/carbonverify-app:staging-latest
-kustomize edit set image <ECR_REGISTRY>/carbonverify-frontend=123456789012.dkr.ecr.us-east-1.amazonaws.com/carbonverify-frontend:staging-latest
+kustomize edit set image carbonverify-app=123456789012.dkr.ecr.us-east-1.amazonaws.com/carbonverify-app:staging-latest
+kustomize edit set image carbonverify-frontend=123456789012.dkr.ecr.us-east-1.amazonaws.com/carbonverify-frontend:staging-latest
 
 # Apply
 kustomize build . | kubectl apply -f -

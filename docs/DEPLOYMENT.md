@@ -180,7 +180,7 @@ After both are deployed:
 
 ### Terraform/CDK (Infrastructure as Code)
 
-See `infrastructure/aws/` for Terraform templates (to be created).
+See `infrastructure/terraform/` for Terraform templates.
 
 ---
 

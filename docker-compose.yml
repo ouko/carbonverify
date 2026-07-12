@@ -134,7 +134,7 @@ services:
         condition: service_healthy
 
   clamav:
-    image: clamav/clamav:latest
+    image: clamav/clamav:1.3
     container_name: cv-clamav
     restart: unless-stopped
     volumes:

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from datetime import datetime, timezone
@@ -34,9 +35,14 @@ async def health_check(request: Request, db: AsyncSession = Depends(get_db)):
 
     overall = "ok" if db_status == "ok" and redis_status == "ok" else "degraded"
 
-    return HealthCheck(
+    content = HealthCheck(
         status=overall,
         database=db_status,
         redis=redis_status,
         timestamp=datetime.now(timezone.utc),
+    ).model_dump(mode="json")
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if overall == "ok" else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=content,
     )

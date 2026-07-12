@@ -107,9 +107,9 @@ cp .env.example .env
 docker-compose up --build
 
 # 4. Access
-# Frontend:  http://localhost:5173
-# API Docs:  http://localhost:8000/docs
-# API Base:  http://localhost:8000
+# Frontend:  http://localhost            # nginx serves the production SPA on port 80
+# API Docs:  http://localhost/docs       # proxied via nginx
+# API Base:  http://localhost            # proxied via nginx
 ```
 
 ### Production Deployment
@@ -139,11 +139,11 @@ docker-compose -f docker-compose.production.yml exec app alembic upgrade head
 |---------|-----------|------|---------|
 | PostgreSQL | `cv-db` | 5432 | Primary data store |
 | Redis | `cv-redis` | 6379 | Celery broker + cache |
-| FastAPI | `cv-app` | 8000 | REST API |
+| FastAPI | `cv-app` | 8000 | REST API (exposed directly by `docker-compose.yml` dev stack) |
 | Celery Worker | `cv-celery-worker` | — | Async task processing |
 | Celery Beat | `cv-celery-beat` | — | Scheduled tasks |
 | ClamAV | `cv-clamav` | — | Virus scanning for uploads |
-| Frontend | `cv-frontend` | 5173 | Vite dev server (development compose only) |
+| Frontend | `cv-frontend` | 8080 | Static SPA served internally; proxied by nginx in production compose |
 | nginx | `cv-nginx` | 80/443 | Reverse proxy + static SPA host (production compose only) |
 
 ### Demo Accounts
@@ -183,7 +183,7 @@ alembic upgrade head
 python -m scripts.seed_demo_data
 
 # Start server
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
 ### Local Frontend Development
@@ -194,7 +194,7 @@ npm install
 npm run dev
 ```
 
-**CORS note:** Do not set `VITE_API_URL` in `frontend/.env.local`. The Vite dev server proxies API calls to `localhost:8000` automatically via `vite.config.ts`. Setting a direct API URL causes CORS issues because the backend and frontend run on different origins locally.
+**CORS note:** Do not set `VITE_API_URL` in `frontend/.env.local`. The Vite dev server proxies API calls to `localhost:8001` automatically via `vite.config.ts`. Setting a direct API URL causes CORS issues because the backend and frontend run on different origins locally.
 
 ### Running Tests
 
@@ -387,53 +387,55 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/v1/leads/` | List all leads |
-| `POST` | `/api/v1/leads/` | Create a manual lead |
-| `GET` | `/api/v1/leads/{id}` | Get lead detail |
-| `PATCH` | `/api/v1/leads/{id}` | Update lead (status, notes, priority) |
-| `DELETE` | `/api/v1/leads/{id}` | Delete a lead |
-| `POST` | `/api/v1/leads/{id}/score` | Re-calculate stuck score |
-| `POST` | `/api/v1/leads/scrape` | Run scrapers (all or per-registry) |
-| `GET` | `/api/v1/leads/stats/dashboard` | Lead aggregate stats |
-| `GET` | `/api/v1/leads/health/scrapers` | Scraper health check |
-| `GET` | `/api/v1/leads/scraper-history` | Per-source last scrape timestamps |
+| `GET` | `/leads/` | List all leads |
+| `POST` | `/leads/` | Create a manual lead |
+| `GET` | `/leads/{id}` | Get lead detail |
+| `PATCH` | `/leads/{id}` | Update lead (status, notes, priority) |
+| `DELETE` | `/leads/{id}` | Delete a lead |
+| `POST` | `/leads/{id}/score` | Re-calculate stuck score |
+| `POST` | `/leads/scrape` | Run scrapers (all or per-registry) |
+| `GET` | `/leads/stats/dashboard` | Lead aggregate stats |
+| `GET` | `/leads/health/scrapers` | Scraper health check |
+| `GET` | `/leads/scraper-history` | Per-source last scrape timestamps |
 
 ### API Endpoints (Core)
 
-> **Pagination:** All list endpoints support `skip` (offset) and `limit` (page size) query parameters. Defaults vary by endpoint (typically 50–100 items); maximum is 200–500. Example: `GET /api/v1/projects?skip=0&limit=50`.
+> **Pagination:** All list endpoints support `skip` (offset) and `limit` (page size) query parameters. Defaults vary by endpoint (typically 50–100 items); maximum is 200–500. Example: `GET /projects?skip=0&limit=50`.
+> For the complete and current API spec, open `/docs` on a running backend.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/v1/auth/register` | Create account |
-| `POST` | `/api/v1/auth/login` | JWT access + refresh tokens (returns `mfa_required` if MFA enabled) |
-| `POST` | `/api/v1/auth/mfa/verify` | Verify TOTP or backup code during MFA login |
-| `POST` | `/api/v1/auth/mfa/confirm` | Confirm MFA setup (returns 10 backup codes) |
-| `POST` | `/api/v1/auth/mfa/regenerate-backup-codes` | Regenerate MFA backup codes |
-| `POST` | `/api/v1/auth/forgot-password` | Request password reset email |
-| `POST` | `/api/v1/auth/reset-password` | Reset password with token |
-| `POST` | `/api/v1/auth/refresh` | Rotate access token |
-| `GET` | `/api/v1/auth/oauth/{provider}` | Initiate OAuth login (google, microsoft, okta) |
-| `GET` | `/api/v1/auth/oauth/{provider}/callback` | OAuth callback |
-| `POST` | `/api/v1/auth/oauth/{provider}/link` | Link OAuth account |
-| `DELETE` | `/api/v1/auth/oauth/{provider}/unlink` | Unlink OAuth account |
-| `GET` | `/api/v1/auth/oauth/accounts` | List linked OAuth accounts |
-| `POST` | `/api/v1/api-keys/` | Create API key (returns full key once) |
-| `GET` | `/api/v1/api-keys/` | List API keys |
-| `DELETE` | `/api/v1/api-keys/{id}` | Revoke API key |
-| `GET` | `/api/v1/users/me` | Current user profile |
-| `POST` | `/api/v1/projects` | Create project |
-| `GET` | `/api/v1/projects` | List projects |
-| `GET` | `/api/v1/projects/{id}` | Project detail |
-| `POST` | `/api/v1/projects/{id}/upload` | Multipart file upload |
-| `GET` | `/api/v1/projects/{id}/data-sources` | List data sources |
-| `POST` | `/api/v1/calculations/projects/{id}/calculate` | Run full calculation pipeline |
-| `GET` | `/api/v1/calculations/{id}` | Get calculation run |
-| `POST` | `/api/v1/calculations/{id}/approve` | Human approval gate |
-| `POST` | `/api/v1/reports/generate` | Generate monitoring report |
-| `POST` | `/api/v1/reports/{id}/submit` | Submit to registry |
-| `GET` | `/api/v1/review-queue` | Human review queue |
-| `POST` | `/api/v1/review-queue/{id}/approve` | Approve flagged item |
-| `POST` | `/api/v1/webhooks/iot/{project_id}` | IoT data ingestion |
+| `POST` | `/auth/register` | Create account (self-registration is forced to `viewer` role) |
+| `POST` | `/auth/login` | JWT access + refresh tokens (returns `mfa_required` if MFA enabled) |
+| `POST` | `/auth/mfa/verify` | Verify TOTP or backup code during MFA login |
+| `POST` | `/auth/mfa/confirm` | Confirm MFA setup (returns 10 backup codes) |
+| `POST` | `/auth/mfa/regenerate-backup-codes` | Regenerate MFA backup codes |
+| `POST` | `/auth/forgot-password` | Request password reset email |
+| `POST` | `/auth/reset-password` | Reset password with token |
+| `POST` | `/auth/refresh` | Rotate access token |
+| `GET` | `/auth/oauth/{provider}` | Initiate OAuth login (google, microsoft, okta) |
+| `GET` | `/auth/oauth/{provider}/callback` | OAuth callback |
+| `POST` | `/auth/oauth/{provider}/link` | Link OAuth account |
+| `DELETE` | `/auth/oauth/{provider}/unlink` | Unlink OAuth account |
+| `GET` | `/auth/oauth/accounts` | List linked OAuth accounts |
+| `POST` | `/api-keys/` | Create API key (returns full key once) |
+| `GET` | `/api-keys/` | List API keys |
+| `DELETE` | `/api-keys/{id}` | Revoke API key |
+| `GET` | `/users/me` | Current user profile |
+| `POST` | `/projects` | Create project |
+| `GET` | `/projects` | List projects |
+| `GET` | `/projects/{id}` | Project detail |
+| `POST` | `/uploads/projects/{id}/upload` | Multipart file upload |
+| `GET` | `/data-sources?project_id={id}` | List data sources for a project |
+| `POST` | `/calculations/projects/{id}/calculate` | Run full calculation pipeline |
+| `GET` | `/calculations/{id}` | Get calculation run |
+| `POST` | `/calculations/{id}/approve` | Human approval gate |
+| `POST` | `/reports/{report_id}/generate` | Generate monitoring report |
+| `POST` | `/reports/{report_id}/submit-to-registry` | Submit to registry |
+| `GET` | `/review-queue` | Human review queue |
+| `PATCH` | `/review-queue/{id}` | Update review item status |
+| `POST` | `/orchestrator/review-queue/{id}/resolve` | Resolve review item |
+| `POST` | `/webhooks/iot/{project_id}` | IoT data ingestion |
 
 ---
 
@@ -451,6 +453,8 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | Route | Page | Role |
 |-------|------|------|
 | `/login` | Login | Public |
+| `/register` | Accept Invite | Public (requires invite token) |
+| `/mfa` | MFA Verification | Public (during login) |
 | `/` | Dashboard | Any |
 | `/projects` | Projects List | Any |
 | `/projects/:id` | Project Detail | Any |
@@ -467,6 +471,18 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | `/brokerage` | Brokerage | Any |
 | `/tokenization` | Tokenization | Any |
 | `/corporate` | Corporate Dashboard | Any |
+
+### Pages — Admin (`AdminLayout`)
+
+| Route | Page | Role |
+|-------|------|------|
+| `/admin` | Admin Dashboard | Admin |
+| `/admin/dashboard` | Admin Dashboard | Admin |
+| `/admin/users` | User Management | Admin |
+| `/admin/users/:id` | User Detail | Admin |
+| `/admin/sessions` | Session Management | Admin |
+| `/admin/api-keys` | API Key Management | Admin |
+| `/admin/settings` | Admin Settings | Admin |
 
 ### Pages — Command Center (`CommandLayout`)
 
