@@ -48,6 +48,7 @@ export default defineConfig({
       '/whatsapp': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/validation': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/oauth': { target: 'http://127.0.0.1:8001', changeOrigin: true },
+      '/methodology-generator': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/api-keys': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/metrics': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/ws': { target: 'ws://127.0.0.1:8001', ws: true },
