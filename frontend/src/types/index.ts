@@ -212,3 +212,37 @@ export interface LeadStats {
   high_priority_count: number
   critical_count: number
 }
+
+export interface GeneratedMethodology {
+  id: string
+  project_id: string
+  name: string
+  sector: string
+  activity_description: string
+  boundaries: Record<string, unknown>
+  data_sources: Array<Record<string, unknown>>
+  gap_analysis?: Record<string, unknown> | null
+  methodology?: Record<string, unknown> | null
+  quantification_scaffold?: Record<string, unknown> | null
+  status: 'draft' | 'under_review' | 'approved' | 'rejected' | 'revision_requested'
+  rejection_reason?: string | null
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateGeneratedMethodologyPayload {
+  project_id: string
+  name: string
+  sector: string
+  activity_description: string
+  boundaries: Record<string, unknown>
+  data_sources: Array<Record<string, unknown>>
+}
+
+export interface UpdateMethodologyStatusPayload {
+  status: GeneratedMethodology['status']
+  rejection_reason?: string
+}
