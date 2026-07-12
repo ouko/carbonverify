@@ -465,7 +465,7 @@ Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/cele
 ## Observability
 
 - **Structured Logging**: JSON format via `app/core/logging.py`
-- **Health Checks**: `/health` and `/health/db` endpoints
+- **Health Checks**: `/health/` endpoint (DB + Redis)
 - **Scraper Health**: `/api/v1/leads/health/scrapers` — per-source status
 - **Key Metrics Logged**:
   - `calculation_complete` with all result fields

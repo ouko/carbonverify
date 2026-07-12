@@ -177,7 +177,7 @@ This document maps CarbonVerify's security controls to SOC 2 Trust Services Crit
 ### CC7.1: System Monitoring
 | Control | Evidence | Owner |
 |---------|----------|-------|
-| Health checks | `/health` endpoint + K8s liveness/readiness | SRE |
+| Health checks | `/health/` endpoint + K8s liveness/readiness | SRE |
 | Performance monitoring | Prometheus + Grafana dashboards | SRE |
 | Error tracking | Sentry integration (recommended) | SRE |
 

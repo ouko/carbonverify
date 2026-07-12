@@ -246,7 +246,7 @@ AuditLog, Brokerage, Compliance, Corporate, SecuritySettings, Tokenization, Sett
 | Dashboard | `/` | ⚠️ Partial | ✅ Yes | ✅ Yes | N/A | ❌ No | **C** |
 | Projects | `/projects` | ✅ Yes | ✅ Yes | ⚠️ Partial | N/A | ❌ No | **B** |
 | Project Detail | `/projects/:id` | ✅ Yes | ✅ Yes | ✅ Yes | N/A | ❌ No | **B** |
-| Project Create | `/projects/new` | ✅ Yes | ✅ Yes | N/A | ✅ Yes | ✅ Yes | **A** |
+| Project Create | `/projects/create` | ✅ Yes | ✅ Yes | N/A | ✅ Yes | ✅ Yes | **A** |
 | Data Sources | `/data-sources` | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes | ❌ No | **C** |
 | Calculations | `/calculations` | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes | ❌ No | **C** |
 | Reports | `/reports` | ✅ Yes | ⚠️ PDF dead | ❌ No | ✅ Yes | ❌ No | **C** |

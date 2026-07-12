@@ -454,7 +454,7 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | `/` | Dashboard | Any |
 | `/projects` | Projects List | Any |
 | `/projects/:id` | Project Detail | Any |
-| `/projects/new` | New Project | Operator+ |
+| `/projects/create` | New Project | Operator+ |
 | `/data-sources` | Data Sources | Operator+ |
 | `/calculations` | Calculations | Operator+ |
 | `/reports` | Reports | Operator+ |
