@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **N+1 query elimination in lead scraping** — `POST /leads/scrape` now batch-loads existing leads by `external_id` with a single `IN` query per source instead of one query per raw lead
 
 ### Added
+- **AI Methodology Designer** — End-to-end wizard for generating registry-aligned draft methodologies for projects that do not fit existing Verra/Gold Standard methodologies. Includes gap analysis, AI-generated methodology draft with quantification scaffold, human review workflow, and Markdown export. Backend: `methodology-generator` router, `MethodologyGeneratorService`, `GeneratedMethodology` model, and Alembic migration. Frontend: `/methodology-designer/:id?` route, wizard components, and React Query hooks. Requires `KIMI_API_KEY` for live AI generation; falls back to a structured placeholder when the key is absent so the UI remains testable.
 - **Invite acceptance page** — New `/register?invite={token}` route with `InviteAcceptPage` component for users to create accounts from invite links
 - **Database index on `refresh_tokens.token_hash`** — Speeds up every token refresh validation (previously full table scan)
 - **Comprehensive audit logging** — All state-changing endpoints across 8 modules now write to `audit_logs`:

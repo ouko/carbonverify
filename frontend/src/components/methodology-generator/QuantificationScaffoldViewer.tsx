@@ -1,11 +1,23 @@
 import type { GeneratedMethodology } from '../../types'
 
+interface QuantificationScaffoldShape {
+  equations?: Record<string, unknown>
+  parameters?: Array<{
+    name?: string
+    description?: string
+    unit?: string
+    data_source?: string
+    uncertainty?: string
+  }>
+  monitoring_frequency?: string
+}
+
 export function QuantificationScaffoldViewer({ gm }: { gm: GeneratedMethodology }) {
-  const scaffold = gm.quantification_scaffold
+  const scaffold = (gm.quantification_scaffold ?? null) as QuantificationScaffoldShape | null
   if (!scaffold) return <p className="text-gray-500">No quantification scaffold yet.</p>
   return (
     <div className="space-y-4">
-      {scaffold.equations && (
+      {!!scaffold.equations && Object.keys(scaffold.equations).length > 0 && (
         <div>
           <h4 className="font-semibold">Equations</h4>
           <pre className="bg-gray-50 p-3 rounded text-sm overflow-x-auto">{JSON.stringify(scaffold.equations, null, 2)}</pre>
@@ -25,7 +37,7 @@ export function QuantificationScaffoldViewer({ gm }: { gm: GeneratedMethodology 
               </tr>
             </thead>
             <tbody>
-              {scaffold.parameters.map((p: any, i: number) => (
+              {scaffold.parameters.map((p, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1 border">{p.name}</td>
                   <td className="px-2 py-1 border">{p.description}</td>
@@ -38,7 +50,7 @@ export function QuantificationScaffoldViewer({ gm }: { gm: GeneratedMethodology 
           </table>
         </div>
       )}
-      {scaffold.monitoring_frequency && (
+      {typeof scaffold.monitoring_frequency === 'string' && scaffold.monitoring_frequency.length > 0 && (
         <div>
           <strong>Monitoring frequency:</strong> {scaffold.monitoring_frequency}
         </div>

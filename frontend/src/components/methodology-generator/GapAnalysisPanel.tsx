@@ -1,7 +1,14 @@
 import type { GeneratedMethodology } from '../../types'
 
+interface GapAnalysisShape {
+  fits_existing_methodology?: boolean
+  matching_methodologies?: Array<{ name?: string; reason?: string }>
+  gaps?: string[]
+  recommendation?: string
+}
+
 export function GapAnalysisPanel({ gm }: { gm: GeneratedMethodology }) {
-  const analysis = gm.gap_analysis
+  const analysis = (gm.gap_analysis ?? null) as GapAnalysisShape | null
   if (!analysis) return <p className="text-gray-500">No gap analysis yet.</p>
   return (
     <div className="space-y-4">
@@ -13,7 +20,7 @@ export function GapAnalysisPanel({ gm }: { gm: GeneratedMethodology }) {
         <div>
           <h4 className="font-semibold">Potential matches</h4>
           <ul className="list-disc pl-5 text-sm">
-            {analysis.matching_methodologies.map((m: any, i: number) => (
+            {analysis.matching_methodologies.map((m, i) => (
               <li key={i}>{m.name}: {m.reason}</li>
             ))}
           </ul>
@@ -23,13 +30,13 @@ export function GapAnalysisPanel({ gm }: { gm: GeneratedMethodology }) {
         <div>
           <h4 className="font-semibold">Gaps</h4>
           <ul className="list-disc pl-5 text-sm">
-            {analysis.gaps.map((g: string, i: number) => (
+            {analysis.gaps.map((g, i) => (
               <li key={i}>{g}</li>
             ))}
           </ul>
         </div>
       )}
-      {analysis.recommendation && (
+      {typeof analysis.recommendation === 'string' && analysis.recommendation.length > 0 && (
         <div className="bg-blue-50 p-3 rounded text-sm">
           <strong>Recommendation:</strong> {analysis.recommendation}
         </div>

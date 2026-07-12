@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import type { GeneratedMethodology } from '../types'
 import { WizardStepper } from '../components/methodology-generator/WizardStepper'
 import { GapAnalysisPanel } from '../components/methodology-generator/GapAnalysisPanel'
 import { MethodologyDraftViewer } from '../components/methodology-generator/MethodologyDraftViewer'
@@ -49,7 +50,7 @@ export default function MethodologyDesignerPage() {
     setStep(4)
   }
 
-  const handleStatus = (status: typeof gm.status) => {
+  const handleStatus = (status: GeneratedMethodology['status']) => {
     if (id) updateStatus.mutate({ id, payload: { status } })
   }
 

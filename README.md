@@ -20,6 +20,7 @@
   - [Calculation Engine](#calculation-engine)
   - [Data Ingestion](#data-ingestion)
   - [Report Generation](#report-generation)
+  - [AI Methodology Designer](#ai-methodology-designer)
   - [VVB Liaison](#vvb-liaison)
   - [Lead Intelligence Engine](#lead-intelligence-engine)
   - [API Endpoints](#api-endpoints)
@@ -41,6 +42,7 @@
 | **Workflow Validation Engine** | Enterprise-grade autonomous QA with JSON-defined workflow graphs, cryptographic proof chains (Merkle trees), synthetic actor factory, auto-remediation, and human escalation gates |
 | **Calculation Engine** | fNRB spatial interpolation, IPCC Tier 1/2 emissions quantification, Monte Carlo uncertainty (10k iterations), leakage detection, methodology compliance scoring |
 | **Report Generator** | Jinja2 HTML templates → WeasyPrint PDF; auto-citations, cross-reference validation, quality gates |
+| **AI Methodology Designer** | Generates registry-aligned draft methodologies for projects that do not fit existing Verra/Gold Standard methodologies; includes gap analysis, quantification scaffold, and human review workflow |
 | **VVB Liaison** | Automated registry submission (Verra / Gold Standard), status polling, SLA tracking, auto-drafted clarification responses |
 | **Lead Intelligence** | Playwright-based scraper for Verra, Gold Standard, and CDM registries; stuck-score algorithm; CRM-style lead pipeline |
 | **Command Center** | Operations dashboard with inbox, project grid, VVB pipeline, quality metrics, and agent performance monitoring |
@@ -202,7 +204,7 @@ npm run dev
 cd backend
 source .venv/bin/activate
 pytest tests/ -v
-# 350 tests covering calculation engine, reports, VVB pipeline, lead intelligence, auth, admin, uploads, security, compliance, tokenization, brokerage, and more
+# 355 tests covering calculation engine, reports, VVB pipeline, lead intelligence, auth, admin, uploads, security, compliance, tokenization, brokerage, AI methodology generator, and more
 ```
 
 ### Local Development Scripts
@@ -348,6 +350,22 @@ DB Query → Build Context → Jinja2 Template → HTML
 - **Quality gates:** Block submission if compliance < 70% or missing citations
 - **Fallback:** If WeasyPrint unavailable, exports as HTML
 
+### AI Methodology Designer
+
+The AI Methodology Designer helps project developers and validators create registry-aligned draft methodologies for activities that do not cleanly map to existing Verra or Gold Standard methodologies. It is a human-in-the-loop feature: the AI produces structured analysis and drafts, and an operator or VVB must review and approve the output before it can be used in a project.
+
+| Step | UI | Backend | Output |
+|------|----|---------|--------|
+| 1. Context | Wizard captures project name, sector, activity description, boundaries, and data sources | `POST /methodology-generator/` | `GeneratedMethodology` record in `draft` status |
+| 2. Gap Analysis | Compare activity against existing methodologies | `POST /{id}/analyze` | `fits_existing_methodology`, matching methodologies, identified gaps, recommendation |
+| 3. Draft Generation | If gaps exist, generate a custom methodology draft | `POST /{id}/generate` | Registry-style sections (applicability, baseline, project boundary, leakage, monitoring, etc.) plus a quantification scaffold |
+| 4. Review | Operator submits, approves, rejects, or requests revision | `PATCH /{id}/status` | Audit-logged status transition |
+| 5. Export | Download the approved draft as Markdown | `POST /{id}/export` | Markdown document ready for human editing |
+
+- **AI provider:** Kimi API (configurable via `KIMI_API_KEY`); falls back to a structured placeholder response when no key is configured so the UI can be tested end-to-end.
+- **Guardrails:** Draft generation is blocked if the gap analysis concludes the project fits an existing methodology, preventing methodological double-counting.
+- **Audit:** Every status change is written to `audit_logs` with the previous and new status.
+
 ### VVB Liaison
 
 | Component | File | Purpose |
@@ -437,6 +455,13 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | `GET` | `/review-queue` | Human review queue |
 | `PATCH` | `/review-queue/{id}` | Update review item status |
 | `POST` | `/orchestrator/review-queue/{id}/resolve` | Resolve review item |
+| `POST` | `/methodology-generator/` | Create a generated methodology |
+| `GET` | `/methodology-generator/` | List generated methodologies |
+| `GET` | `/methodology-generator/{id}` | Get generated methodology |
+| `POST` | `/methodology-generator/{id}/analyze` | Run gap analysis vs existing methodologies |
+| `POST` | `/methodology-generator/{id}/generate` | Generate draft methodology and quantification scaffold |
+| `PATCH` | `/methodology-generator/{id}/status` | Update review status (operator+) |
+| `POST` | `/methodology-generator/{id}/export` | Export draft methodology as Markdown |
 | `POST` | `/webhooks/iot/{project_id}` | IoT data ingestion |
 
 ---
@@ -463,6 +488,7 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | `/projects/create` | New Project | Operator+ |
 | `/data-sources` | Data Sources | Operator+ |
 | `/calculations` | Calculations | Operator+ |
+| `/methodology-designer/:id?` | AI Methodology Designer | Any (authenticated) |
 | `/reports` | Reports | Operator+ |
 | `/review-queue` | Review Queue | Operator+ |
 | `/field` | Field Dashboard | Operator+ |
@@ -520,6 +546,7 @@ pytest tests/ -v
 | `test_auth.py` | 20 | Login, MFA, session management, invite flow, password policies, rate limiting |
 | `test_users.py` | 18 | Admin CRUD, permissions, role-based access control, pagination |
 | `test_admin.py` | 8 | Stats, session management, global analytics, batched queries |
+| `test_methodology_generator.py` | 5 | Create, gap analysis, draft generation, status transitions, export |
 
 ---
 

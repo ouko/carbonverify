@@ -195,6 +195,40 @@ WeasyPrint HTML → PDF
 S3 storage + Report record
 ```
 
+### 3.5 AI Methodology Designer Flow
+
+```
+Operator describes novel project activity
+       │
+       ▼
+POST /methodology-generator/
+       │
+       ▼
+GeneratedMethodology record (status = draft)
+       │
+       ▼
+POST /{id}/analyze
+       │
+       ├───► Fits existing methodology? → YES → stop; recommend existing methodology
+       └───► NO → gap analysis JSON (gaps, matches, recommendation)
+       │
+       ▼
+POST /{id}/generate
+       │
+       ├───► Kimi API or fallback generator
+       ├───► methodology JSON (applicability, baseline, boundary, leakage, monitoring)
+       └───► quantification_scaffold JSON (equations, parameters, data sources, uncertainty)
+       │
+       ▼
+Operator / VVB review
+       │
+       ├───► approve → status = approved → export Markdown
+       ├───► reject → status = rejected + rejection_reason
+       └───► revision_requested → status = revision_requested → back to draft
+```
+
+The generator is intentionally **human-in-the-loop**: the AI produces structured drafts, but only an operator or admin can transition the record out of `under_review`. All status transitions are written to `audit_logs`.
+
 ### 4. Registry Submission Flow
 
 ```
