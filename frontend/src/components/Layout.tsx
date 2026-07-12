@@ -23,6 +23,7 @@ import {
   MapPin,
   Settings,
   Users,
+  FlaskConical,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -59,6 +60,7 @@ const baseNavGroups = [
       { to: '/projects', icon: FolderOpen, label: 'Projects' },
       { to: '/data-sources', icon: Database, label: 'Data Sources' },
       { to: '/calculations', icon: Calculator, label: 'Calculations' },
+      { to: '/methodology-designer', icon: FlaskConical, label: 'Methodology Designer' },
       { to: '/reports', icon: FileText, label: 'Reports' },
       { to: '/review-queue', icon: ClipboardList, label: 'Review Queue' },
       { to: '/field', icon: MapPin, label: 'Field' },
