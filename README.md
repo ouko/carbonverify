@@ -225,6 +225,8 @@ Logs are written to `.local-logs/` and PIDs are tracked in `.local-dev.pids`.
 
 > **Note on Redis port in hybrid mode:** `docker-compose.local.yml` exposes Redis to the host on port `6380` (mapped to container port `6379`). Make sure `.env.local` and `backend/.env` use `redis://localhost:6380/0` for `REDIS_URL`, `CELERY_BROKER_URL`, and `CELERY_RESULT_BACKEND`.
 
+> **Note on local Celery concurrency:** `scripts/start-local.sh` starts the Celery worker with `--concurrency=1` to keep resource usage low on developer machines. If you need more throughput for background jobs locally, edit the worker command in `scripts/start-local.sh`.
+
 ---
 
 ## Project Structure

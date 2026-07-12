@@ -197,7 +197,7 @@ log_ok "Frontend started (PID $FRONTEND_PID)"
 log_info "Starting Celery worker ..."
 cd "$PROJECT_ROOT/backend"
 source .venv/bin/activate
-nohup celery -A app.tasks.celery_app worker --loglevel=info \
+nohup celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1 \
   >"$LOG_DIR/celery-worker.log" 2>&1 &
 WORKER_PID=$!
 echo "celery-worker:$WORKER_PID" >> "$PIDFILE"

@@ -724,7 +724,7 @@ async def seed_brokerage(
                 co_benefits=random.sample(["health", "gender_equality", "biodiversity", "education"], k=random.randint(1, 3)),
                 delivery_timeline_days=random.randint(15, 90),
                 location=random.choice(KENYA_COUNTIES),
-                status=random.choice(list(ListingStatusEnum)),
+                status=ListingStatusEnum.active,
                 minimum_purchase=rand_float(100, 1000),
                 metadata_json={"certification_body": random.choice(["Verra", "Gold Standard"])},
                 created_at=days_ago(random.randint(1, 60)),
