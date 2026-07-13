@@ -113,12 +113,75 @@ wait_for() {
 }
 
 # ------------------------------------------------------------------
+# Helpers: pre-flight checks
+# ------------------------------------------------------------------
+check_port_conflict() {
+  # Detect if another Docker container (not cv-db) is already publishing host port 5432.
+  local conflicting
+  conflicting=$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null | grep -E '\b5432->' | grep -v '^cv-db\b' || true)
+  if [[ -n "$conflicting" ]]; then
+    log_error "Port 5432 is already allocated by another Docker container:"
+    echo "  $conflicting"
+    log_error "Stop that container or move CarbonVerify's Postgres to a different port."
+    return 1
+  fi
+
+  # Detect non-Docker listeners on 5432 (skip Colima's SSH mux when cv-db itself is running).
+  local listener=""
+  if command -v lsof >/dev/null 2>&1; then
+    listener=$(lsof -i TCP:5432 -sTCP:LISTEN -nP 2>/dev/null | awk 'NR>1 {print $1,$2}' || true)
+  elif command -v ss >/dev/null 2>&1; then
+    listener=$(ss -tlnp 2>/dev/null | grep ':5432' || true)
+  fi
+  if [[ -n "$listener" ]] && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'cv-db'; then
+    log_error "Port 5432 is already in use by a non-Docker process:"
+    echo "  $listener"
+    log_error "Stop that process or move CarbonVerify's Postgres to a different port."
+    return 1
+  fi
+}
+
+validate_encryption_key() {
+  local key="${ENCRYPTION_KEY_HEX:-}"
+  if [[ -z "$key" ]]; then
+    log_error "ENCRYPTION_KEY_HEX is not set in .env.local"
+    log_error "Generate a valid key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    return 1
+  fi
+  if [[ ! "$key" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    log_error "ENCRYPTION_KEY_HEX must be exactly 64 hexadecimal characters (32 bytes)"
+    log_error "Current length: ${#key} characters"
+    log_error "Generate a valid key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    return 1
+  fi
+}
+
+require_free_port() {
+  local port="$1"
+  local name="$2"
+  local listener=""
+  if command -v lsof >/dev/null 2>&1; then
+    listener=$(lsof -i TCP:"$port" -sTCP:LISTEN -nP 2>/dev/null | awk 'NR>1 {print $1,$2}' || true)
+  elif command -v ss >/dev/null 2>&1; then
+    listener=$(ss -tlnp 2>/dev/null | grep ":$port" || true)
+  fi
+  if [[ -n "$listener" ]]; then
+    log_error "$name port $port is already in use:"
+    echo "  $listener"
+    log_error "Run ./scripts/stop-local.sh first, or stop the process manually."
+    return 1
+  fi
+}
+
+# ------------------------------------------------------------------
 # 1. Start Docker infrastructure
 # ------------------------------------------------------------------
 if [[ "$START_INFRA" == true ]]; then
   log_info "Starting Docker infrastructure (PostgreSQL + Redis)..."
 
   mkdir -p "$LOG_DIR"
+
+  check_port_conflict
 
   $DOCKER_COMPOSE -f docker-compose.yml -f docker-compose.local.yml up -d db redis
 
@@ -150,6 +213,8 @@ set -a
 source "$PROJECT_ROOT/.env.local"
 set +a
 
+validate_encryption_key
+
 # Ensure virtualenv exists
 if [[ ! -d "$PROJECT_ROOT/backend/.venv" ]]; then
   log_warn "Python virtualenv not found at backend/.venv"
@@ -167,6 +232,7 @@ fi
 mkdir -p "$LOG_DIR"
 
 # ---- Backend ----
+require_free_port 8001 "FastAPI backend"
 log_info "Starting FastAPI backend on http://localhost:8001 ..."
 cd "$PROJECT_ROOT/backend"
 source .venv/bin/activate
@@ -185,6 +251,7 @@ echo "backend:$BACKEND_PID" >> "$PIDFILE"
 log_ok "Backend started (PID $BACKEND_PID)"
 
 # ---- Frontend ----
+require_free_port 5173 "Vite frontend"
 log_info "Starting Vite frontend on http://localhost:5173 ..."
 cd "$PROJECT_ROOT/frontend"
 nohup npm run dev \

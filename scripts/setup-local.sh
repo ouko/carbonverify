@@ -65,6 +65,48 @@ log_info "CarbonVerify Local Setup"
 echo ""
 
 # ------------------------------------------------------------------
+# Helpers: pre-flight checks
+# ------------------------------------------------------------------
+check_port_conflict() {
+  local conflicting
+  conflicting=$(docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null | grep -E '\b5432->' | grep -v '^cv-db\b' || true)
+  if [[ -n "$conflicting" ]]; then
+    log_warn "Port 5432 is already allocated by another Docker container:"
+    echo "  $conflicting"
+    log_warn "Stop that container or move CarbonVerify's Postgres to a different port."
+    return 1
+  fi
+
+  local listener=""
+  if command -v lsof >/dev/null 2>&1; then
+    listener=$(lsof -i TCP:5432 -sTCP:LISTEN -nP 2>/dev/null | awk 'NR>1 {print $1,$2}' || true)
+  elif command -v ss >/dev/null 2>&1; then
+    listener=$(ss -tlnp 2>/dev/null | grep ':5432' || true)
+  fi
+  if [[ -n "$listener" ]] && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'cv-db'; then
+    log_warn "Port 5432 is already in use by a non-Docker process:"
+    echo "  $listener"
+    log_warn "Stop that process or move CarbonVerify's Postgres to a different port."
+    return 1
+  fi
+}
+
+validate_encryption_key() {
+  local key="${ENCRYPTION_KEY_HEX:-}"
+  if [[ -z "$key" ]]; then
+    log_warn "ENCRYPTION_KEY_HEX is not set in .env.local"
+    log_warn "Generate a valid key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    return 1
+  fi
+  if [[ ! "$key" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    log_warn "ENCRYPTION_KEY_HEX must be exactly 64 hexadecimal characters (32 bytes)"
+    log_warn "Current length: ${#key} characters"
+    log_warn "Generate a valid key with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    return 1
+  fi
+}
+
+# ------------------------------------------------------------------
 # 1. Check prerequisites
 # ------------------------------------------------------------------
 log_info "Checking prerequisites..."
@@ -137,6 +179,7 @@ fi
 # ------------------------------------------------------------------
 log_info "Starting Docker infrastructure..."
 cd "$PROJECT_ROOT"
+check_port_conflict
 $DOCKER_COMPOSE -f docker-compose.yml -f docker-compose.local.yml up -d db redis
 
 log_info "Waiting for PostgreSQL to be ready..."
@@ -160,6 +203,7 @@ source .venv/bin/activate
 set -a
 source "$PROJECT_ROOT/.env.local"
 set +a
+validate_encryption_key
 alembic upgrade head
 log_ok "Migrations applied"
 

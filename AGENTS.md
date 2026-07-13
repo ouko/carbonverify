@@ -219,7 +219,7 @@ Key variables in `.env`:
 | `PROXY_URL` | HTTP proxy for scraper IP rotation (e.g. `http://proxy:8080`) |
 | `SCRAPER_FORCE_HEADLESS` | `true` to force headless in production containers |
 | `SCRAPER_USER_AGENTS` | Comma-separated custom user agents for scraper rotation |
-| `ENCRYPTION_KEY_HEX` | 32-byte hex key for PII field-level encryption |
+| `ENCRYPTION_KEY_HEX` | 32-byte (64 hex character) key for PII field-level encryption. Must be exactly 64 hex chars; generate with `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `IOT_WEBHOOK_API_KEY` | API key for IoT device webhook authentication |
 | `IOT_WEBHOOK_SECRET` | Shared secret for HMAC signature verification on IoT webhooks |
 | `WHATSAPP_VERIFY_TOKEN` | Meta webhook verification token for WhatsApp bot |
@@ -319,6 +319,13 @@ celery -A app.tasks.celery_app beat --loglevel=info
 **CORS fix for local dev:** Do **not** set `VITE_API_URL` in `frontend/.env.local`. Leave it empty (or remove the file) so the Vite dev server proxies API requests to `localhost:8000` via same-origin, avoiding CORS preflight issues. The `vite.config.ts` proxy routes (`/auth`, `/projects`, `/calculations`, etc.) handle this automatically.
 
 **Browser extensions:** MetaMask and some other extensions inject scripts into `localhost` pages that can break API requests with `net::ERR_FAILED`. Use an incognito/private window if you see unexplained network failures.
+
+### Local Development Troubleshooting
+
+- **Port 5432 already allocated / login fails with DB errors**: Another Postgres container (or process) is using `localhost:5432`. `scripts/start-local.sh` and `scripts/setup-local.sh` now detect this up front. Fix by stopping the conflicting container/process, or reconfigure CarbonVerify to use a different host port by editing `docker-compose.local.yml` and `.env.local`.
+- **Port 8001 or 5173 already in use**: The startup scripts now refuse to start if the FastAPI or Vite ports are occupied. Run `./scripts/stop-local.sh` first, or stop the other process manually.
+- **`ENCRYPTION_KEY_HEX must be exactly 64 hexadecimal characters`**: Field-level encryption and searchable email hashes require a 32-byte key. Generate one with `python3 -c "import secrets; print(secrets.token_hex(32))"` and set it in `.env.local` (and keep `backend/.env` in sync if you run backend commands directly in `backend/`).
+- **`Invalid credentials` on first login after setup**: Usually means the demo users were seeded with a different `ENCRYPTION_KEY_HEX` than the one currently loaded. Reset the local DB (`dropdb`/`createdb` inside the `cv-db` container), rerun migrations, and re-seed.
 
 ### Demo Data Seeding
 
