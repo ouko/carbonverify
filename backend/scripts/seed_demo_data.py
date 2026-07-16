@@ -70,6 +70,7 @@ from app.models import (
     LeadWorkflowStatusEnum,
     ListingStatusEnum,
     MethodologyEnum,
+    MethodologyTemplate,
     MethodologyVersion,
     OrchestratorEvent,
     OrchestratorEventTypeEnum,
@@ -1028,6 +1029,63 @@ async def seed_file_uploads(db: AsyncSession, projects: list[Project]) -> None:
     print("✅ Created file upload records")
 
 
+async def seed_methodology_templates(db: AsyncSession) -> None:
+    result = await db.execute(select(MethodologyTemplate).limit(1))
+    if result.scalar_one_or_none():
+        return
+
+    templates = [
+        MethodologyTemplate(
+            id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+            name="Cookstoves / Household Energy",
+            sector="Cookstoves",
+            is_active=True,
+            description="Improved biomass cookstoves distributed to households to reduce fuel use and emissions.",
+            defaults_json={
+                "boundaries": {
+                    "geographic_scope": "Rural households in target region",
+                    "temporal_scope": "2025-01-01 to 2034-12-31",
+                    "physical_boundary": "Households receiving improved cookstoves and their fuel consumption",
+                    "ghg_sources_included": "CO₂ and CH₄ from avoided biomass fuel combustion",
+                },
+                "data_sources": [
+                    {
+                        "source_type": "household_survey",
+                        "description": "Survey of stove usage and fuel consumption",
+                        "frequency": "annual",
+                        "provider_quality": "Third-party enumerator with 10% spot checks",
+                    }
+                ],
+            },
+        ),
+        MethodologyTemplate(
+            id=uuid.UUID("22222222-2222-2222-2222-222222222222"),
+            name="Blue Carbon / Coastal Ecosystems",
+            sector="Blue Carbon",
+            is_active=True,
+            description="Mangrove, seagrass, or tidal marsh restoration and conservation for carbon sequestration.",
+            defaults_json={
+                "boundaries": {
+                    "geographic_scope": "Coastal project area",
+                    "temporal_scope": "2025-01-01 to 2054-12-31",
+                    "physical_boundary": "Restored and conserved mangrove/seagrass area",
+                    "ghg_sources_included": "CO₂ sequestered in coastal ecosystem biomass and soils",
+                },
+                "data_sources": [
+                    {
+                        "source_type": "satellite_imagery",
+                        "description": "Remote sensing of vegetation extent and biomass",
+                        "frequency": "annual",
+                        "provider_quality": "Public satellite data, validated with field surveys",
+                    }
+                ],
+            },
+        ),
+    ]
+    db.add_all(templates)
+    await db.commit()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Main runner
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1058,6 +1116,7 @@ async def seed_all() -> None:
 
         await seed_corporate_portfolios(db, users, tokens)
         await seed_leads(db, users)
+        await seed_methodology_templates(db)
         await seed_methodology_versions(db, users)
         await seed_file_uploads(db, projects)
         await seed_field_data(db, projects, users)
