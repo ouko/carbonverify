@@ -4,6 +4,7 @@ import type {
   GeneratedMethodology,
   CreateGeneratedMethodologyPayload,
   UpdateMethodologyStatusPayload,
+  MethodologyTemplate,
 } from '../types'
 
 export function useGeneratedMethodologies(projectId?: string) {
@@ -69,5 +70,15 @@ export function useUpdateMethodologyStatus() {
       return res.data as GeneratedMethodology
     },
     onSuccess: (_, { id }) => qc.invalidateQueries({ queryKey: ['generated-methodology', id] }),
+  })
+}
+
+export function useMethodologyTemplates() {
+  return useQuery<MethodologyTemplate[]>({
+    queryKey: ['methodology-templates'],
+    queryFn: async () => {
+      const res = await api.get('/methodology-templates/')
+      return res.data
+    },
   })
 }
