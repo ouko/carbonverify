@@ -578,7 +578,7 @@ export default function MethodologyDesignerPage() {
 
                 {showAdvanced && (
                   <FormField
-                    label="GHG sources included"
+                    label="Greenhouse gases covered (optional)"
                     htmlFor="ghg_sources_included"
                     helper="Which greenhouse gases and sources are explicitly included?"
                     advanced

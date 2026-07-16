@@ -14,3 +14,5 @@ export function renderWithRouter(ui: ReactNode) {
     </BrowserRouter>
   )
 }
+
+export { renderWithRouter as render }
