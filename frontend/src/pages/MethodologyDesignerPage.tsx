@@ -161,6 +161,7 @@ export default function MethodologyDesignerPage() {
   const addDataSource = () => {
     setForm((prev) => ({ ...prev, data_sources: [...prev.data_sources, { ...INITIAL_DATA_SOURCE }] }))
     setFieldErrors((prev) => ({ ...prev, data_sources: '' }))
+    setSelectedTemplateId(null)
   }
 
   const removeDataSource = (idx: number) => {
@@ -169,11 +170,24 @@ export default function MethodologyDesignerPage() {
       data_sources: prev.data_sources.filter((_, i) => i !== idx),
     }))
     setFieldErrors((prev) => {
-      const next = { ...prev }
-      delete next[`data_source_${idx}`]
+      const next: Record<string, string> = {}
+      Object.entries(prev).forEach(([key, value]) => {
+        if (key === `data_source_${idx}`) return
+        if (key.startsWith('data_source_')) {
+          const sourceIdx = parseInt(key.replace('data_source_', ''), 10)
+          if (sourceIdx > idx) {
+            next[`data_source_${sourceIdx - 1}`] = value
+          } else {
+            next[key] = value
+          }
+        } else {
+          next[key] = value
+        }
+      })
       next.data_sources = ''
       return next
     })
+    setSelectedTemplateId(null)
   }
 
   const applyTemplate = (template: MethodologyTemplate) => {
@@ -198,6 +212,18 @@ export default function MethodologyDesignerPage() {
             }))
           : [{ ...INITIAL_DATA_SOURCE }],
     }))
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next.sector
+      delete next.geographic_scope
+      delete next.temporal_scope
+      delete next.physical_boundary
+      delete next.data_sources
+      Object.keys(next).forEach((key) => {
+        if (key.startsWith('data_source_')) delete next[key]
+      })
+      return next
+    })
   }
 
   const validateContext = (): string | null => {
@@ -207,7 +233,14 @@ export default function MethodologyDesignerPage() {
     if (!form.sector.trim()) errors.sector = 'Sector is required.'
     if (form.activity_description.trim().length < 10)
       errors.activity_description = 'Activity description must be at least 10 characters.'
-    setFieldErrors((prev) => ({ ...prev, ...errors }))
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next.project_id
+      delete next.name
+      delete next.sector
+      delete next.activity_description
+      return { ...next, ...errors }
+    })
     return Object.keys(errors).length > 0 ? 'Please fix the highlighted fields.' : null
   }
 
@@ -225,7 +258,17 @@ export default function MethodologyDesignerPage() {
         errors[`data_source_${i}`] = `Data source #${i + 1} needs a type and description.`
       }
     }
-    setFieldErrors((prev) => ({ ...prev, ...errors }))
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next.geographic_scope
+      delete next.temporal_scope
+      delete next.physical_boundary
+      delete next.data_sources
+      Object.keys(next).forEach((key) => {
+        if (key.startsWith('data_source_')) delete next[key]
+      })
+      return { ...next, ...errors }
+    })
     return Object.keys(errors).length > 0 ? 'Please fix the highlighted fields.' : null
   }
 
@@ -354,7 +397,11 @@ export default function MethodologyDesignerPage() {
                 />
               ) : null}
 
-              <FormField label="Project this methodology is for *" error={fieldErrors.project_id}>
+              <FormField
+                label="Project this methodology is for *"
+                htmlFor="project_id"
+                error={fieldErrors.project_id}
+              >
                 {projectsLoading ? (
                   <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -419,6 +466,7 @@ export default function MethodologyDesignerPage() {
                   onChange={(e) => {
                     setField('sector', e.target.value)
                     setFieldErrors((prev) => ({ ...prev, sector: '' }))
+                    setSelectedTemplateId(null)
                   }}
                 />
               </FormField>
@@ -485,6 +533,7 @@ export default function MethodologyDesignerPage() {
                     onChange={(e) => {
                       setBoundary('geographic_scope', e.target.value)
                       setFieldErrors((prev) => ({ ...prev, geographic_scope: '' }))
+                      setSelectedTemplateId(null)
                     }}
                   />
                 </FormField>
@@ -503,6 +552,7 @@ export default function MethodologyDesignerPage() {
                     onChange={(e) => {
                       setBoundary('temporal_scope', e.target.value)
                       setFieldErrors((prev) => ({ ...prev, temporal_scope: '' }))
+                      setSelectedTemplateId(null)
                     }}
                   />
                 </FormField>
@@ -521,6 +571,7 @@ export default function MethodologyDesignerPage() {
                     onChange={(e) => {
                       setBoundary('physical_boundary', e.target.value)
                       setFieldErrors((prev) => ({ ...prev, physical_boundary: '' }))
+                      setSelectedTemplateId(null)
                     }}
                   />
                 </FormField>
@@ -540,6 +591,7 @@ export default function MethodologyDesignerPage() {
                       onChange={(e) => {
                         setBoundary('ghg_sources_included', e.target.value)
                         setFieldErrors((prev) => ({ ...prev, ghg_sources_included: '' }))
+                        setSelectedTemplateId(null)
                       }}
                     />
                   </FormField>
@@ -568,6 +620,7 @@ export default function MethodologyDesignerPage() {
                             onChange={(e) => {
                               setDataSource(idx, 'source_type', e.target.value)
                               setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                              setSelectedTemplateId(null)
                             }}
                           />
                         </FormField>
@@ -585,47 +638,54 @@ export default function MethodologyDesignerPage() {
                             onChange={(e) => {
                               setDataSource(idx, 'frequency', e.target.value)
                               setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                              setSelectedTemplateId(null)
                             }}
                           />
                         </FormField>
 
-                        <FormField
-                          label="Description *"
-                          htmlFor={`description_${idx}`}
-                          helper="What does this source measure and how is it used?"
-                          error={fieldErrors[`data_source_${idx}`]}
-                          advanced={false}
-                        >
-                          <input
-                            id={`description_${idx}`}
-                            className="w-full md:col-span-2 input-modern"
-                            placeholder="Description of what the source measures"
-                            value={ds.description}
-                            onChange={(e) => {
-                              setDataSource(idx, 'description', e.target.value)
-                              setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
-                            }}
-                          />
-                        </FormField>
-
-                        {showAdvanced && (
+                        <div className="md:col-span-2">
                           <FormField
-                            label="Provider / quality assurance"
-                            htmlFor={`provider_quality_${idx}`}
-                            helper="Who provides the data and how is quality assured?"
-                            advanced
+                            label="Description *"
+                            htmlFor={`description_${idx}`}
+                            helper="What does this source measure and how is it used?"
+                            error={fieldErrors[`data_source_${idx}`]}
+                            advanced={false}
                           >
                             <input
-                              id={`provider_quality_${idx}`}
-                              className="w-full md:col-span-2 input-modern"
-                              placeholder="Provider / quality assurance notes"
-                              value={ds.provider_quality}
+                              id={`description_${idx}`}
+                              className="w-full input-modern"
+                              placeholder="Description of what the source measures"
+                              value={ds.description}
                               onChange={(e) => {
-                                setDataSource(idx, 'provider_quality', e.target.value)
+                                setDataSource(idx, 'description', e.target.value)
                                 setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                                setSelectedTemplateId(null)
                               }}
                             />
                           </FormField>
+                        </div>
+
+                        {showAdvanced && (
+                          <div className="md:col-span-2">
+                            <FormField
+                              label="Provider / quality assurance"
+                              htmlFor={`provider_quality_${idx}`}
+                              helper="Who provides the data and how is quality assured?"
+                              advanced
+                            >
+                              <input
+                                id={`provider_quality_${idx}`}
+                                className="w-full input-modern"
+                                placeholder="Provider / quality assurance notes"
+                                value={ds.provider_quality}
+                                onChange={(e) => {
+                                  setDataSource(idx, 'provider_quality', e.target.value)
+                                  setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                                  setSelectedTemplateId(null)
+                                }}
+                              />
+                            </FormField>
+                          </div>
                         )}
                       </div>
                       {form.data_sources.length > 1 && (
