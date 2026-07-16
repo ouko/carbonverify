@@ -50,6 +50,7 @@ from app.api.admin import router as admin_router
 from app.api.api_keys import router as api_keys_router
 from app.api.oauth import router as oauth_router
 from app.api.methodology_generator import router as methodology_generator_router
+from app.api.methodology_templates import router as methodology_templates_router
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -204,6 +205,7 @@ app.include_router(whatsapp_router)
 app.include_router(audit_router)
 app.include_router(compliance_router)
 app.include_router(methodology_generator_router)
+app.include_router(methodology_templates_router)
 app.include_router(brokerage_router)
 app.include_router(tokenization_router)
 app.include_router(corporate_router)
