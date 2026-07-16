@@ -246,3 +246,32 @@ export interface UpdateMethodologyStatusPayload {
   status: GeneratedMethodology['status']
   rejection_reason?: string
 }
+
+export interface BoundariesForm {
+  geographic_scope: string
+  temporal_scope: string
+  physical_boundary: string
+  ghg_sources_included: string
+}
+
+export interface DataSourceForm {
+  source_type: string
+  description: string
+  frequency: string
+  provider_quality: string
+}
+
+export interface MethodologyTemplate {
+  id: string
+  name: string
+  sector: string
+  is_active: boolean
+  defaults_json: {
+    boundaries: BoundariesForm
+    data_sources: DataSourceForm[]
+  }
+  description?: string
+  created_by?: string
+  created_at: string
+  updated_at: string
+}
