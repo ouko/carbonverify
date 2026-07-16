@@ -1,8 +1,11 @@
 import pytest
 import uuid
 
+from sqlalchemy import select
+
 from app.models import MethodologyTemplate
 from app.services.methodology_generator import MethodologyTemplateService
+from scripts.seed_demo_data import seed_methodology_templates
 
 
 @pytest.mark.asyncio
@@ -83,3 +86,18 @@ async def test_service_defaults_to_form_handles_malformed_json():
         "ghg_sources_included": "",
     }
     assert result["data_sources"] == []
+
+
+@pytest.mark.asyncio
+async def test_seed_methodology_templates_is_idempotent(db_session):
+    """Calling seed_methodology_templates twice must not duplicate templates."""
+    await seed_methodology_templates(db_session)
+    result = await db_session.execute(select(MethodologyTemplate))
+    count_after_first = len(result.scalars().all())
+
+    await seed_methodology_templates(db_session)
+    result = await db_session.execute(select(MethodologyTemplate))
+    count_after_second = len(result.scalars().all())
+
+    assert count_after_first > 0
+    assert count_after_second == count_after_first
