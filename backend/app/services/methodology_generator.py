@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.services.kimi_api import KimiAPIClient
-from app.models import GeneratedMethodology, MethodologyVersion
+from app.models import GeneratedMethodology, MethodologyVersion, MethodologyTemplate
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -228,4 +228,51 @@ Gap analysis: {json.dumps(gap_analysis)}"""
                 "monitoring_frequency": "annual",
                 "project_boundary": boundaries.get("physical_boundary", "as described above"),
             },
+        }
+
+
+class MethodologyTemplateService:
+    """Read-only helper for methodology starting templates."""
+
+    async def list_active(
+        self, db: AsyncSession
+    ) -> List[MethodologyTemplate]:
+        result = await db.execute(
+            select(MethodologyTemplate).where(MethodologyTemplate.is_active.is_(True))
+        )
+        return list(result.scalars().all())
+
+    async def get(
+        self, db: AsyncSession, template_id: uuid.UUID
+    ) -> Optional[MethodologyTemplate]:
+        result = await db.execute(
+            select(MethodologyTemplate).where(
+                MethodologyTemplate.id == template_id,
+                MethodologyTemplate.is_active.is_(True),
+            )
+        )
+        return result.scalar_one_or_none()
+
+    def defaults_to_form(self, template: MethodologyTemplate) -> Dict[str, Any]:
+        """Return a safe, validated defaults dict for the frontend form."""
+        raw = template.defaults_json or {}
+        boundaries = raw.get("boundaries", {}) if isinstance(raw.get("boundaries"), dict) else {}
+        data_sources = raw.get("data_sources", []) if isinstance(raw.get("data_sources"), list) else []
+        return {
+            "sector": template.sector,
+            "boundaries": {
+                "geographic_scope": str(boundaries.get("geographic_scope", "")),
+                "temporal_scope": str(boundaries.get("temporal_scope", "")),
+                "physical_boundary": str(boundaries.get("physical_boundary", "")),
+                "ghg_sources_included": str(boundaries.get("ghg_sources_included", "")),
+            },
+            "data_sources": [
+                {
+                    "source_type": str(ds.get("source_type", "")) if isinstance(ds, dict) else "",
+                    "description": str(ds.get("description", "")) if isinstance(ds, dict) else "",
+                    "frequency": str(ds.get("frequency", "")) if isinstance(ds, dict) else "",
+                    "provider_quality": str(ds.get("provider_quality", "")) if isinstance(ds, dict) else "",
+                }
+                for ds in data_sources
+            ],
         }
