@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { GeneratedMethodology, Project } from '../types'
+import type { GeneratedMethodology, MethodologyTemplate, Project } from '../types'
 import { WizardStepper } from '../components/methodology-generator/WizardStepper'
 import { GapAnalysisPanel } from '../components/methodology-generator/GapAnalysisPanel'
 import { MethodologyDraftViewer } from '../components/methodology-generator/MethodologyDraftViewer'
 import { QuantificationScaffoldViewer } from '../components/methodology-generator/QuantificationScaffoldViewer'
+import { FormField } from '../components/methodology-generator/FormField'
+import { MethodologyTemplateSelector } from '../components/methodology-generator/MethodologyTemplateSelector'
+import { SimpleModeToggle } from '../components/methodology-generator/SimpleModeToggle'
 import {
   useCreateGeneratedMethodology,
   useGeneratedMethodology,
   useAnalyzeGap,
   useGenerateMethodology,
   useUpdateMethodologyStatus,
+  useMethodologyTemplates,
 } from '../hooks/useMethodologyGenerator'
 import { useProjects } from '../hooks/useProjects'
 import { api } from '../services/api'
@@ -119,6 +123,10 @@ export default function MethodologyDesignerPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const { data: templates, isLoading: templatesLoading } = useMethodologyTemplates()
 
   const create = useCreateGeneratedMethodology()
   const {
@@ -152,6 +160,7 @@ export default function MethodologyDesignerPage() {
 
   const addDataSource = () => {
     setForm((prev) => ({ ...prev, data_sources: [...prev.data_sources, { ...INITIAL_DATA_SOURCE }] }))
+    setFieldErrors((prev) => ({ ...prev, data_sources: '' }))
   }
 
   const removeDataSource = (idx: number) => {
@@ -159,29 +168,65 @@ export default function MethodologyDesignerPage() {
       ...prev,
       data_sources: prev.data_sources.filter((_, i) => i !== idx),
     }))
+    setFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next[`data_source_${idx}`]
+      next.data_sources = ''
+      return next
+    })
+  }
+
+  const applyTemplate = (template: MethodologyTemplate) => {
+    const defaults = template.defaults_json
+    setSelectedTemplateId(template.id)
+    setForm((prev) => ({
+      ...prev,
+      sector: template.sector,
+      boundaries: {
+        geographic_scope: defaults.boundaries?.geographic_scope ?? '',
+        temporal_scope: defaults.boundaries?.temporal_scope ?? '',
+        physical_boundary: defaults.boundaries?.physical_boundary ?? '',
+        ghg_sources_included: defaults.boundaries?.ghg_sources_included ?? '',
+      },
+      data_sources:
+        defaults.data_sources && defaults.data_sources.length > 0
+          ? defaults.data_sources.map((ds) => ({
+              source_type: ds.source_type ?? '',
+              description: ds.description ?? '',
+              frequency: ds.frequency ?? '',
+              provider_quality: ds.provider_quality ?? '',
+            }))
+          : [{ ...INITIAL_DATA_SOURCE }],
+    }))
   }
 
   const validateContext = (): string | null => {
-    if (!form.project_id) return 'Please select a linked project.'
-    if (!form.name.trim()) return 'Methodology name is required.'
-    if (!form.sector.trim()) return 'Sector is required.'
+    const errors: Record<string, string> = {}
+    if (!form.project_id) errors.project_id = 'Please select a linked project.'
+    if (!form.name.trim()) errors.name = 'Methodology name is required.'
+    if (!form.sector.trim()) errors.sector = 'Sector is required.'
     if (form.activity_description.trim().length < 10)
-      return 'Activity description must be at least 10 characters.'
-    return null
+      errors.activity_description = 'Activity description must be at least 10 characters.'
+    setFieldErrors((prev) => ({ ...prev, ...errors }))
+    return Object.keys(errors).length > 0 ? 'Please fix the highlighted fields.' : null
   }
 
   const validateBoundaries = (): string | null => {
-    if (!form.boundaries.geographic_scope.trim()) return 'Geographic scope is required.'
-    if (!form.boundaries.temporal_scope.trim()) return 'Temporal scope is required.'
-    if (!form.boundaries.physical_boundary.trim()) return 'Physical boundary is required.'
-    if (form.data_sources.length === 0) return 'Add at least one data source.'
+    const errors: Record<string, string> = {}
+    if (!form.boundaries.geographic_scope.trim())
+      errors.geographic_scope = 'Geographic scope is required.'
+    if (!form.boundaries.temporal_scope.trim()) errors.temporal_scope = 'Temporal scope is required.'
+    if (!form.boundaries.physical_boundary.trim())
+      errors.physical_boundary = 'Physical boundary is required.'
+    if (form.data_sources.length === 0) errors.data_sources = 'Add at least one data source.'
     for (let i = 0; i < form.data_sources.length; i++) {
       const ds = form.data_sources[i]
       if (!ds.source_type.trim() || !ds.description.trim()) {
-        return `Data source #${i + 1} needs a type and description.`
+        errors[`data_source_${i}`] = `Data source #${i + 1} needs a type and description.`
       }
     }
-    return null
+    setFieldErrors((prev) => ({ ...prev, ...errors }))
+    return Object.keys(errors).length > 0 ? 'Please fix the highlighted fields.' : null
   }
 
   const toPayload = () => ({
@@ -278,8 +323,8 @@ export default function MethodologyDesignerPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-2">AI Methodology Designer</h1>
-      <p className="text-gray-600 dark:text-gray-300 mb-6">
+      <h1 className="page-title mb-2">AI Methodology Designer</h1>
+      <p className="text-surface-600 dark:text-surface-400 mb-6">
         Generate registry-aligned draft methodologies for projects that do not fit existing
         methodologies.
       </p>
@@ -287,9 +332,7 @@ export default function MethodologyDesignerPage() {
 
       {error && <Alert type="error" message={error} />}
       {success && <Alert type="success" message={success} />}
-      {gmError && !error && (
-        <Alert type="error" message={getErrorMessage(gmError)} />
-      )}
+      {gmError && !error && <Alert type="error" message={getErrorMessage(gmError)} />}
 
       <div className="mt-6">
         {step === 0 && (
@@ -298,19 +341,35 @@ export default function MethodologyDesignerPage() {
             description="Choose the project this methodology belongs to, then describe the activity and sector so the AI can compare it against existing methodologies."
           >
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Linked project *</label>
+              {templatesLoading ? (
+                <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Loading templates...</span>
+                </div>
+              ) : templates && templates.length > 0 ? (
+                <MethodologyTemplateSelector
+                  templates={templates}
+                  selectedId={selectedTemplateId ?? undefined}
+                  onSelect={applyTemplate}
+                />
+              ) : null}
+
+              <FormField label="Project this methodology is for *" error={fieldErrors.project_id}>
                 {projectsLoading ? (
-                  <div className="flex items-center space-x-2 text-gray-500">
+                  <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Loading projects...</span>
                   </div>
                 ) : (
                   <>
                     <select
-                      className="w-full border rounded p-2 bg-white dark:bg-surface-900"
+                      id="project_id"
+                      className="input-modern"
                       value={form.project_id}
-                      onChange={(e) => setField('project_id', e.target.value)}
+                      onChange={(e) => {
+                        setField('project_id', e.target.value)
+                        setFieldErrors((prev) => ({ ...prev, project_id: '' }))
+                      }}
                     >
                       <option value="">Select an existing project</option>
                       {projects?.map((project: Project) => (
@@ -320,39 +379,71 @@ export default function MethodologyDesignerPage() {
                       ))}
                     </select>
                     {(!projects || projects.length === 0) && (
-                      <p className="text-sm text-amber-600 mt-1">
+                      <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                         No projects found. Create a project first from the Projects page.
                       </p>
                     )}
                   </>
                 )}
-              </div>
+              </FormField>
 
-              <input
-                className="w-full border rounded p-2"
-                placeholder="Methodology name *"
-                value={form.name}
-                onChange={(e) => setField('name', e.target.value)}
-              />
-              <input
-                className="w-full border rounded p-2"
-                placeholder="Sector (e.g. Blue Carbon, Cookstoves) *"
-                value={form.sector}
-                onChange={(e) => setField('sector', e.target.value)}
-              />
-              <textarea
-                className="w-full border rounded p-2"
-                rows={4}
-                placeholder="Describe the project activity in detail (at least 10 characters) *"
-                value={form.activity_description}
-                onChange={(e) => setField('activity_description', e.target.value)}
-              />
-              <p className="text-xs text-gray-500">
-                Tip: include what is being measured, where it happens, and why existing methodologies
-                may not apply.
-              </p>
+              <FormField
+                label="Methodology name *"
+                htmlFor="name"
+                helper="Choose a clear, descriptive name. Example: Improved Cookstoves Distribution Methodology v1.0"
+                error={fieldErrors.name}
+              >
+                <input
+                  id="name"
+                  className="input-modern"
+                  placeholder="e.g. Mangrove Restoration Methodology v1.0"
+                  value={form.name}
+                  onChange={(e) => {
+                    setField('name', e.target.value)
+                    setFieldErrors((prev) => ({ ...prev, name: '' }))
+                  }}
+                />
+              </FormField>
+
+              <FormField
+                label="Sector / project type *"
+                htmlFor="sector"
+                helper="Pick the sector that best describes the project. Examples: Blue Carbon, Cookstoves, Forestry, Renewable Energy."
+                error={fieldErrors.sector}
+              >
+                <input
+                  id="sector"
+                  className="input-modern"
+                  placeholder="e.g. Blue Carbon, Cookstoves"
+                  value={form.sector}
+                  onChange={(e) => {
+                    setField('sector', e.target.value)
+                    setFieldErrors((prev) => ({ ...prev, sector: '' }))
+                  }}
+                />
+              </FormField>
+
+              <FormField
+                label="Activity description *"
+                htmlFor="activity_description"
+                helper="Include what is being measured, where it happens, and why existing methodologies may not apply."
+                error={fieldErrors.activity_description}
+              >
+                <textarea
+                  id="activity_description"
+                  className="input-modern"
+                  rows={4}
+                  placeholder="Describe the project activity in detail (at least 10 characters)"
+                  value={form.activity_description}
+                  onChange={(e) => {
+                    setField('activity_description', e.target.value)
+                    setFieldErrors((prev) => ({ ...prev, activity_description: '' }))
+                  }}
+                />
+              </FormField>
+
               <button
-                className="bg-emerald-600 text-white px-4 py-2 rounded inline-flex items-center space-x-2 disabled:opacity-50"
+                className="btn-primary"
                 onClick={() => {
                   const err = validateContext()
                   if (err) {
@@ -375,92 +466,171 @@ export default function MethodologyDesignerPage() {
             description="Define the system boundary and list the data sources the project will use. The AI uses these to assess gaps and build a quantification scaffold."
           >
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Geographic scope *</label>
-                  <input
-                    className="w-full border rounded p-2"
-                    placeholder="e.g. Kwale County, Kenya"
-                    value={form.boundaries.geographic_scope}
-                    onChange={(e) => setBoundary('geographic_scope', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Temporal scope *</label>
-                  <input
-                    className="w-full border rounded p-2"
-                    placeholder="e.g. 2025-01-01 to 2034-12-31"
-                    value={form.boundaries.temporal_scope}
-                    onChange={(e) => setBoundary('temporal_scope', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Physical boundary *</label>
-                  <input
-                    className="w-full border rounded p-2"
-                    placeholder="e.g. project-installation sites and supply chain"
-                    value={form.boundaries.physical_boundary}
-                    onChange={(e) => setBoundary('physical_boundary', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">GHG sources included</label>
-                  <input
-                    className="w-full border rounded p-2"
-                    placeholder="e.g. CO2, CH4 from avoided fuel combustion"
-                    value={form.boundaries.ghg_sources_included}
-                    onChange={(e) => setBoundary('ghg_sources_included', e.target.value)}
-                  />
-                </div>
+              <div className="flex justify-end">
+                <SimpleModeToggle showAdvanced={showAdvanced} onChange={setShowAdvanced} />
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium">Data sources *</label>
-                  <button
-                    className="text-sm text-emerald-600 hover:text-emerald-700 inline-flex items-center space-x-1"
-                    onClick={addDataSource}
-                    disabled={anyLoading}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  label="Geographic scope *"
+                  htmlFor="geographic_scope"
+                  helper="Where will the project activity take place?"
+                  error={fieldErrors.geographic_scope}
+                >
+                  <input
+                    id="geographic_scope"
+                    className="input-modern"
+                    placeholder="e.g. Kwale County, Kenya"
+                    value={form.boundaries.geographic_scope}
+                    onChange={(e) => {
+                      setBoundary('geographic_scope', e.target.value)
+                      setFieldErrors((prev) => ({ ...prev, geographic_scope: '' }))
+                    }}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Temporal scope *"
+                  htmlFor="temporal_scope"
+                  helper="What time period will the methodology cover?"
+                  error={fieldErrors.temporal_scope}
+                >
+                  <input
+                    id="temporal_scope"
+                    className="input-modern"
+                    placeholder="e.g. 2025-01-01 to 2034-12-31"
+                    value={form.boundaries.temporal_scope}
+                    onChange={(e) => {
+                      setBoundary('temporal_scope', e.target.value)
+                      setFieldErrors((prev) => ({ ...prev, temporal_scope: '' }))
+                    }}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Physical boundary *"
+                  htmlFor="physical_boundary"
+                  helper="What physical assets, sites, or processes are included?"
+                  error={fieldErrors.physical_boundary}
+                >
+                  <input
+                    id="physical_boundary"
+                    className="input-modern"
+                    placeholder="e.g. project-installation sites and supply chain"
+                    value={form.boundaries.physical_boundary}
+                    onChange={(e) => {
+                      setBoundary('physical_boundary', e.target.value)
+                      setFieldErrors((prev) => ({ ...prev, physical_boundary: '' }))
+                    }}
+                  />
+                </FormField>
+
+                {showAdvanced && (
+                  <FormField
+                    label="GHG sources included"
+                    htmlFor="ghg_sources_included"
+                    helper="Which greenhouse gases and sources are explicitly included?"
+                    advanced
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Add source</span>
-                  </button>
-                </div>
+                    <input
+                      id="ghg_sources_included"
+                      className="input-modern"
+                      placeholder="e.g. CO2, CH4 from avoided fuel combustion"
+                      value={form.boundaries.ghg_sources_included}
+                      onChange={(e) => {
+                        setBoundary('ghg_sources_included', e.target.value)
+                        setFieldErrors((prev) => ({ ...prev, ghg_sources_included: '' }))
+                      }}
+                    />
+                  </FormField>
+                )}
+              </div>
+
+              <FormField label="Data sources *" error={fieldErrors.data_sources}>
                 <div className="space-y-3">
                   {form.data_sources.map((ds, idx) => (
                     <div
                       key={idx}
-                      className="border rounded p-3 bg-gray-50 dark:bg-surface-900/50"
+                      className="border border-surface-200 dark:border-surface-700 rounded-xl p-3 bg-surface-50 dark:bg-surface-900/50"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <input
-                          className="w-full border rounded p-2 bg-white dark:bg-surface-900"
-                          placeholder="Source type (e.g. satellite, IoT, survey) *"
-                          value={ds.source_type}
-                          onChange={(e) => setDataSource(idx, 'source_type', e.target.value)}
-                        />
-                        <input
-                          className="w-full border rounded p-2 bg-white dark:bg-surface-900"
-                          placeholder="Frequency (e.g. monthly, annual)"
-                          value={ds.frequency}
-                          onChange={(e) => setDataSource(idx, 'frequency', e.target.value)}
-                        />
-                        <input
-                          className="w-full md:col-span-2 border rounded p-2 bg-white dark:bg-surface-900"
-                          placeholder="Description of what the source measures *"
-                          value={ds.description}
-                          onChange={(e) => setDataSource(idx, 'description', e.target.value)}
-                        />
-                        <input
-                          className="w-full md:col-span-2 border rounded p-2 bg-white dark:bg-surface-900"
-                          placeholder="Provider / quality assurance notes"
-                          value={ds.provider_quality}
-                          onChange={(e) => setDataSource(idx, 'provider_quality', e.target.value)}
-                        />
+                        <FormField
+                          label="Source type *"
+                          htmlFor={`source_type_${idx}`}
+                          helper="e.g. satellite, IoT sensor, survey"
+                          error={fieldErrors[`data_source_${idx}`]}
+                        >
+                          <input
+                            id={`source_type_${idx}`}
+                            className="input-modern"
+                            placeholder="e.g. satellite, IoT, survey"
+                            value={ds.source_type}
+                            onChange={(e) => {
+                              setDataSource(idx, 'source_type', e.target.value)
+                              setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                            }}
+                          />
+                        </FormField>
+
+                        <FormField
+                          label="Frequency"
+                          htmlFor={`frequency_${idx}`}
+                          helper="How often is the data collected?"
+                        >
+                          <input
+                            id={`frequency_${idx}`}
+                            className="input-modern"
+                            placeholder="e.g. monthly, annual"
+                            value={ds.frequency}
+                            onChange={(e) => {
+                              setDataSource(idx, 'frequency', e.target.value)
+                              setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                            }}
+                          />
+                        </FormField>
+
+                        <FormField
+                          label="Description *"
+                          htmlFor={`description_${idx}`}
+                          helper="What does this source measure and how is it used?"
+                          error={fieldErrors[`data_source_${idx}`]}
+                          advanced={false}
+                        >
+                          <input
+                            id={`description_${idx}`}
+                            className="w-full md:col-span-2 input-modern"
+                            placeholder="Description of what the source measures"
+                            value={ds.description}
+                            onChange={(e) => {
+                              setDataSource(idx, 'description', e.target.value)
+                              setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                            }}
+                          />
+                        </FormField>
+
+                        {showAdvanced && (
+                          <FormField
+                            label="Provider / quality assurance"
+                            htmlFor={`provider_quality_${idx}`}
+                            helper="Who provides the data and how is quality assured?"
+                            advanced
+                          >
+                            <input
+                              id={`provider_quality_${idx}`}
+                              className="w-full md:col-span-2 input-modern"
+                              placeholder="Provider / quality assurance notes"
+                              value={ds.provider_quality}
+                              onChange={(e) => {
+                                setDataSource(idx, 'provider_quality', e.target.value)
+                                setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
+                              }}
+                            />
+                          </FormField>
+                        )}
                       </div>
                       {form.data_sources.length > 1 && (
                         <button
-                          className="mt-2 text-sm text-red-600 hover:text-red-700 inline-flex items-center space-x-1"
+                          className="mt-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 inline-flex items-center space-x-1"
                           onClick={() => removeDataSource(idx)}
                           disabled={anyLoading}
                         >
@@ -471,21 +641,21 @@ export default function MethodologyDesignerPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+                <button
+                  className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 inline-flex items-center space-x-1"
+                  onClick={addDataSource}
+                  disabled={anyLoading}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add source</span>
+                </button>
+              </FormField>
 
               <div className="flex items-center space-x-3">
-                <button
-                  className="px-4 py-2 rounded border"
-                  onClick={() => setStep(0)}
-                  disabled={anyLoading}
-                >
+                <button className="btn-secondary" onClick={() => setStep(0)} disabled={anyLoading}>
                   Back
                 </button>
-                <button
-                  className="bg-emerald-600 text-white px-4 py-2 rounded inline-flex items-center space-x-2 disabled:opacity-50"
-                  onClick={handleCreate}
-                  disabled={anyLoading}
-                >
+                <button className="btn-primary" onClick={handleCreate} disabled={anyLoading}>
                   {create.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Save & Analyze Gap</span>
                 </button>
@@ -500,30 +670,30 @@ export default function MethodologyDesignerPage() {
             description="Compare the project against existing methodologies. If a good match exists, custom draft generation is blocked."
           >
             {gmLoading ? (
-              <div className="flex items-center space-x-2 text-gray-500">
+              <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Loading methodology record...</span>
               </div>
             ) : !gm ? (
-              <p className="text-gray-500">No methodology record found.</p>
+              <p className="text-surface-500 dark:text-surface-400">No methodology record found.</p>
             ) : (
               <div className="space-y-4">
                 {selectedProject && (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-surface-700 dark:text-surface-300">
                     Linked project: <strong>{selectedProject.name}</strong>
                   </p>
                 )}
                 <GapAnalysisPanel gm={gm} />
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    className="px-4 py-2 rounded border"
+                    className="btn-secondary"
                     onClick={() => setStep(1)}
                     disabled={anyLoading}
                   >
                     Back
                   </button>
                   <button
-                    className="bg-emerald-600 text-white px-4 py-2 rounded inline-flex items-center space-x-2 disabled:opacity-50"
+                    className="btn-primary"
                     onClick={handleAnalyze}
                     disabled={anyLoading}
                   >
@@ -532,7 +702,7 @@ export default function MethodologyDesignerPage() {
                   </button>
                   {gm.gap_analysis && (
                     <button
-                      className="bg-blue-600 text-white px-4 py-2 rounded inline-flex items-center space-x-2 disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={handleGenerate}
                       disabled={anyLoading || gm.gap_analysis.fits_existing_methodology === true}
                     >
@@ -542,7 +712,7 @@ export default function MethodologyDesignerPage() {
                   )}
                 </div>
                 {gm.gap_analysis?.fits_existing_methodology === true && (
-                  <p className="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-100">
+                  <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 rounded border border-amber-100 dark:border-amber-900">
                     The AI believes this activity may fit an existing methodology. Draft generation
                     is disabled to avoid creating a redundant methodology.
                   </p>
@@ -558,25 +728,25 @@ export default function MethodologyDesignerPage() {
             description="Review the AI-generated methodology sections. If they look correct, proceed to the quantification scaffold."
           >
             {gmLoading ? (
-              <div className="flex items-center space-x-2 text-gray-500">
+              <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Loading...</span>
               </div>
             ) : !gm ? (
-              <p className="text-gray-500">No methodology record found.</p>
+              <p className="text-surface-500 dark:text-surface-400">No methodology record found.</p>
             ) : (
               <div className="space-y-4">
                 <MethodologyDraftViewer gm={gm} />
                 <div className="flex items-center space-x-3">
                   <button
-                    className="px-4 py-2 rounded border"
+                    className="btn-secondary"
                     onClick={() => setStep(2)}
                     disabled={anyLoading}
                   >
                     Back
                   </button>
                   <button
-                    className="bg-emerald-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="btn-primary"
                     onClick={() => setStep(4)}
                     disabled={anyLoading}
                   >
@@ -594,25 +764,25 @@ export default function MethodologyDesignerPage() {
             description="Review equations, parameters, and monitoring frequency. This scaffold is what the calculation engine will eventually execute."
           >
             {gmLoading ? (
-              <div className="flex items-center space-x-2 text-gray-500">
+              <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Loading...</span>
               </div>
             ) : !gm ? (
-              <p className="text-gray-500">No methodology record found.</p>
+              <p className="text-surface-500 dark:text-surface-400">No methodology record found.</p>
             ) : (
               <div className="space-y-4">
                 <QuantificationScaffoldViewer gm={gm} />
                 <div className="flex items-center space-x-3">
                   <button
-                    className="px-4 py-2 rounded border"
+                    className="btn-secondary"
                     onClick={() => setStep(3)}
                     disabled={anyLoading}
                   >
                     Back
                   </button>
                   <button
-                    className="bg-emerald-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="btn-primary"
                     onClick={() => setStep(5)}
                     disabled={anyLoading}
                   >
@@ -630,24 +800,24 @@ export default function MethodologyDesignerPage() {
             description="Submit the draft for review, approve it, or request revisions. Rejections and revision requests require a reason."
           >
             {gmLoading ? (
-              <div className="flex items-center space-x-2 text-gray-500">
+              <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Loading...</span>
               </div>
             ) : !gm ? (
-              <p className="text-gray-500">No methodology record found.</p>
+              <p className="text-surface-500 dark:text-surface-400">No methodology record found.</p>
             ) : (
               <div className="space-y-4">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-surface-700 dark:text-surface-300">
                   Current status: <strong className="uppercase">{gm.status.replace(/_/g, ' ')}</strong>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1.5">
                     Rejection / revision reason
                   </label>
                   <textarea
-                    className="w-full border rounded p-2"
+                    className="input-modern"
                     rows={3}
                     placeholder="Required when rejecting or requesting revisions"
                     value={rejectionReason}
@@ -657,7 +827,7 @@ export default function MethodologyDesignerPage() {
 
                 <div className="flex flex-wrap gap-2">
                   <button
-                    className="bg-emerald-600 text-white px-4 py-2 rounded inline-flex items-center space-x-2 disabled:opacity-50"
+                    className="btn-primary"
                     onClick={() => handleStatus('under_review')}
                     disabled={anyLoading || gm.status !== 'draft'}
                   >
@@ -665,21 +835,21 @@ export default function MethodologyDesignerPage() {
                     <span>Submit for Review</span>
                   </button>
                   <button
-                    className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleStatus('approved')}
                     disabled={anyLoading || gm.status !== 'under_review'}
                   >
                     Approve
                   </button>
                   <button
-                    className="bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleStatus('rejected')}
                     disabled={anyLoading || gm.status !== 'under_review'}
                   >
                     Reject
                   </button>
                   <button
-                    className="bg-amber-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-600 text-white font-medium rounded-xl hover:bg-amber-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleStatus('revision_requested')}
                     disabled={anyLoading || gm.status !== 'under_review'}
                   >
@@ -689,7 +859,7 @@ export default function MethodologyDesignerPage() {
 
                 <div className="flex items-center space-x-3 pt-2">
                   <button
-                    className="px-4 py-2 rounded border"
+                    className="btn-secondary"
                     onClick={() => setStep(4)}
                     disabled={anyLoading}
                   >
@@ -697,7 +867,7 @@ export default function MethodologyDesignerPage() {
                   </button>
                   {gm.methodology && (
                     <button
-                      className="px-4 py-2 rounded border border-emerald-600 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-emerald-600 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       onClick={async () => {
                         if (!id) return
                         try {
