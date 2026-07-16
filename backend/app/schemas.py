@@ -912,6 +912,18 @@ class GeneratedMethodologyOut(GeneratedMethodologyBase):
     updated_at: datetime
 
 
+class MethodologyTemplateOut(ORMBase):
+    id: uuid.UUID
+    name: str
+    sector: str
+    is_active: bool
+    defaults_json: dict
+    description: Optional[str] = None
+    created_by: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class GeneratedMethodologyStatusUpdate(BaseModel):
     status: Literal[
         "draft", "under_review", "approved", "rejected", "revision_requested"
