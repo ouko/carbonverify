@@ -35,6 +35,6 @@ describe('ValidationWorkflowBuilderPage', () => {
   it('adds a step when a palette item is clicked', () => {
     renderPage('/validation-workflows/new/builder')
     fireEvent.click(screen.getByText('AI Evaluation'))
-    expect(screen.getAllByText('ai_evaluation_1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ai_evaluation_1')).not.toHaveLength(0)
   })
 })
