@@ -284,3 +284,162 @@ export interface MethodologyTemplate {
   created_at: string
   updated_at: string
 }
+
+export type WorkflowStepType =
+  | 'http_request'
+  | 'database_query'
+  | 'service_call'
+  | 'external_api'
+  | 'notification'
+  | 'dom_capture'
+  | 'decision_gate'
+  | 'ai_evaluation'
+  | 'wait'
+  | 'parallel'
+  | 'subflow'
+
+export interface RetryPolicy {
+  max_retries: number
+  backoff_multiplier: number
+  initial_delay_ms: number
+  retry_on: string[]
+}
+
+export interface CircuitBreakerConfig {
+  failure_threshold: number
+  recovery_timeout_ms: number
+  half_open_max_calls: number
+}
+
+export interface WorkflowStep {
+  id: string
+  name: string
+  type: WorkflowStepType
+  description?: string
+  enabled: boolean
+  config: Record<string, unknown>
+  retry_policy?: RetryPolicy
+  next_on_success: string[]
+  next_on_failure: string[]
+  timeout_ms: number
+  capture_proof: boolean
+  checkpoint: boolean
+  skippable: boolean
+}
+
+export interface WorkflowGraph {
+  version: string
+  description?: string
+  entry_step: string
+  retry_policy: RetryPolicy
+  circuit_breaker: CircuitBreakerConfig
+  steps: WorkflowStep[]
+  variables: Record<string, unknown>
+  human_gates_required: boolean
+  sla_seconds?: number
+}
+
+export interface ValidationWorkflow {
+  id: string
+  name: string
+  version: string
+  description?: string
+  active: boolean
+  graph_hash: string
+  workflow_graph: WorkflowGraph
+  sla_seconds?: number
+  human_gates_required: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ValidationWorkflowCreatePayload {
+  name: string
+  version?: string
+  description?: string
+  workflow_graph: WorkflowGraph
+  sla_seconds?: number
+  human_gates_required?: boolean
+}
+
+export interface ValidationWorkflowUpdatePayload {
+  description?: string
+  active?: boolean
+  workflow_graph?: WorkflowGraph
+  sla_seconds?: number
+  human_gates_required?: boolean
+}
+
+export interface ValidationRun {
+  id: string
+  workflow_id: string
+  project_id?: string
+  status: string
+  trigger_event: string
+  confidence_score?: number
+  merkle_root?: string
+  radix_tx_ref?: string
+  started_at?: string
+  completed_at?: string
+  created_at: string
+  error_message?: string
+  remediation_count: number
+  human_intervened: boolean
+  awaiting_human_decision: boolean
+}
+
+export interface RunTriggerPayload {
+  workflow_id: string
+  project_id?: string
+  trigger_event?: string
+  input_data?: Record<string, unknown>
+}
+
+export interface StepExecution {
+  id: string
+  step_id: string
+  step_index: number
+  step_type: WorkflowStepType
+  step_name: string
+  status: string
+  step_hash?: string
+  duration_ms?: number
+  retry_count: number
+  error_message?: string
+  started_at?: string
+  completed_at?: string
+}
+
+export interface ValidationProof {
+  id: string
+  step_execution_id?: string
+  proof_type: string
+  proof_hash: string
+  merkle_leaf_index?: number
+  captured_at: string
+}
+
+export interface ValidationTransition {
+  id: string
+  from_state: string
+  to_state: string
+  actor_type: string
+  reason?: string
+  transition_hash: string
+  previous_hash?: string
+  occurred_at: string
+}
+
+export interface SyntheticActor {
+  id: string
+  name: string
+  actor_type: string
+  profile_key: string
+  markers: Record<string, unknown>
+  behavior_config: Record<string, unknown>
+  context_data: Record<string, unknown>
+  active: boolean
+  usage_count: number
+  created_at: string
+  last_used_at?: string
+}
