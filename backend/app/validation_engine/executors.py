@@ -496,6 +496,108 @@ class DecisionGateExecutor:
         raise ValueError(f"Disallowed AST node type: {type(node).__name__}")
 
 
+class AiEvaluationExecutor:
+    """Execute AI-led evaluation steps using the Kimi API."""
+
+    async def execute(
+        self,
+        config: Dict[str, Any],
+        context: Dict[str, Any],
+        run: ValidationRun,
+    ) -> Dict[str, Any]:
+        from app.validation_engine.schemas import AiEvaluationConfig
+        from app.services.kimi_api import KimiAPIClient
+        import json
+
+        cfg = AiEvaluationConfig.model_validate(config)
+        client = KimiAPIClient()
+
+        # Merge explicit input_data with workflow variables and run context
+        evaluation_context = {
+            **context.get("variables", {}),
+            **cfg.input_data,
+            "run_id": str(run.id) if run else None,
+            "trigger_event": run.trigger_event if run else None,
+        }
+
+        system_prompt = (
+            "You are an expert evaluator for carbon credit MRV workflows. "
+            "Evaluate the provided input and return strict JSON with keys: "
+            "score (float 0.0-1.0), passed (bool), reasoning (string), and recommendation (string). "
+            "Be conservative: only pass evaluations that are genuinely satisfactory."
+        )
+        user_prompt = f"{cfg.prompt}\n\nInput context: {json.dumps(evaluation_context, default=str)}"
+
+        started = time.monotonic()
+        try:
+            response = await client.chat_completion(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=cfg.temperature,
+                max_tokens=cfg.max_tokens,
+            )
+            latency_ms = int((time.monotonic() - started) * 1000)
+            content = response.get("content", "{}").strip()
+
+            # Parse JSON, tolerating markdown fences
+            if content.startswith("```"):
+                content = content.split("```json", 1)[-1].split("```", 1)[0].strip()
+
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError as exc:
+                logger.error("ai_evaluation_json_parse_failed", content=content[:200], error=str(exc))
+                if cfg.fail_on_error:
+                    raise RuntimeError(f"AI evaluation response is not valid JSON: {exc}")
+                return {
+                    "score": 0.0,
+                    "passed": False,
+                    "reasoning": "AI response could not be parsed as JSON.",
+                    "recommendation": "Retry the evaluation or review the prompt.",
+                    "raw_response": content,
+                    "latency_ms": latency_ms,
+                    "parse_error": str(exc),
+                }
+
+            score = float(parsed.get("score", 0.0))
+            passed = parsed.get("passed", score >= cfg.pass_threshold)
+            reasoning = str(parsed.get("reasoning", ""))
+            recommendation = str(parsed.get("recommendation", ""))
+
+            result = {
+                "score": score,
+                "passed": passed,
+                "reasoning": reasoning,
+                "recommendation": recommendation,
+                "raw_response": content,
+                "latency_ms": latency_ms,
+                "pass_threshold": cfg.pass_threshold,
+            }
+
+            if not passed and cfg.fail_on_error:
+                raise RuntimeError(
+                    f"AI evaluation failed (score {score:.2f} below threshold {cfg.pass_threshold:.2f}): {reasoning}"
+                )
+
+            return result
+        except Exception as exc:
+            if isinstance(exc, RuntimeError):
+                raise
+            logger.error("ai_evaluation_execution_failed", error=str(exc))
+            if cfg.fail_on_error:
+                raise RuntimeError(f"AI evaluation step failed: {exc}") from exc
+            return {
+                "score": 0.0,
+                "passed": False,
+                "reasoning": f"Execution error: {exc}",
+                "recommendation": "Check AI service availability and retry.",
+                "latency_ms": int((time.monotonic() - started) * 1000),
+                "error": str(exc),
+            }
+
+
 class WaitExecutor:
     """Execute wait steps."""
 
@@ -566,6 +668,7 @@ class StepExecutorRegistry:
             WorkflowStepType.notification: NotificationExecutor(),
             WorkflowStepType.dom_capture: DomCaptureExecutor(),
             WorkflowStepType.decision_gate: DecisionGateExecutor(),
+            WorkflowStepType.ai_evaluation: AiEvaluationExecutor(),
             WorkflowStepType.wait: WaitExecutor(),
             WorkflowStepType.parallel: ParallelExecutor(),
             WorkflowStepType.subflow: SubflowExecutor(),

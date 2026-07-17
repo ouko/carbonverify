@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import unittest.mock
 import uuid
 from datetime import datetime, timezone
 
@@ -29,7 +30,7 @@ from app.validation_engine.models import (
     WorkflowRunStatus,
     WorkflowStepType,
 )
-from app.validation_engine.executors import DecisionGateExecutor, ServiceCallExecutor
+from app.validation_engine.executors import DecisionGateExecutor, ServiceCallExecutor, AiEvaluationExecutor, StepExecutorRegistry
 from app.validation_engine.orchestrator import ValidationOrchestrator
 from app.validation_engine.proofs import MerkleTree, ProofGenerator
 from app.validation_engine.schemas import WorkflowGraph, WorkflowStep
@@ -739,6 +740,153 @@ class TestSafeEvaluator:
     def test_malformed_expression(self):
         executor = DecisionGateExecutor()
         assert executor._evaluate_condition("5 > > 3", {}) is False
+
+
+# ─── AI Evaluation Tests ──────────────────────────────────────────────────────
+
+class TestAiEvaluationExecutor:
+    @pytest.mark.asyncio
+    async def test_ai_evaluation_passes(self, db_session, test_workflow, test_user):
+        run = ValidationRun(
+            workflow_id=test_workflow.id,
+            trigger_event="ai_eval_test",
+            input_data={},
+            status=WorkflowRunStatus.running,
+            triggered_by=test_user.id,
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AiEvaluationExecutor()
+
+        class FakeClient:
+            async def chat_completion(self, messages, temperature=None, max_tokens=None):
+                return {
+                    "content": '{"score": 0.85, "passed": true, "reasoning": "Looks good", "recommendation": "Approve"}'
+                }
+
+        with unittest.mock.patch("app.services.kimi_api.KimiAPIClient", FakeClient):
+            result = await executor.execute(
+                {
+                    "prompt": "Evaluate this workflow.",
+                    "input_data": {"value": 10},
+                    "pass_threshold": 0.7,
+                },
+                {"variables": {"foo": "bar"}},
+                run,
+            )
+
+        assert result["score"] == 0.85
+        assert result["passed"] is True
+        assert result["reasoning"] == "Looks good"
+        assert "latency_ms" in result
+
+    @pytest.mark.asyncio
+    async def test_ai_evaluation_fails_below_threshold(self, db_session, test_workflow, test_user):
+        run = ValidationRun(
+            workflow_id=test_workflow.id,
+            trigger_event="ai_eval_fail_test",
+            input_data={},
+            status=WorkflowRunStatus.running,
+            triggered_by=test_user.id,
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AiEvaluationExecutor()
+
+        class FakeClient:
+            async def chat_completion(self, messages, temperature=None, max_tokens=None):
+                return {
+                    "content": '{"score": 0.45, "passed": false, "reasoning": "Insufficient data", "recommendation": "Reject"}'
+                }
+
+        with unittest.mock.patch("app.services.kimi_api.KimiAPIClient", FakeClient):
+            with pytest.raises(RuntimeError, match="AI evaluation failed"):
+                await executor.execute(
+                    {
+                        "prompt": "Evaluate this workflow.",
+                        "pass_threshold": 0.7,
+                        "fail_on_error": True,
+                    },
+                    {},
+                    run,
+                )
+
+    @pytest.mark.asyncio
+    async def test_ai_evaluation_malformed_json_returns_failure(self, db_session, test_workflow, test_user):
+        run = ValidationRun(
+            workflow_id=test_workflow.id,
+            trigger_event="ai_eval_malformed_test",
+            input_data={},
+            status=WorkflowRunStatus.running,
+            triggered_by=test_user.id,
+        )
+        db_session.add(run)
+        await db_session.commit()
+
+        executor = AiEvaluationExecutor()
+
+        class FakeClient:
+            async def chat_completion(self, messages, temperature=None, max_tokens=None):
+                return {"content": "not valid json"}
+
+        with unittest.mock.patch("app.services.kimi_api.KimiAPIClient", FakeClient):
+            result = await executor.execute(
+                {
+                    "prompt": "Evaluate this workflow.",
+                    "fail_on_error": False,
+                },
+                {},
+                run,
+            )
+            assert result["passed"] is False
+            assert "parse_error" in result
+
+
+class TestWorkflowSchemaAiEvaluation:
+    def test_ai_evaluation_step_validates(self):
+        from app.validation_engine.schemas import WorkflowGraph, WorkflowStep
+
+        graph = WorkflowGraph(
+            entry_step="eval",
+            steps=[
+                WorkflowStep(
+                    id="eval",
+                    name="AI Evaluation",
+                    type=WorkflowStepType.ai_evaluation,
+                    config={
+                        "prompt": "Check if the data quality is acceptable.",
+                        "pass_threshold": 0.8,
+                    },
+                    next_on_success=["end"],
+                )
+            ],
+        )
+        assert graph.entry_step == "eval"
+        assert graph.steps[0].type == WorkflowStepType.ai_evaluation
+
+    def test_ai_evaluation_step_invalid_config_raises(self):
+        from app.validation_engine.schemas import WorkflowGraph, WorkflowStep
+
+        with pytest.raises(ValueError):
+            WorkflowGraph(
+                entry_step="eval",
+                steps=[
+                    WorkflowStep(
+                        id="eval",
+                        name="AI Evaluation",
+                        type=WorkflowStepType.ai_evaluation,
+                        config={"pass_threshold": 2.0},  # invalid: > 1.0
+                        next_on_success=["end"],
+                    )
+                ],
+            )
+
+    def test_executor_registry_has_ai_evaluation(self):
+        registry = StepExecutorRegistry()
+        executor = registry.get_executor(WorkflowStepType.ai_evaluation)
+        assert isinstance(executor, AiEvaluationExecutor)
 
 
 # ─── ServiceCallExecutor Tests ────────────────────────────────────────────────

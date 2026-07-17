@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- **AI-led evaluation step in Workflow Validation Engine** — JSON-defined workflows can now include `ai_evaluation` steps that call the Kimi API, score outputs on a 0.0–1.0 scale, and pass/fail based on a configurable `pass_threshold`. Includes Alembic migration for the `workflow_step_type` enum, `AiEvaluationConfig` Pydantic schema, `AiEvaluationExecutor`, `ai_evaluation_request`/`ai_evaluation_response` proof types, and backend tests.
 - **Methodology Designer UX improvements** — Non-technical users can now start from sector templates (Cookstoves, Blue Carbon) and use a simple/advanced mode toggle. Added `methodology_templates` table, read-only API, reusable `FormField` components, inline validation, and frontend tests.
 
 ### Production Readiness

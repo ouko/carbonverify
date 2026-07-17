@@ -93,6 +93,23 @@ class DecisionGateConfig(BaseModel):
     escalation_level: EscalationLevel = Field(default=EscalationLevel.l1_operator)
 
 
+class AiEvaluationConfig(BaseModel):
+    # The evaluation prompt sent to the AI
+    prompt: str = Field(..., min_length=1, max_length=8000)
+    # Optional structured input data from the workflow context
+    input_data: Dict[str, Any] = Field(default_factory=dict)
+    # Expected JSON schema for the AI response (descriptive, not enforced by DB)
+    expected_output_schema: Optional[Dict[str, Any]] = None
+    # Minimum confidence score (0.0 - 1.0) for the step to be considered successful
+    pass_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
+    # Whether the step should fail when the AI returns an error or unparseable response
+    fail_on_error: bool = Field(default=True)
+    # LLM temperature
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    # Maximum tokens for the AI response
+    max_tokens: int = Field(default=1536, ge=100, le=8192)
+
+
 class WaitConfig(BaseModel):
     duration_ms: int = Field(..., ge=0)
     condition: Optional[str] = None  # Optional polling condition
@@ -152,6 +169,8 @@ class WorkflowStep(BaseModel):
             DomCaptureConfig.model_validate(v)
         elif step_type == WorkflowStepType.decision_gate:
             DecisionGateConfig.model_validate(v)
+        elif step_type == WorkflowStepType.ai_evaluation:
+            AiEvaluationConfig.model_validate(v)
         elif step_type == WorkflowStepType.wait:
             WaitConfig.model_validate(v)
         elif step_type == WorkflowStepType.parallel:
