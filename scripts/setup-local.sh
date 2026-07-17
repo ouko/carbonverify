@@ -166,10 +166,13 @@ log_ok "Frontend dependencies installed"
 # 4. Environment file
 # ------------------------------------------------------------------
 if [[ ! -f "$PROJECT_ROOT/.env.local" ]]; then
-  log_info "Creating .env.local..."
-  # The .env.local file is already in the repo, but if it wasn't:
-  # cp "$PROJECT_ROOT/.env.local" "$PROJECT_ROOT/.env.local"
-  log_ok ".env.local ready"
+  if [[ -f "$PROJECT_ROOT/.env.example" ]]; then
+    log_info "Creating .env.local from .env.example..."
+    cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env.local"
+    log_warn ".env.local created from example — please review and fill in any required secrets"
+  else
+    log_warn ".env.example not found — create .env.local manually"
+  fi
 else
   log_warn ".env.local already exists — skipping"
 fi
