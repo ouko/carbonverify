@@ -50,16 +50,19 @@ export function useCreateWorkflow() {
   })
 }
 
-export function useUpdateWorkflow(id: string) {
+export function useUpdateWorkflow(id: string | undefined) {
   const qc = useQueryClient()
   return useMutation<ValidationWorkflow, unknown, ValidationWorkflowUpdatePayload>({
     mutationFn: async (payload) => {
+      if (!id) throw new Error('Workflow ID is required')
       const res = await api.patch(`/validation/workflows/${id}`, payload)
       return res.data
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: workflowKey(id) })
-      qc.invalidateQueries({ queryKey: WORKFLOWS_KEY })
+      if (id) {
+        qc.invalidateQueries({ queryKey: workflowKey(id) })
+        qc.invalidateQueries({ queryKey: WORKFLOWS_KEY })
+      }
     },
   })
 }

@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { WorkflowGraph } from '../../types'
 
 interface GraphPreviewProps {
@@ -5,6 +6,7 @@ interface GraphPreviewProps {
 }
 
 export function GraphPreview({ graph }: GraphPreviewProps) {
+  const arrowMarkerId = useId()
   const nodeHeight = 36
   const nodeGap = 56
   const width = 600
@@ -62,7 +64,7 @@ export function GraphPreview({ graph }: GraphPreviewProps) {
               <path
                 key={`${step.id}-${targetId}-${tidx}`}
                 d={`M ${centerX} ${fromY} L ${centerX} ${toY - 4}`}
-                markerEnd="url(#arrow)"
+                markerEnd={`url(#${arrowMarkerId})`}
                 fill="none"
                 className={isFailure ? 'stroke-red-400 stroke-dashed' : 'stroke-surface-400'}
                 strokeWidth={1.5}
@@ -73,7 +75,7 @@ export function GraphPreview({ graph }: GraphPreviewProps) {
         })}
 
         <defs>
-          <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+          <marker id={arrowMarkerId} markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
             <path d="M0,0 L0,6 L9,3 z" className="fill-surface-400" />
           </marker>
         </defs>

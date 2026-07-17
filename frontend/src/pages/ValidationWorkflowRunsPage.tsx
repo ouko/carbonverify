@@ -4,13 +4,36 @@ import { useWorkflow, useValidationRuns } from '../hooks/useValidationWorkflows'
 import { WorkflowRunDetail } from '../components/validation-workflow-builder/WorkflowRunDetail'
 import LoadingSpinner from '../components/LoadingSpinner'
 
+function getErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const axiosErr = err as { response?: { data?: { detail?: string } } }
+    return axiosErr.response?.data?.detail || 'Failed to load workflow'
+  }
+  if (err instanceof Error) return err.message
+  return 'Failed to load workflow'
+}
+
 export default function ValidationWorkflowRunsPage() {
   const { id, runId } = useParams<{ id: string; runId: string }>()
   const navigate = useNavigate()
-  const { data: workflow } = useWorkflow(id)
+  const { data: workflow, isLoading, isError, error } = useWorkflow(id)
   const { data: runs } = useValidationRuns(id)
 
-  if (!workflow) return <LoadingSpinner fullscreen />
+  if (isLoading) return <LoadingSpinner fullscreen />
+
+  if (isError || !workflow) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-6">
+        <div className="card max-w-md w-full p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">Workflow not found</h2>
+          <p className="text-sm text-surface-600 dark:text-surface-400">{getErrorMessage(error)}</p>
+          <button onClick={() => navigate('/validation-workflows')} className="btn-secondary flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" /> Back to workflows
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 h-full flex flex-col">

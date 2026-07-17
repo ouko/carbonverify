@@ -57,7 +57,7 @@ export default function ValidationWorkflowBuilderPage() {
   const isNew = id === 'new'
   const { data: existingWorkflow, isLoading } = useWorkflow(isNew ? undefined : id)
   const createWorkflow = useCreateWorkflow()
-  const updateWorkflow = useUpdateWorkflow(id || '')
+  const updateWorkflow = useUpdateWorkflow(isNew ? undefined : id)
 
   const [name, setName] = useState('')
   const [version, setVersion] = useState('1.0.0')
@@ -100,8 +100,11 @@ export default function ValidationWorkflowBuilderPage() {
   const updateStep = (updatedStep: WorkflowStep) => {
     setGraph((g) => ({
       ...g,
-      steps: g.steps.map((s) => (s.id === updatedStep.id ? updatedStep : s)),
+      steps: g.steps.map((s) => (s.id === selectedStepId ? updatedStep : s)),
     }))
+    if (selectedStepId && updatedStep.id !== selectedStepId) {
+      setSelectedStepId(updatedStep.id)
+    }
   }
 
   const removeStep = (stepId: string) => {

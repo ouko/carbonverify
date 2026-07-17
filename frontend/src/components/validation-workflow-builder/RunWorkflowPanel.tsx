@@ -10,26 +10,42 @@ interface RunWorkflowPanelProps {
   onRunCreated: (run: ValidationRun) => void
 }
 
+function getErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const axiosErr = err as { response?: { data?: { detail?: string } } }
+    return axiosErr.response?.data?.detail || 'An unexpected error occurred'
+  }
+  if (err instanceof Error) return err.message
+  return 'An unexpected error occurred'
+}
+
 export function RunWorkflowPanel({ workflow, onRunCreated }: RunWorkflowPanelProps) {
   const { data: projects } = useProjects()
   const trigger = useTriggerRun()
   const [projectId, setProjectId] = useState('')
   const [triggerEvent, setTriggerEvent] = useState('manual_test')
   const [inputData, setInputData] = useState<Record<string, unknown>>({})
+  const [error, setError] = useState<string | null>(null)
 
   const handleRun = async () => {
-    const run = await trigger.mutateAsync({
-      workflow_id: workflow.id,
-      project_id: projectId || undefined,
-      trigger_event: triggerEvent,
-      input_data: inputData,
-    })
-    onRunCreated(run)
+    setError(null)
+    try {
+      const run = await trigger.mutateAsync({
+        workflow_id: workflow.id,
+        project_id: projectId || undefined,
+        trigger_event: triggerEvent,
+        input_data: inputData,
+      })
+      onRunCreated(run)
+    } catch (err) {
+      setError(getErrorMessage(err))
+    }
   }
 
   return (
     <div className="p-4 space-y-4 border-t border-surface-200 dark:border-surface-700">
       <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-100">Test Run</h3>
+      {error && <div className="card border-l-4 border-l-red-500 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
 
       <div>
         <label className="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">Project (optional)</label>
