@@ -1,7 +1,7 @@
 import type { WorkflowGraph, WorkflowStep } from '../types'
 import type { ValidationIssue } from '../components/validation-workflow-builder/ValidationIssuesPanel'
 
-const ID_PATTERN = /^[a-zA-Z0-9_\-]+$/
+const ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 
 export function validateWorkflowGraph(graph: WorkflowGraph): ValidationIssue[] {
   const issues: ValidationIssue[] = []
@@ -36,7 +36,7 @@ export function validateWorkflowGraph(graph: WorkflowGraph): ValidationIssue[] {
   }
 
   graph.steps.forEach((step) => {
-    ;[...step.next_on_success, ...step.next_on_failure].forEach((ref) => {
+    [...step.next_on_success, ...step.next_on_failure].forEach((ref) => {
       if (ref !== 'end' && ref !== 'fail' && !stepIds.has(ref)) {
         issues.push({ type: 'error', message: `Reference to unknown step "${ref}".`, stepId: step.id })
       }
@@ -49,7 +49,7 @@ export function validateWorkflowGraph(graph: WorkflowGraph): ValidationIssue[] {
     reachable.add(id)
     const step = graph.steps.find((s) => s.id === id)
     if (!step) return
-    ;[...step.next_on_success, ...step.next_on_failure].forEach((ref) => {
+    [...step.next_on_success, ...step.next_on_failure].forEach((ref) => {
       if (ref !== 'end' && ref !== 'fail') visit(ref)
     })
   }
