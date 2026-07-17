@@ -25,7 +25,7 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
           <button onClick={clearAll} className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
             Clear
           </button>
-          <button onClick={onClose} aria-label="Close notifications" className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <button onClick={onClose} aria-label="Close notifications" className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -49,17 +49,17 @@ export function NotificationCenter({ onClose }: { onClose: () => void }) {
                   {n.title}
                 </p>
                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{n.message}</p>
-                <p className="mt-1 text-[10px] text-gray-400">
+                <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
                   {new Date(n.timestamp).toLocaleTimeString()}
                 </p>
               </div>
               <div className="flex flex-col gap-1">
                 {!n.read && (
-                  <button onClick={() => markRead(n.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" title="Mark read">
+                  <button onClick={() => markRead(n.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700" title="Mark read">
                     <CheckCircle className="h-3.5 w-3.5" />
                   </button>
                 )}
-                <button onClick={() => dismiss(n.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" title="Dismiss">
+                <button onClick={() => dismiss(n.id)} className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700" title="Dismiss">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>

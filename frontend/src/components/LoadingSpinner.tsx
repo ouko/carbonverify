@@ -9,13 +9,13 @@ export function LoadingSpinner({ message = 'Loading...', fullscreen = false }: L
   const content = (
     <div className="flex flex-col items-center justify-center gap-3">
       <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      <span className="text-sm text-gray-500">{message}</span>
+      <span className="text-sm text-surface-500 dark:text-surface-400">{message}</span>
     </div>
   );
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-surface-950/80 backdrop-blur-sm">
         {content}
       </div>
     );
