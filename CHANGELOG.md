@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Methodology Designer UX improvements** — Non-technical users can now start from sector templates (Cookstoves, Blue Carbon) and use a simple/advanced mode toggle. Added `methodology_templates` table, read-only API, reusable `FormField` components, inline validation, and frontend tests.
+
 ### Production Readiness
 - **Python runtime pinned to 3.11** — Reverted experimental Python 3.14 target; backend `Dockerfile`, CI workflow, and documentation now use Python 3.11 for stability
 - **Backend Dockerfile hardened** — Uses `python:3.11-slim`, adds explicit `CMD`, fixes healthcheck path, and creates a non-root user

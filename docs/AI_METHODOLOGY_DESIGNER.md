@@ -24,6 +24,8 @@ Most carbon projects today use well-known methodologies such as TPDDTEC v4, VM00
 | Step | UI | Backend endpoint | Purpose |
 |------|----|------------------|---------|
 | **1. Capture context** | Wizard form | `POST /methodology-generator/` | Store project name, sector, activity description, boundaries, and data sources |
+| **1a. Pick a template** | Template selector | `GET /methodology-templates/` | Choose a sector template (Cookstoves, Blue Carbon, etc.) to pre-fill common boundaries and data sources |
+| **1b. Simple / advanced mode** | Toggle | — | Hide optional fields (GHG sources, provider quality) until the user chooses to see them |
 | **2. Gap analysis** | Gap analysis panel | `POST /{id}/analyze` | Compare the activity against the existing methodology library and identify what is missing |
 | **3. Draft generation** | Methodology draft viewer | `POST /{id}/generate` | Produce a registry-style draft: applicability, baseline, project boundary, leakage, monitoring plan, etc. |
 | **4. Quantification scaffold** | Parameters / equations table | Included in step 3 | Define equations, parameters, data sources, uncertainty, and monitoring frequency |
@@ -52,6 +54,44 @@ The gap analysis endpoint returns a structured JSON object with the following fi
 ```
 
 If `fits_existing_methodology` is `true`, the system **blocks** draft generation to avoid creating a redundant or conflicting methodology.
+
+---
+
+## Methodology starting templates
+
+To make the wizard easier for non-technical users, the designer includes a set of built-in starting templates. Selecting a template pre-fills the sector, boundaries, and an example data source so the user has a concrete starting point instead of a blank form.
+
+### Built-in templates
+
+| Template | Sector | Pre-filled example data |
+|----------|--------|------------------------|
+| Cookstoves / Household Energy | Cookstoves | Rural households; annual household survey |
+| Blue Carbon / Coastal Ecosystems | Blue Carbon | Coastal project area; annual satellite imagery + field surveys |
+
+### API
+
+Templates are stored in the `methodology_templates` table and exposed through a read-only API:
+
+- `GET /methodology-templates/` — list active templates
+- `GET /methodology-templates/{template_id}` — get a single active template
+
+Both endpoints require authentication. The response `defaults_json` is sanitized by the backend so missing or malformed boundary/data-source fields are returned as empty strings/arrays instead of `undefined`, keeping the frontend form stable.
+
+### Simple / advanced mode
+
+The Boundaries & Data Sources step defaults to a simple view that shows only the most common fields:
+
+- Geographic scope
+- Temporal scope
+- Physical boundary
+- Data source type, description, and frequency
+
+Clicking **Show advanced fields** reveals optional fields:
+
+- Greenhouse gases covered
+- Provider / quality assurance notes
+
+This keeps the initial form short while still allowing experienced users to capture detailed information.
 
 ---
 
@@ -101,9 +141,10 @@ Rejections and revision requests require a `rejection_reason`.
 
 ## Database
 
-The feature adds one table via Alembic migration `96ec14ae4fd3_add_generated_methodologies.py`:
+The feature adds two tables via Alembic migrations:
 
 - `generated_methodologies` — stores project context, gap analysis, methodology draft, quantification scaffold, status, and review metadata. JSON fields are stored as JSONB.
+- `methodology_templates` — stores read-only starting templates with `name`, `sector`, `description`, and `defaults_json`. Added by migration `20260716_add_methodology_templates.py`.
 
 ---
 
@@ -114,7 +155,7 @@ Backend tests cover the full lifecycle:
 ```bash
 cd backend
 source .venv/bin/activate
-pytest tests/test_methodology_generator.py -v
+pytest tests/test_methodology_generator.py tests/test_methodology_templates.py -v
 ```
 
 Tests verify:
@@ -125,6 +166,23 @@ Tests verify:
 - Blocking generation when the project fits an existing methodology
 - Status transitions and rejection reason validation
 - Markdown export
+- Listing and retrieving methodology templates
+- Sanitizing malformed template `defaults_json` in API responses
+- Seed idempotency for built-in templates
+
+Frontend tests cover the UX refactor:
+
+```bash
+cd frontend
+npm run test -- src/test/MethodologyDesignerPage.test.tsx
+```
+
+Tests verify:
+
+- Template selector renders built-in templates
+- Selecting a template pre-fills the form
+- Advanced fields are hidden by default and shown on toggle
+- Inline validation surfaces errors for required fields
 
 ---
 

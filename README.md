@@ -357,12 +357,15 @@ The AI Methodology Designer helps project developers and validators create regis
 | Step | UI | Backend | Output |
 |------|----|---------|--------|
 | 1. Context | Wizard captures project name, sector, activity description, boundaries, and data sources | `POST /methodology-generator/` | `GeneratedMethodology` record in `draft` status |
+| 1a. Templates | Choose a sector template (Cookstoves, Blue Carbon, etc.) | `GET /methodology-templates/` | Pre-filled boundaries and example data source |
+| 1b. Simple/Advanced | Toggle hides optional fields until needed | — | Cleaner form for non-technical users |
 | 2. Gap Analysis | Compare activity against existing methodologies | `POST /{id}/analyze` | `fits_existing_methodology`, matching methodologies, identified gaps, recommendation |
 | 3. Draft Generation | If gaps exist, generate a custom methodology draft | `POST /{id}/generate` | Registry-style sections (applicability, baseline, project boundary, leakage, monitoring, etc.) plus a quantification scaffold |
 | 4. Review | Operator submits, approves, rejects, or requests revision | `PATCH /{id}/status` | Audit-logged status transition |
 | 5. Export | Download the approved draft as Markdown | `POST /{id}/export` | Markdown document ready for human editing |
 
 - **AI provider:** Kimi API (configurable via `KIMI_API_KEY`); falls back to a structured placeholder response when no key is configured so the UI can be tested end-to-end.
+- **Templates:** Built-in starting templates are seeded by `scripts/seed_demo_data.py` and stored in the `methodology_templates` table.
 - **Guardrails:** Draft generation is blocked if the gap analysis concludes the project fits an existing methodology, preventing methodological double-counting.
 - **Audit:** Every status change is written to `audit_logs` with the previous and new status.
 
@@ -455,6 +458,8 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | `GET` | `/review-queue` | Human review queue |
 | `PATCH` | `/review-queue/{id}` | Update review item status |
 | `POST` | `/orchestrator/review-queue/{id}/resolve` | Resolve review item |
+| `GET` | `/methodology-templates/` | List active methodology starting templates |
+| `GET` | `/methodology-templates/{id}` | Get a single active template |
 | `POST` | `/methodology-generator/` | Create a generated methodology |
 | `GET` | `/methodology-generator/` | List generated methodologies |
 | `GET` | `/methodology-generator/{id}` | Get generated methodology |
