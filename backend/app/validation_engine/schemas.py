@@ -246,6 +246,7 @@ class WorkflowResponse(BaseModel):
     description: Optional[str]
     active: bool
     graph_hash: str
+    workflow_graph: Dict[str, Any]
     sla_seconds: Optional[int]
     human_gates_required: bool
     created_at: str
