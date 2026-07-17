@@ -22,6 +22,7 @@ export function MethodologyTemplateSelector({
             key={template.id}
             type="button"
             onClick={() => onSelect(template)}
+            aria-pressed={selectedId === template.id}
             className={`text-left rounded-xl border p-4 transition-all ${
               selectedId === template.id
                 ? 'border-primary-400 bg-primary-50/50 dark:border-primary-500/50 dark:bg-primary-950/10'

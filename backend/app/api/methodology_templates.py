@@ -19,12 +19,16 @@ service = MethodologyTemplateService()
 
 
 def _template_to_dict(template) -> Dict[str, Any]:
+    safe_defaults = service.defaults_to_form(template)
     return {
         "id": template.id,
         "name": template.name,
         "sector": template.sector,
         "is_active": template.is_active,
-        "defaults_json": template.defaults_json,
+        "defaults_json": {
+            "boundaries": safe_defaults["boundaries"],
+            "data_sources": safe_defaults["data_sources"],
+        },
         "description": template.description,
         "created_by": template.created_by,
         "created_at": template.created_at,

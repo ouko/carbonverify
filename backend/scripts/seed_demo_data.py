@@ -1030,9 +1030,12 @@ async def seed_file_uploads(db: AsyncSession, projects: list[Project]) -> None:
 
 
 async def seed_methodology_templates(db: AsyncSession) -> None:
-    result = await db.execute(select(MethodologyTemplate).limit(1))
-    if result.scalar_one_or_none():
-        return
+    built_in_ids = [
+        uuid.UUID("11111111-1111-1111-1111-111111111111"),
+        uuid.UUID("22222222-2222-2222-2222-222222222222"),
+    ]
+    result = await db.execute(select(MethodologyTemplate.id))
+    existing_ids = {row[0] for row in result.all()}
 
     templates = [
         MethodologyTemplate(
@@ -1082,8 +1085,10 @@ async def seed_methodology_templates(db: AsyncSession) -> None:
             },
         ),
     ]
-    db.add_all(templates)
-    await db.commit()
+    missing_templates = [t for t in templates if t.id not in existing_ids]
+    if missing_templates:
+        db.add_all(missing_templates)
+        await db.commit()
 
 
 # ──────────────────────────────────────────────────────────────────────────────

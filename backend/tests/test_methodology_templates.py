@@ -89,6 +89,35 @@ async def test_service_defaults_to_form_handles_malformed_json():
 
 
 @pytest.mark.asyncio
+async def test_api_sanitizes_malformed_defaults_json(authenticated_client, db_session):
+    client, _ = authenticated_client
+    template_id = uuid.uuid4()
+    db_session.add(
+        MethodologyTemplate(
+            id=template_id,
+            name="Malformed API Template",
+            sector="Malformed",
+            is_active=True,
+            defaults_json={"boundaries": "not-a-dict", "data_sources": "not-a-list"},
+        )
+    )
+    await db_session.commit()
+
+    r = await client.get(f"/methodology-templates/{template_id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["defaults_json"] == {
+        "boundaries": {
+            "geographic_scope": "",
+            "temporal_scope": "",
+            "physical_boundary": "",
+            "ghg_sources_included": "",
+        },
+        "data_sources": [],
+    }
+
+
+@pytest.mark.asyncio
 async def test_seed_methodology_templates_is_idempotent(db_session):
     """Calling seed_methodology_templates twice must not duplicate templates."""
     await seed_methodology_templates(db_session)
@@ -101,3 +130,28 @@ async def test_seed_methodology_templates_is_idempotent(db_session):
 
     assert count_after_first > 0
     assert count_after_second == count_after_first
+
+
+@pytest.mark.asyncio
+async def test_seed_methodology_templates_adds_builtins_when_custom_exists(db_session):
+    """Built-in templates should still be seeded even if a custom template already exists."""
+    db_session.add(
+        MethodologyTemplate(
+            id=uuid.uuid4(),
+            name="Custom Template",
+            sector="Custom",
+            is_active=True,
+            defaults_json={"boundaries": {}, "data_sources": []},
+        )
+    )
+    await db_session.commit()
+
+    await seed_methodology_templates(db_session)
+    result = await db_session.execute(select(MethodologyTemplate))
+    templates = result.scalars().all()
+    names = {t.name for t in templates}
+
+    assert "Custom Template" in names
+    assert "Cookstoves / Household Energy" in names
+    assert "Blue Carbon / Coastal Ecosystems" in names
+    assert len(templates) == 3

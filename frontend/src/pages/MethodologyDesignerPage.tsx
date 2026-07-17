@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { GeneratedMethodology, MethodologyTemplate, Project } from '../types'
+import type { BoundariesForm, DataSourceForm, GeneratedMethodology, MethodologyTemplate, Project } from '../types'
 import { WizardStepper } from '../components/methodology-generator/WizardStepper'
 import { GapAnalysisPanel } from '../components/methodology-generator/GapAnalysisPanel'
 import { MethodologyDraftViewer } from '../components/methodology-generator/MethodologyDraftViewer'
@@ -21,20 +21,6 @@ import { api } from '../services/api'
 import { Loader2, AlertCircle, CheckCircle2, Info, Plus, Trash2 } from 'lucide-react'
 
 const STEPS = ['Context', 'Boundaries', 'Gap Analysis', 'Draft', 'Scaffold', 'Review']
-
-interface BoundariesForm {
-  geographic_scope: string
-  temporal_scope: string
-  physical_boundary: string
-  ghg_sources_included: string
-}
-
-interface DataSourceForm {
-  source_type: string
-  description: string
-  frequency: string
-  provider_quality: string
-}
 
 interface PageForm {
   project_id: string
@@ -649,7 +635,6 @@ export default function MethodologyDesignerPage() {
                             htmlFor={`description_${idx}`}
                             helper="What does this source measure and how is it used?"
                             error={fieldErrors[`data_source_${idx}`]}
-                            advanced={false}
                           >
                             <input
                               id={`description_${idx}`}
