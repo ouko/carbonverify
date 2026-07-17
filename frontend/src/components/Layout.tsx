@@ -24,6 +24,7 @@ import {
   Settings,
   Users,
   FlaskConical,
+  GitBranch,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -61,6 +62,7 @@ const baseNavGroups = [
       { to: '/data-sources', icon: Database, label: 'Data Sources' },
       { to: '/calculations', icon: Calculator, label: 'Calculations' },
       { to: '/methodology-designer', icon: FlaskConical, label: 'Methodology Designer' },
+      { to: '/validation-workflows', icon: GitBranch, label: 'Workflow Builder' },
       { to: '/reports', icon: FileText, label: 'Reports' },
       { to: '/review-queue', icon: ClipboardList, label: 'Review Queue' },
       { to: '/field', icon: MapPin, label: 'Field' },

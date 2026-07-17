@@ -37,6 +37,9 @@ const TokenizationPage = lazy(() => import('./pages/TokenizationPage').then(m =>
 const CorporateDashboardPage = lazy(() => import('./pages/CorporateDashboardPage').then(m => ({ default: m.CorporateDashboardPage })));
 const LeadsPage = lazy(() => import('./pages/LeadsPage').then(m => ({ default: m.default })));
 const MethodologyDesignerPage = lazy(() => import('./pages/MethodologyDesignerPage').then(m => ({ default: m.default })));
+const ValidationWorkflowListPage = lazy(() => import('./pages/ValidationWorkflowListPage').then(m => ({ default: m.default })))
+const ValidationWorkflowBuilderPage = lazy(() => import('./pages/ValidationWorkflowBuilderPage').then(m => ({ default: m.default })))
+const ValidationWorkflowRunsPage = lazy(() => import('./pages/ValidationWorkflowRunsPage').then(m => ({ default: m.default })))
 const CommandLayout = lazy(() => import('./components/CommandLayout').then(m => ({ default: m.default })));
 const InboxPage = lazy(() => import('./pages/command/InboxPage').then(m => ({ default: m.InboxPage })));
 const ProjectsGridPage = lazy(() => import('./pages/command/ProjectsGridPage').then(m => ({ default: m.ProjectsGridPage })));
@@ -89,6 +92,9 @@ function App() {
                   <Route path="/review-queue" element={<Suspense fallback={<LoadingSpinner />}><ReviewQueuePage /></Suspense>} />
                   <Route path="/field" element={<Suspense fallback={<LoadingSpinner />}><FieldDashboardPage /></Suspense>} />
                   <Route path="/methodology-designer/:id?" element={<Suspense fallback={<LoadingSpinner />}><MethodologyDesignerPage /></Suspense>} />
+                  <Route path="/validation-workflows" element={<Suspense fallback={<LoadingSpinner />}><ValidationWorkflowListPage /></Suspense>} />
+                  <Route path="/validation-workflows/:id/builder" element={<Suspense fallback={<LoadingSpinner />}><ValidationWorkflowBuilderPage /></Suspense>} />
+                  <Route path="/validation-workflows/:id/runs/:runId?" element={<Suspense fallback={<LoadingSpinner />}><ValidationWorkflowRunsPage /></Suspense>} />
                 </Route>
               </Route>
               <Route element={<ProtectedRoute requiredRole="admin" />}>
