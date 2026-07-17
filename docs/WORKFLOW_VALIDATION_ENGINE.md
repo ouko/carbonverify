@@ -232,6 +232,29 @@ If `KIMI_API_KEY` is not set, the Kimi client returns a fallback response. In pr
 
 ---
 
+## UI Builder
+
+The Workflow Builder (`/validation-workflows`) provides a visual, form-based interface for creating and editing validation workflows without writing JSON.
+
+### Features
+
+- **Step palette** — add any of the 11 supported step types.
+- **Templates** — start from pre-built workflows such as "Document quality gate" or "HTTP health check + notify".
+- **Graph preview** — live SVG diagram of nodes and edges.
+- **Per-step configuration** — type-specific forms for every step config schema.
+- **Client-side validation** — unique step IDs, valid next-step references, required fields, and numeric bounds.
+- **Test runs** — trigger a run directly from the builder and navigate to run details.
+- **Run history** — view status, step executions, proofs, and transition audit chain.
+
+### Navigation
+
+- `/validation-workflows` — list and clone workflows
+- `/validation-workflows/new/builder` — create a workflow from scratch or template
+- `/validation-workflows/:id/builder` — edit workflow graph
+- `/validation-workflows/:id/runs/:runId?` — run history and detail
+
+---
+
 ## Testing
 
 Run the validation engine tests:
