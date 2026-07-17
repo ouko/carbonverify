@@ -156,6 +156,43 @@
            transition-all duration-200;
   }
 
+  .btn-blue {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-blue-600 text-white font-medium rounded-xl
+           hover:bg-blue-500 active:scale-[0.98]
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-red {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-red-600 text-white font-medium rounded-xl
+           hover:bg-red-500 active:scale-[0.98]
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-amber {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-amber-600 text-white font-medium rounded-xl
+           hover:bg-amber-500 active:scale-[0.98]
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-emerald-outline {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           rounded-xl border border-emerald-600
+           text-emerald-700 font-medium
+           hover:bg-emerald-50 active:scale-[0.98]
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .dark .btn-emerald-outline {
+    @apply text-emerald-300 hover:bg-emerald-950/30;
+  }
+
   /* ─── Inputs ─────────────────────────────────────────────────────────────── */
 
   .input-modern {

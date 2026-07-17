@@ -261,6 +261,15 @@ export interface DataSourceForm {
   provider_quality: string
 }
 
+export interface PageForm {
+  project_id: string
+  name: string
+  sector: string
+  activity_description: string
+  boundaries: BoundariesForm
+  data_sources: DataSourceForm[]
+}
+
 export interface MethodologyTemplate {
   id: string
   name: string

@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { BoundariesForm, DataSourceForm, GeneratedMethodology, MethodologyTemplate, Project } from '../types'
+import type { BoundariesForm, DataSourceForm, GeneratedMethodology, MethodologyTemplate, PageForm } from '../types'
 import { WizardStepper } from '../components/methodology-generator/WizardStepper'
 import { GapAnalysisPanel } from '../components/methodology-generator/GapAnalysisPanel'
 import { MethodologyDraftViewer } from '../components/methodology-generator/MethodologyDraftViewer'
 import { QuantificationScaffoldViewer } from '../components/methodology-generator/QuantificationScaffoldViewer'
-import { FormField } from '../components/methodology-generator/FormField'
-import { MethodologyTemplateSelector } from '../components/methodology-generator/MethodologyTemplateSelector'
-import { SimpleModeToggle } from '../components/methodology-generator/SimpleModeToggle'
+import { ContextStep } from '../components/methodology-generator/ContextStep'
+import { BoundariesStep } from '../components/methodology-generator/BoundariesStep'
 import {
   useCreateGeneratedMethodology,
   useGeneratedMethodology,
@@ -18,18 +17,9 @@ import {
 } from '../hooks/useMethodologyGenerator'
 import { useProjects } from '../hooks/useProjects'
 import { api } from '../services/api'
-import { Loader2, AlertCircle, CheckCircle2, Info, Plus, Trash2 } from 'lucide-react'
+import { Loader2, AlertCircle, CheckCircle2, Info } from 'lucide-react'
 
 const STEPS = ['Context', 'Boundaries', 'Gap Analysis', 'Draft', 'Scaffold', 'Review']
-
-interface PageForm {
-  project_id: string
-  name: string
-  sector: string
-  activity_description: string
-  boundaries: BoundariesForm
-  data_sources: DataSourceForm[]
-}
 
 const INITIAL_BOUNDARIES: BoundariesForm = {
   geographic_scope: '',
@@ -128,8 +118,8 @@ export default function MethodologyDesignerPage() {
   const anyLoading =
     create.isPending || analyze.isPending || generate.isPending || updateStatus.isPending
 
-  const setField = <K extends keyof PageForm>(key: K, value: PageForm[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
+  const handleContextChange = (updates: Partial<PageForm>) => {
+    setForm((prev) => ({ ...prev, ...updates }))
   }
 
   const setBoundary = (key: keyof BoundariesForm, value: string) => {
@@ -158,11 +148,13 @@ export default function MethodologyDesignerPage() {
     setFieldErrors((prev) => {
       const next: Record<string, string> = {}
       Object.entries(prev).forEach(([key, value]) => {
-        if (key === `data_source_${idx}`) return
-        if (key.startsWith('data_source_')) {
-          const sourceIdx = parseInt(key.replace('data_source_', ''), 10)
+        if (key === `data_source_${idx}_type` || key === `data_source_${idx}_description`) return
+        const match = key.match(/^data_source_(\d+)_(type|description)$/)
+        if (match) {
+          const sourceIdx = parseInt(match[1], 10)
+          const field = match[2]
           if (sourceIdx > idx) {
-            next[`data_source_${sourceIdx - 1}`] = value
+            next[`data_source_${sourceIdx - 1}_${field}`] = value
           } else {
             next[key] = value
           }
@@ -240,8 +232,11 @@ export default function MethodologyDesignerPage() {
     if (form.data_sources.length === 0) errors.data_sources = 'Add at least one data source.'
     for (let i = 0; i < form.data_sources.length; i++) {
       const ds = form.data_sources[i]
-      if (!ds.source_type.trim() || !ds.description.trim()) {
-        errors[`data_source_${i}`] = `Data source #${i + 1} needs a type and description.`
+      if (!ds.source_type.trim()) {
+        errors[`data_source_${i}_type`] = `Data source #${i + 1} needs a type.`
+      }
+      if (!ds.description.trim()) {
+        errors[`data_source_${i}_description`] = `Data source #${i + 1} needs a description.`
       }
     }
     setFieldErrors((prev) => {
@@ -369,128 +364,27 @@ export default function MethodologyDesignerPage() {
             title="Project context"
             description="Choose the project this methodology belongs to, then describe the activity and sector so the AI can compare it against existing methodologies."
           >
-            <div className="space-y-4">
-              {templatesLoading ? (
-                <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Loading templates...</span>
-                </div>
-              ) : templates && templates.length > 0 ? (
-                <MethodologyTemplateSelector
-                  templates={templates}
-                  selectedId={selectedTemplateId ?? undefined}
-                  onSelect={applyTemplate}
-                />
-              ) : null}
-
-              <FormField
-                label="Project this methodology is for *"
-                htmlFor="project_id"
-                error={fieldErrors.project_id}
-              >
-                {projectsLoading ? (
-                  <div className="flex items-center space-x-2 text-surface-500 dark:text-surface-400">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Loading projects...</span>
-                  </div>
-                ) : (
-                  <>
-                    <select
-                      id="project_id"
-                      className="input-modern"
-                      value={form.project_id}
-                      onChange={(e) => {
-                        setField('project_id', e.target.value)
-                        setFieldErrors((prev) => ({ ...prev, project_id: '' }))
-                      }}
-                    >
-                      <option value="">Select an existing project</option>
-                      {projects?.map((project: Project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.name}
-                        </option>
-                      ))}
-                    </select>
-                    {(!projects || projects.length === 0) && (
-                      <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
-                        No projects found. Create a project first from the Projects page.
-                      </p>
-                    )}
-                  </>
-                )}
-              </FormField>
-
-              <FormField
-                label="Methodology name *"
-                htmlFor="name"
-                helper="Choose a clear, descriptive name. Example: Improved Cookstoves Distribution Methodology v1.0"
-                error={fieldErrors.name}
-              >
-                <input
-                  id="name"
-                  className="input-modern"
-                  placeholder="e.g. Mangrove Restoration Methodology v1.0"
-                  value={form.name}
-                  onChange={(e) => {
-                    setField('name', e.target.value)
-                    setFieldErrors((prev) => ({ ...prev, name: '' }))
-                  }}
-                />
-              </FormField>
-
-              <FormField
-                label="Sector / project type *"
-                htmlFor="sector"
-                helper="Pick the sector that best describes the project. Examples: Blue Carbon, Cookstoves, Forestry, Renewable Energy."
-                error={fieldErrors.sector}
-              >
-                <input
-                  id="sector"
-                  className="input-modern"
-                  placeholder="e.g. Blue Carbon, Cookstoves"
-                  value={form.sector}
-                  onChange={(e) => {
-                    setField('sector', e.target.value)
-                    setFieldErrors((prev) => ({ ...prev, sector: '' }))
-                    setSelectedTemplateId(null)
-                  }}
-                />
-              </FormField>
-
-              <FormField
-                label="Activity description *"
-                htmlFor="activity_description"
-                helper="Include what is being measured, where it happens, and why existing methodologies may not apply."
-                error={fieldErrors.activity_description}
-              >
-                <textarea
-                  id="activity_description"
-                  className="input-modern"
-                  rows={4}
-                  placeholder="Describe the project activity in detail (at least 10 characters)"
-                  value={form.activity_description}
-                  onChange={(e) => {
-                    setField('activity_description', e.target.value)
-                    setFieldErrors((prev) => ({ ...prev, activity_description: '' }))
-                  }}
-                />
-              </FormField>
-
-              <button
-                className="btn-primary"
-                onClick={() => {
-                  const err = validateContext()
-                  if (err) {
-                    setError(err)
-                    return
-                  }
-                  setError(null)
-                  setStep(1)
-                }}
-              >
-                <span>Next: Boundaries & Data Sources</span>
-              </button>
-            </div>
+            <ContextStep
+              form={form}
+              fieldErrors={fieldErrors}
+              templates={templates}
+              templatesLoading={templatesLoading}
+              projects={projects}
+              projectsLoading={projectsLoading}
+              selectedTemplateId={selectedTemplateId}
+              onSelectTemplate={applyTemplate}
+              onChange={handleContextChange}
+              onClearError={(key) => setFieldErrors((prev) => ({ ...prev, [key]: '' }))}
+              onNext={() => {
+                const err = validateContext()
+                if (err) {
+                  setError(err)
+                  return
+                }
+                setError(null)
+                setStep(1)
+              }}
+            />
           </StepCard>
         )}
 
@@ -499,213 +393,21 @@ export default function MethodologyDesignerPage() {
             title="Boundaries & data sources"
             description="Define the system boundary and list the data sources the project will use. The AI uses these to assess gaps and build a quantification scaffold."
           >
-            <div className="space-y-6">
-              <div className="flex justify-end">
-                <SimpleModeToggle showAdvanced={showAdvanced} onChange={setShowAdvanced} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  label="Geographic scope *"
-                  htmlFor="geographic_scope"
-                  helper="Where will the project activity take place?"
-                  error={fieldErrors.geographic_scope}
-                >
-                  <input
-                    id="geographic_scope"
-                    className="input-modern"
-                    placeholder="e.g. Kwale County, Kenya"
-                    value={form.boundaries.geographic_scope}
-                    onChange={(e) => {
-                      setBoundary('geographic_scope', e.target.value)
-                      setFieldErrors((prev) => ({ ...prev, geographic_scope: '' }))
-                      setSelectedTemplateId(null)
-                    }}
-                  />
-                </FormField>
-
-                <FormField
-                  label="Temporal scope *"
-                  htmlFor="temporal_scope"
-                  helper="What time period will the methodology cover?"
-                  error={fieldErrors.temporal_scope}
-                >
-                  <input
-                    id="temporal_scope"
-                    className="input-modern"
-                    placeholder="e.g. 2025-01-01 to 2034-12-31"
-                    value={form.boundaries.temporal_scope}
-                    onChange={(e) => {
-                      setBoundary('temporal_scope', e.target.value)
-                      setFieldErrors((prev) => ({ ...prev, temporal_scope: '' }))
-                      setSelectedTemplateId(null)
-                    }}
-                  />
-                </FormField>
-
-                <FormField
-                  label="Physical boundary *"
-                  htmlFor="physical_boundary"
-                  helper="What physical assets, sites, or processes are included?"
-                  error={fieldErrors.physical_boundary}
-                >
-                  <input
-                    id="physical_boundary"
-                    className="input-modern"
-                    placeholder="e.g. project-installation sites and supply chain"
-                    value={form.boundaries.physical_boundary}
-                    onChange={(e) => {
-                      setBoundary('physical_boundary', e.target.value)
-                      setFieldErrors((prev) => ({ ...prev, physical_boundary: '' }))
-                      setSelectedTemplateId(null)
-                    }}
-                  />
-                </FormField>
-
-                {showAdvanced && (
-                  <FormField
-                    label="Greenhouse gases covered (optional)"
-                    htmlFor="ghg_sources_included"
-                    helper="Which greenhouse gases and sources are explicitly included?"
-                    advanced
-                  >
-                    <input
-                      id="ghg_sources_included"
-                      className="input-modern"
-                      placeholder="e.g. CO2, CH4 from avoided fuel combustion"
-                      value={form.boundaries.ghg_sources_included}
-                      onChange={(e) => {
-                        setBoundary('ghg_sources_included', e.target.value)
-                        setFieldErrors((prev) => ({ ...prev, ghg_sources_included: '' }))
-                        setSelectedTemplateId(null)
-                      }}
-                    />
-                  </FormField>
-                )}
-              </div>
-
-              <FormField label="Data sources *" error={fieldErrors.data_sources}>
-                <div className="space-y-3">
-                  {form.data_sources.map((ds, idx) => (
-                    <div
-                      key={idx}
-                      className="border border-surface-200 dark:border-surface-700 rounded-xl p-3 bg-surface-50 dark:bg-surface-900/50"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <FormField
-                          label="Source type *"
-                          htmlFor={`source_type_${idx}`}
-                          helper="e.g. satellite, IoT sensor, survey"
-                          error={fieldErrors[`data_source_${idx}`]}
-                        >
-                          <input
-                            id={`source_type_${idx}`}
-                            className="input-modern"
-                            placeholder="e.g. satellite, IoT, survey"
-                            value={ds.source_type}
-                            onChange={(e) => {
-                              setDataSource(idx, 'source_type', e.target.value)
-                              setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
-                              setSelectedTemplateId(null)
-                            }}
-                          />
-                        </FormField>
-
-                        <FormField
-                          label="Frequency"
-                          htmlFor={`frequency_${idx}`}
-                          helper="How often is the data collected?"
-                        >
-                          <input
-                            id={`frequency_${idx}`}
-                            className="input-modern"
-                            placeholder="e.g. monthly, annual"
-                            value={ds.frequency}
-                            onChange={(e) => {
-                              setDataSource(idx, 'frequency', e.target.value)
-                              setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
-                              setSelectedTemplateId(null)
-                            }}
-                          />
-                        </FormField>
-
-                        <div className="md:col-span-2">
-                          <FormField
-                            label="Description *"
-                            htmlFor={`description_${idx}`}
-                            helper="What does this source measure and how is it used?"
-                            error={fieldErrors[`data_source_${idx}`]}
-                          >
-                            <input
-                              id={`description_${idx}`}
-                              className="w-full input-modern"
-                              placeholder="Description of what the source measures"
-                              value={ds.description}
-                              onChange={(e) => {
-                                setDataSource(idx, 'description', e.target.value)
-                                setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
-                                setSelectedTemplateId(null)
-                              }}
-                            />
-                          </FormField>
-                        </div>
-
-                        {showAdvanced && (
-                          <div className="md:col-span-2">
-                            <FormField
-                              label="Provider / quality assurance"
-                              htmlFor={`provider_quality_${idx}`}
-                              helper="Who provides the data and how is quality assured?"
-                              advanced
-                            >
-                              <input
-                                id={`provider_quality_${idx}`}
-                                className="w-full input-modern"
-                                placeholder="Provider / quality assurance notes"
-                                value={ds.provider_quality}
-                                onChange={(e) => {
-                                  setDataSource(idx, 'provider_quality', e.target.value)
-                                  setFieldErrors((prev) => ({ ...prev, [`data_source_${idx}`]: '' }))
-                                  setSelectedTemplateId(null)
-                                }}
-                              />
-                            </FormField>
-                          </div>
-                        )}
-                      </div>
-                      {form.data_sources.length > 1 && (
-                        <button
-                          className="mt-2 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 inline-flex items-center space-x-1"
-                          onClick={() => removeDataSource(idx)}
-                          disabled={anyLoading}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Remove</span>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 inline-flex items-center space-x-1"
-                  onClick={addDataSource}
-                  disabled={anyLoading}
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add source</span>
-                </button>
-              </FormField>
-
-              <div className="flex items-center space-x-3">
-                <button className="btn-secondary" onClick={() => setStep(0)} disabled={anyLoading}>
-                  Back
-                </button>
-                <button className="btn-primary" onClick={handleCreate} disabled={anyLoading}>
-                  {create.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>Save & Analyze Gap</span>
-                </button>
-              </div>
-            </div>
+            <BoundariesStep
+              form={form}
+              fieldErrors={fieldErrors}
+              showAdvanced={showAdvanced}
+              onToggleAdvanced={setShowAdvanced}
+              onChangeBoundary={setBoundary}
+              onChangeDataSource={setDataSource}
+              onAddDataSource={addDataSource}
+              onRemoveDataSource={removeDataSource}
+              onClearError={(key) => setFieldErrors((prev) => ({ ...prev, [key]: '' }))}
+              onClearTemplateSelection={() => setSelectedTemplateId(null)}
+              onBack={() => setStep(0)}
+              onSubmit={handleCreate}
+              isSubmitting={create.isPending}
+            />
           </StepCard>
         )}
 
@@ -747,7 +449,7 @@ export default function MethodologyDesignerPage() {
                   </button>
                   {gm.gap_analysis && (
                     <button
-                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-blue"
                       onClick={handleGenerate}
                       disabled={anyLoading || gm.gap_analysis.fits_existing_methodology === true}
                     >
@@ -880,21 +582,21 @@ export default function MethodologyDesignerPage() {
                     <span>Submit for Review</span>
                   </button>
                   <button
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-blue"
                     onClick={() => handleStatus('approved')}
                     disabled={anyLoading || gm.status !== 'under_review'}
                   >
                     Approve
                   </button>
                   <button
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-red"
                     onClick={() => handleStatus('rejected')}
                     disabled={anyLoading || gm.status !== 'under_review'}
                   >
                     Reject
                   </button>
                   <button
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-600 text-white font-medium rounded-xl hover:bg-amber-500 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-amber"
                     onClick={() => handleStatus('revision_requested')}
                     disabled={anyLoading || gm.status !== 'under_review'}
                   >
@@ -912,7 +614,7 @@ export default function MethodologyDesignerPage() {
                   </button>
                   {gm.methodology && (
                     <button
-                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-emerald-600 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="btn-emerald-outline"
                       onClick={async () => {
                         if (!id) return
                         try {
