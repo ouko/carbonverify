@@ -182,6 +182,10 @@ async def update_workflow(
     if workflow is None:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
+    if payload.name is not None:
+        workflow.name = payload.name
+    if payload.version is not None:
+        workflow.version = payload.version
     if payload.description is not None:
         workflow.description = payload.description
     if payload.active is not None:

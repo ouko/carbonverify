@@ -133,7 +133,7 @@ export default function ValidationWorkflowBuilderPage() {
         const created = await createWorkflow.mutateAsync(payload)
         navigate(`/validation-workflows/${created.id}/builder`, { replace: true })
       } else {
-        await updateWorkflow.mutateAsync({ workflow_graph: graph, description })
+        await updateWorkflow.mutateAsync({ name, version, workflow_graph: graph, description })
       }
     } catch (err) {
       setError(getErrorMessage(err))

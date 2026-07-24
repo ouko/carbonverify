@@ -363,6 +363,8 @@ export interface ValidationWorkflowCreatePayload {
 }
 
 export interface ValidationWorkflowUpdatePayload {
+  name?: string
+  version?: string
   description?: string
   active?: boolean
   workflow_graph?: WorkflowGraph

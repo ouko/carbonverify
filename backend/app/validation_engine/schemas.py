@@ -232,6 +232,8 @@ class WorkflowCreateRequest(BaseModel):
 
 
 class WorkflowUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    version: Optional[str] = Field(default=None, min_length=1, max_length=50)
     description: Optional[str] = None
     active: Optional[bool] = None
     workflow_graph: Optional[WorkflowGraph] = None
