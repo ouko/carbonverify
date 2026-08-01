@@ -50,4 +50,5 @@ def downgrade() -> None:
     op.drop_index('ix_lead_documents_lead_id', table_name='lead_documents')
     op.drop_index('ix_lead_documents_document_type', table_name='lead_documents')
     op.drop_table('lead_documents')
+    sa.Enum('discovered', 'fetched', 'failed', name='lead_document_status').drop(op.get_bind())
     # ### end Alembic commands ###
