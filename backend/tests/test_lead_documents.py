@@ -37,6 +37,8 @@ from unittest.mock import patch, MagicMock
 
 from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum
 from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetcher
+from app.services.lead_intelligence.gold_standard import _parse_gold_standard_documents
+from app.services.lead_intelligence.verra import _parse_verra_documents
 
 
 @pytest_asyncio.fixture
@@ -102,3 +104,48 @@ async def test_fetch_document_failure(async_db_session, sample_lead):
     assert result.status == LeadDocumentStatusEnum.failed
     assert "connection refused" in result.error_message
     fetcher.close()
+
+
+def test_parse_gold_standard_documents():
+    html = """
+    <html><body>
+    <a href="/docs/pdd.pdf">Project Design Document</a>
+    <a href="/docs/verification.pdf">Verification Report</a>
+    </body></html>
+    """
+    docs = _parse_gold_standard_documents(html)
+    assert len(docs) == 2
+    assert docs[0]["document_type"] == "pdd"
+    assert docs[0]["source_url"] == "https://registry.goldstandard.org/docs/pdd.pdf"
+    assert docs[1]["document_type"] == "verification_report"
+
+
+def test_parse_verra_documents():
+    html = """
+    <html><body>
+    <a href="/api/file/123/project-description.pdf">Project Description</a>
+    <a href="/api/file/456/monitoring-report.pdf">Monitoring Report</a>
+    </body></html>
+    """
+    docs = _parse_verra_documents(html)
+    assert len(docs) == 2
+    assert docs[0]["document_type"] == "pdd"
+    assert docs[0]["source_url"] == "https://registry.verra.org/api/file/123/project-description.pdf"
+    assert docs[1]["document_type"] == "monitoring_report"
+
+
+from app.services.lead_intelligence.cdm import _parse_cdm_documents
+
+
+def test_parse_cdm_documents():
+    html = """
+    <html><body>
+    <a href="/Projects/DB/ABC123/pdd.pdf">Project Design Document (PDF)</a>
+    <a href="/Projects/DB/ABC123/val.pdf">Validation Report</a>
+    </body></html>
+    """
+    docs = _parse_cdm_documents(html, "https://cdm.unfccc.int/Projects/DB/ABC123/history")
+    assert len(docs) == 2
+    assert docs[0]["document_type"] == "pdd"
+    assert docs[0]["source_url"] == "https://cdm.unfccc.int/Projects/DB/ABC123/pdd.pdf"
+    assert docs[1]["document_type"] == "validation_report"

@@ -193,6 +193,43 @@ def _scrape_cdm_with_playwright(country: str) -> List[Dict[str, Any]]:
         return []
 
 
+CDM_DOCUMENT_TYPE_MAP = {
+    "project design document": "pdd",
+    "pdd": "pdd",
+    "validation report": "validation_report",
+    "verification report": "verification_report",
+    "monitoring report": "monitoring_report",
+    "verification and certification report": "verification_report",
+}
+
+
+def _parse_cdm_documents(html: str, base_url: str) -> List[Dict[str, Any]]:
+    """Parse a CDM project detail/history page for document links."""
+    soup = BeautifulSoup(html, "html.parser")
+    documents = []
+
+    for link in soup.find_all("a", href=True):
+        href = link.get("href", "")
+        text = link.get_text(strip=True).lower()
+        if not href.endswith(".pdf") and not href.endswith(".xlsx") and not href.endswith(".xls"):
+            continue
+
+        doc_type = "document"
+        for key, value in CDM_DOCUMENT_TYPE_MAP.items():
+            if key in text:
+                doc_type = value
+                break
+
+        url = href if href.startswith("http") else f"https://cdm.unfccc.int{href}"
+        documents.append({
+            "document_type": doc_type,
+            "source_url": url,
+            "title": link.get_text(strip=True),
+        })
+
+    return documents
+
+
 class CDMScraper(BaseRegistryScraper):
     source = "cdm"
 
@@ -257,6 +294,26 @@ class CDMScraper(BaseRegistryScraper):
         for lead in leads:
             lead["_scrape_meta"] = {"source": self.source, "data_source": data_source}
         return leads
+
+    def fetch_documents(self, lead: "Lead") -> List[Dict[str, Any]]:
+        if not lead.registry_url:
+            return []
+
+        # CDM detail page uses /view; history page often has the documents
+        history_url = lead.registry_url.replace("/view", "/history")
+
+        try:
+            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser, _new_stealth_page
+            browser = _get_or_launch_browser(headless=False)
+            page = _new_stealth_page(browser)
+            page.goto(history_url, timeout=30000, wait_until="domcontentloaded")
+            page.wait_for_timeout(3000)
+            html = page.content()
+            page.context.close()
+            return _parse_cdm_documents(html, history_url)
+        except Exception as exc:
+            logger.error("cdm_fetch_documents_failed", lead_id=str(lead.id), error=str(exc))
+            return []
 
     def close(self) -> None:
         pass
