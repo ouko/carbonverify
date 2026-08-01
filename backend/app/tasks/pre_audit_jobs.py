@@ -1,9 +1,10 @@
 """Celery tasks for AI pre-audit document discovery and fetching."""
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.logging import get_logger
 from app.database import AsyncSessionLocal
@@ -13,6 +14,9 @@ from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetc
 from app.tasks.celery_app import celery_app
 
 logger = get_logger(__name__)
+
+MAX_DOCUMENT_FETCH_ATTEMPTS = 5
+DOCUMENT_FETCH_RETRY_MINUTES = 60
 
 
 def run_async(coro):
@@ -80,10 +84,14 @@ def fetch_lead_documents(self, lead_id: str) -> None:
                 fetcher = RegistryDocumentFetcher()
                 try:
                     for doc in docs_to_fetch:
-                        await fetcher.fetch_document(doc)
+                        await fetcher.fetch_document(
+                            doc,
+                            lead_id=str(lead.id),
+                            registry_source=lead.registry_source.value,
+                        )
                         await db.commit()
                 finally:
-                    fetcher.close()
+                    await fetcher.close()
             finally:
                 scraper.close()
 
@@ -96,14 +104,35 @@ def fetch_lead_documents(self, lead_id: str) -> None:
 
 @celery_app.task(bind=True, max_retries=3)
 def fetch_all_pending_documents(self) -> None:
-    """Fetch documents for all leads that have no fetched documents yet."""
+    """Fetch documents for all leads that have undiscovered or retryable documents.
+
+    Leads are excluded when every document has either been fetched successfully,
+    exhausted its retry budget, or failed within the retry cooldown window.
+    """
 
     async def _run():
         async with AsyncSessionLocal() as db:
-            result = await db.execute(
-                select(Lead.id).where(
-                    ~Lead.documents.any(LeadDocument.status == LeadDocumentStatusEnum.fetched)
+            retry_cutoff = datetime.now(timezone.utc) - timedelta(minutes=DOCUMENT_FETCH_RETRY_MINUTES)
+
+            # A lead is pending if it has at least one document that is:
+            #   - discovered (never fetched), or
+            #   - failed with attempts remaining and outside the cooldown window.
+            pending_doc = (
+                (LeadDocument.status == LeadDocumentStatusEnum.discovered)
+                | (
+                    (LeadDocument.status == LeadDocumentStatusEnum.failed)
+                    & (LeadDocument.fetch_attempts < MAX_DOCUMENT_FETCH_ATTEMPTS)
+                    & (
+                        (LeadDocument.last_fetch_attempt_at.is_(None))
+                        | (LeadDocument.last_fetch_attempt_at < retry_cutoff)
+                    )
                 )
+            )
+
+            result = await db.execute(
+                select(Lead.id)
+                .where(Lead.documents.any(pending_doc))
+                .distinct()
             )
             lead_ids = [str(row[0]) for row in result.all()]
             logger.info("fetch_all_pending_documents", count=len(lead_ids))

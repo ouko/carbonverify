@@ -1337,6 +1337,8 @@ class LeadDocument(Base):
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    fetch_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_fetch_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )

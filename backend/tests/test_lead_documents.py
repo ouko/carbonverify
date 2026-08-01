@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock, Mock
 
 from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum
 from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetcher
@@ -37,6 +37,12 @@ async def test_get_lead_documents_empty(client: AsyncClient, operator_headers):
     resp = await client.get(f"/leads/{lead_id}/documents", headers=operator_headers)
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_lead_documents_missing_lead(client: AsyncClient, operator_headers):
+    resp = await client.get("/leads/00000000-0000-0000-0000-000000000000/documents", headers=operator_headers)
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -81,7 +87,7 @@ async def test_fetch_lead_documents_task(async_db_session, sample_lead):
             with patch("app.tasks.pre_audit_jobs.RegistryDocumentFetcher") as MockFetcher:
                 mock_fetcher = MagicMock()
                 mock_fetcher.fetch_document = AsyncMock(return_value=MagicMock())
-                mock_fetcher.close = MagicMock()
+                mock_fetcher.close = AsyncMock()
                 MockFetcher.return_value = mock_fetcher
 
                 fetch_lead_documents(str(sample_lead.id))
@@ -101,9 +107,13 @@ async def test_fetch_document_success(async_db_session, sample_lead):
     await async_db_session.commit()
     await async_db_session.refresh(doc)
 
+    mock_scanner = MagicMock()
+    mock_scanner.scan_buffer = AsyncMock(return_value=MagicMock(status="clean"))
+
     fetcher = RegistryDocumentFetcher()
-    with patch.object(fetcher.client, "get") as mock_get, \
-         patch.object(fetcher, "_upload_to_s3") as mock_upload:
+    with patch.object(fetcher.client, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(fetcher, "_upload_to_s3", new_callable=AsyncMock) as mock_upload, \
+         patch("app.services.lead_intelligence.document_fetcher.get_scanner", return_value=mock_scanner):
         mock_response = MagicMock()
         mock_response.content = b"PDF content"
         mock_response.headers = {"content-type": "application/pdf"}
@@ -112,12 +122,17 @@ async def test_fetch_document_success(async_db_session, sample_lead):
         mock_get.return_value = mock_response
         mock_upload.return_value = None
 
-        result = await fetcher.fetch_document(doc)
+        result = await fetcher.fetch_document(
+            doc,
+            lead_id=str(sample_lead.id),
+            registry_source=sample_lead.registry_source.value,
+        )
 
     assert result.status == LeadDocumentStatusEnum.fetched
     assert result.file_hash_sha256 is not None
     assert result.mime_type == "application/pdf"
-    fetcher.close()
+    assert result.fetch_attempts == 1
+    await fetcher.close()
 
 
 @pytest.mark.asyncio
@@ -132,14 +147,19 @@ async def test_fetch_document_failure(async_db_session, sample_lead):
     await async_db_session.refresh(doc)
 
     fetcher = RegistryDocumentFetcher()
-    with patch.object(fetcher.client, "get") as mock_get:
+    with patch.object(fetcher.client, "get", new_callable=AsyncMock) as mock_get:
         mock_get.side_effect = Exception("connection refused")
 
-        result = await fetcher.fetch_document(doc)
+        result = await fetcher.fetch_document(
+            doc,
+            lead_id=str(sample_lead.id),
+            registry_source=sample_lead.registry_source.value,
+        )
 
     assert result.status == LeadDocumentStatusEnum.failed
     assert "connection refused" in result.error_message
-    fetcher.close()
+    assert result.fetch_attempts == 1
+    await fetcher.close()
 
 
 def test_parse_cdm_documents():

@@ -137,6 +137,9 @@ async def get_lead_documents(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_viewer),
 ):
+    lead = await db.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
     result = await db.execute(
         select(LeadDocument).where(LeadDocument.lead_id == lead_id).order_by(LeadDocument.created_at)
     )
