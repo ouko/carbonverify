@@ -9,7 +9,7 @@ celery_app = Celery(
     "carbonverify",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.compliance_jobs", "app.validation_engine.tasks"],
+    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.validation_engine.tasks"],
 )
 
 celery_app.conf.update(

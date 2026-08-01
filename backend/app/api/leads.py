@@ -16,7 +16,7 @@ from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer, require_admin
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 from app.services.lead_intelligence.factory import get_scraper, list_scrapers, health_check_all
-from app.tasks.lead_jobs import fetch_lead_documents_task
+from app.tasks.pre_audit_jobs import fetch_lead_documents as fetch_lead_documents_task
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

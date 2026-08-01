@@ -1,10 +1,11 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum
 from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetcher
+from app.tasks.pre_audit_jobs import fetch_lead_documents
 from app.services.lead_intelligence.cdm import _parse_cdm_documents
 from app.services.lead_intelligence.gold_standard import _parse_gold_standard_documents
 from app.services.lead_intelligence.verra import _parse_verra_documents
@@ -50,6 +51,43 @@ async def test_fetch_lead_documents_queued(client: AsyncClient, operator_headers
     resp = await client.post(f"/leads/{lead_id}/fetch-documents", headers=operator_headers)
     assert resp.status_code == 202
     assert resp.json()["lead_id"] == lead_id
+
+
+class _FakeSessionContext:
+    def __init__(self, session):
+        self.session = session
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_fetch_lead_documents_task(async_db_session, sample_lead):
+    with patch(
+        "app.tasks.pre_audit_jobs.AsyncSessionLocal",
+        return_value=_FakeSessionContext(async_db_session),
+    ):
+        with patch("app.tasks.pre_audit_jobs.get_scraper") as mock_factory:
+            mock_scraper = MagicMock()
+            mock_scraper.fetch_documents.return_value = [
+                {"document_type": "pdd", "source_url": "https://example.com/pdd.pdf", "title": "PDD"}
+            ]
+            mock_scraper.close = MagicMock()
+            mock_factory.return_value = mock_scraper
+
+            with patch("app.tasks.pre_audit_jobs.RegistryDocumentFetcher") as MockFetcher:
+                mock_fetcher = MagicMock()
+                mock_fetcher.fetch_document = AsyncMock(return_value=MagicMock())
+                mock_fetcher.close = MagicMock()
+                MockFetcher.return_value = mock_fetcher
+
+                fetch_lead_documents(str(sample_lead.id))
+
+    mock_scraper.fetch_documents.assert_called_once()
+    mock_fetcher.fetch_document.assert_called_once()
 
 
 @pytest.mark.asyncio

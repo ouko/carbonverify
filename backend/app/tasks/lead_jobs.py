@@ -10,6 +10,7 @@ from app.database import AsyncSessionLocal
 from app.models import Lead, LeadWorkflowStatusEnum, ScraperRun
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 from app.services.lead_intelligence.factory import get_scraper, list_scrapers
+from app.tasks.pre_audit_jobs import fetch_lead_documents
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,6 +39,7 @@ def scrape_registries(self, country: str = "Kenya"):
         async with AsyncSessionLocal() as db:
             total_created = 0
             total_updated = 0
+            created_or_updated: list[Lead] = []
 
             for source in list_scrapers():
                 scraper = get_scraper(source)
@@ -93,6 +95,7 @@ def scrape_registries(self, country: str = "Kenya"):
                         lead.priority = priority
                         lead.last_scored_at = datetime.now(timezone.utc)
                         lead.updated_at = datetime.now(timezone.utc)
+                        created_or_updated.append(lead)
                         total_updated += 1
                         source_updated += 1
                     else:
@@ -123,7 +126,9 @@ def scrape_registries(self, country: str = "Kenya"):
                         if raw.get("last_verification_date"):
                             lead_data["last_verification_date"] = date.fromisoformat(raw["last_verification_date"])
 
-                        db.add(Lead(**lead_data))
+                        lead = Lead(**lead_data)
+                        db.add(lead)
+                        created_or_updated.append(lead)
                         total_created += 1
                         source_created += 1
 
@@ -141,6 +146,10 @@ def scrape_registries(self, country: str = "Kenya"):
                 ))
 
             await db.commit()
+
+            for lead in created_or_updated:
+                fetch_lead_documents.delay(str(lead.id))
+
             logger.info("task_scrape_registries_completed", created=total_created, updated=total_updated)
             return {"created": total_created, "updated": total_updated}
 
@@ -222,15 +231,3 @@ def check_lead_deadlines(self):
     except Exception as exc:
         logger.error("task_check_lead_deadlines_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=300)
-
-
-@celery_app.task(bind=True, max_retries=3)
-def fetch_lead_documents_task(self, lead_id: str):
-    """Stub: queue lead document fetching for a single lead.
-
-    Full implementation will scan the lead's registry URL, discover linked
-    documents, persist LeadDocument rows, and fetch them into S3.
-    """
-    logger.info("task_fetch_lead_documents_started", lead_id=lead_id)
-    # TODO: implement document discovery and fetching in Task 6
-    return {"lead_id": lead_id, "status": "queued"}
