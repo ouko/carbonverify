@@ -1,0 +1,275 @@
+# AI Pre-Audit User Guide
+
+**Purpose:** Use CarbonVerify to discover carbon-credit opportunities on public registries, gather their available documents, and run AI-assisted pre-audit checks so that human auditors spend less time chasing missing paperwork and more time validating substance.
+
+**Audience:** Operators, auditors, and project managers who want to shorten verification timelines.
+
+---
+
+## What this guide covers
+
+1. The pre-audit concept
+2. What CarbonVerify can do today
+3. Recommended manual workflow (now)
+4. Automated workflow (coming next)
+5. Interpreting AI pre-audit results
+6. Best practices
+
+---
+
+## 1. The pre-audit concept
+
+A traditional audit flow looks like this:
+
+```
+Project developer submits documents
+        ↓
+Auditor reviews and finds gaps
+        ↓
+Developer fixes gaps
+        ↓
+Auditor reviews again
+        ↓
+Report submitted to registry
+```
+
+The biggest delays happen in the first two steps: documents are incomplete, inconsistent, or missing required sections, and the auditor spends days identifying those gaps.
+
+A **pre-audit** flips this around:
+
+```
+CarbonVerify discovers project on registry
+        ↓
+Public documents are pulled automatically
+        ↓
+AI checks completeness + consistency
+        ↓
+Gap report is produced
+        ↓
+Developer fixes gaps BEFORE auditor assignment
+        ↓
+Auditor receives a clean, pre-checked package
+```
+
+Result: fewer back-and-forth cycles, faster verification, and lower cost for both auditors and project developers.
+
+---
+
+## 2. What CarbonVerify can do today
+
+### 2.1 Discover opportunities on registries
+
+CarbonVerify can scrape three major carbon registries:
+
+- **Verra (Verified Carbon Standard)**
+- **Gold Standard**
+- **UNFCCC CDM (Clean Development Mechanism)**
+
+To run a scrape:
+
+1. Log in as an **operator** or **admin**.
+2. Go to **Core → Lead Intelligence**.
+3. Click **Run Scrape**.
+4. The system will contact each registry and create/update `Lead` records.
+
+Each lead shows:
+- Project name, developer, country, methodology
+- Registry status (e.g., "under validation", "registered", "verification pending")
+- Crediting period and last verification date
+- A **stuck score** that tells you how long the project has been stalled
+
+> **Note:** Live scraping can be blocked by registry anti-bot protection. If a registry blocks the request, CarbonVerify falls back to representative demo data so the UI still works. Set `LEAD_SCRAPER_MODE=live` in your environment to attempt live scraping.
+
+### 2.2 Review and prioritize leads
+
+The Lead Intelligence page has two views:
+
+- **Table view** — sort and filter by registry, priority, status, or country.
+- **Kanban view** — move leads through `new → contacted → qualified → proposal_sent → converted`.
+
+Use the stuck score and priority to decide which projects are worth pursuing. High stuck-score projects are usually the ones that have been waiting longest for verification help.
+
+### 2.3 Build validation workflows with AI evaluation
+
+CarbonVerify includes a **Workflow Validation Engine**. You can create workflows that:
+
+- Fetch data from APIs or databases
+- Run rule-based decision gates
+- Call the Kimi AI for document evaluation
+- Generate proof artifacts and audit trails
+
+To create a pre-audit workflow:
+
+1. Go to **Core → Workflow Builder**.
+2. Click **New Workflow** or start from the **Document quality gate** template.
+3. Add an `AI Evaluation` step.
+4. In the step config, write a prompt that asks the AI to review a Project Design Document (PDD) or monitoring report for completeness.
+5. Set a **pass threshold** (e.g., `0.75`).
+6. Wire the success path to `end` and the failure path to a `Notification` step or another `AI Evaluation`.
+7. Save the workflow.
+
+Example prompt:
+
+```text
+Review the following Project Design Document for completeness against
+VCS/Gold Standard/CDM requirements. Evaluate:
+- Baseline scenario and additionality demonstration
+- Monitoring plan and data sources
+- Stakeholder consultation evidence
+- Methodology-specific requirements
+
+Return strict JSON:
+{
+  "score": 0.0-1.0,
+  "passed": true|false,
+  "gaps": ["short description", ...],
+  "risk_flags": ["description", ...],
+  "recommendation": "string"
+}
+```
+
+### 2.4 Run a workflow against a project
+
+Once a workflow exists, you can trigger it:
+
+1. Go to the workflow detail or run history page.
+2. Click **Run Workflow**.
+3. Select the project and provide any input data (e.g., document IDs, registry URLs).
+4. The run executes asynchronously. You can watch the steps complete and review proofs.
+
+The workflow produces:
+- A pass/fail result
+- Step-by-step execution log
+- Proof artifacts (hashed and anchored)
+- AI evaluation request/response records
+
+---
+
+## 3. Recommended manual workflow today
+
+Until the fully automated pipeline is implemented, you can use CarbonVerify's existing features to run an AI pre-audit manually:
+
+### Step 1 — Scrape registries
+
+Run **Lead Intelligence → Run Scrape** daily or weekly. Focus on projects whose status indicates they are pending validation or verification.
+
+### Step 2 — Qualify leads
+
+In the Lead Intelligence page:
+
+- Filter for high priority / high stuck-score leads.
+- Open the lead detail modal.
+- Check the registry URL to see public documents (PDD, monitoring report, verification report).
+- Move promising leads to `qualified` or `proposal_sent`.
+
+### Step 3 — Create a project
+
+When a lead is qualified, create a CarbonVerify project:
+
+1. Copy the project name, methodology, crediting period, and country from the lead.
+2. Go to **Projects → New Project**.
+3. Fill in the project details and save.
+
+### Step 4 — Upload available documents
+
+Download public documents from the registry URL:
+
+- PDD / Project Design Document
+- Monitoring reports
+- Verification reports
+- Stakeholder consultation records
+
+Then upload them to the project:
+
+1. Open the project detail page.
+2. Go to **Documents** or **Data Sources**.
+3. Upload each file. CarbonVerify will virus-scan, hash, and store them in S3.
+4. The system creates `DataSource` records for further processing.
+
+### Step 5 — Run the pre-audit workflow
+
+1. Go to **Core → Workflow Builder**.
+2. Open your pre-audit workflow.
+3. Click **Run Workflow**.
+4. Select the project you just created.
+5. The AI evaluation step reads the uploaded documents and returns a score + gap list.
+
+### Step 6 — Review results and act
+
+Open the run detail page:
+
+- If the workflow **passed** and the score is high, move the project to `review` and assign an auditor.
+- If the workflow found **gaps**, export the gap report and send it to the project developer. Wait for corrected documents, then re-run the workflow.
+- If the workflow **failed**, archive the project or keep it as a low-priority lead.
+
+---
+
+## 4. Automated workflow (planned)
+
+The design spec at `docs/superpowers/specs/2026-07-18-ai-pre-audit-automation-design.md` describes the fully automated version. In short, the next phase will add:
+
+- **Automatic document fetching** from registry project pages.
+- **One-click lead → project conversion** with documents already attached.
+- **Default pre-audit workflow** that runs automatically after conversion.
+- **Readiness score** displayed on the project card.
+- **Gap report routing** to the review queue.
+
+When implemented, the operator workflow will shrink to:
+
+1. Run scrape.
+2. Review projects with a **Pre-Audit Ready** badge.
+3. Approve, request info, or dismiss.
+4. Auditor receives a pre-checked package.
+
+---
+
+## 5. Interpreting AI pre-audit results
+
+### Readiness score
+
+| Score | Meaning | Suggested action |
+|-------|---------|------------------|
+| 0.80 – 1.00 | Strong package, few or no gaps | Assign to auditor |
+| 0.60 – 0.79 | Usable but has gaps | Request corrections first |
+| 0.00 – 0.59 | Major issues or missing documents | Reconsider engagement or ask for full resubmission |
+
+### Gap types
+
+- **Completeness gaps** — required sections missing from PDD/monitoring report.
+- **Consistency gaps** — numbers or statements contradict each other across documents.
+- **Methodology gaps** — project does not fully follow the claimed methodology.
+- **Evidence gaps** — stakeholder consultation, baseline data, or monitoring evidence is missing.
+
+### Risk flags
+
+Risk flags highlight issues that are likely to cause auditor pushback even if the score is passing. Always review risk flags before assigning an auditor.
+
+---
+
+## 6. Best practices
+
+- **Run scrapes regularly.** Registries update project statuses daily. A project that was "under validation" yesterday may have published new documents today.
+- **Prioritize by stuck score, not just size.** A small project that has been stuck for 18 months may convert faster than a large one stuck for 3 months.
+- **Always verify AI output.** AI pre-audit is a triage tool, not a substitute for human judgment. Auditors must still perform substantive review.
+- **Keep prompts versioned.** As methodologies and registry rules change, update the AI evaluation prompt and save a new workflow version.
+- **Feed back auditor decisions.** When an auditor confirms or rejects an AI-flagged gap, record that. It improves future pre-audit accuracy.
+- **Respect registry terms.** Only download publicly disclosed documents. Do not hammer registry servers with rapid requests; use the built-in daily scheduling.
+
+---
+
+## 7. Related documentation
+
+- `docs/WORKFLOW_VALIDATION_ENGINE.md` — technical details of the validation engine
+- `docs/superpowers/specs/2026-07-18-ai-pre-audit-automation-design.md` — implementation design spec
+- `AGENTS.md` — development commands and environment setup
+
+---
+
+## 8. Getting help
+
+If a registry scrape consistently fails:
+
+1. Check **Lead Intelligence → Scraper Health**.
+2. Review logs in `.local-logs/celery-worker.log`.
+3. Try switching `LEAD_SCRAPER_MODE` between `live` and `demo`.
+4. Ensure Playwright and Chromium are installed if running outside Docker.
