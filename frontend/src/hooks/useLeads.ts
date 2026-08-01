@@ -127,3 +127,43 @@ export function useLeadsStats() {
     },
   })
 }
+
+export interface LeadDocument {
+  id: string
+  lead_id: string
+  document_type: string
+  source_url: string
+  title?: string
+  status: 'discovered' | 'fetched' | 'failed'
+  file_hash_sha256?: string
+  s3_key?: string
+  file_size_bytes?: number
+  mime_type?: string
+  error_message?: string
+  fetched_at?: string
+  created_at: string
+}
+
+export function useLeadDocuments(leadId: string | undefined) {
+  return useQuery<LeadDocument[]>({
+    queryKey: ['leads', leadId, 'documents'],
+    queryFn: async () => {
+      const { data } = await api.get<LeadDocument[]>(`/leads/${leadId}/documents`)
+      return data
+    },
+    enabled: !!leadId,
+  })
+}
+
+export function useFetchLeadDocuments() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (leadId: string) => {
+      const { data } = await api.post(`/leads/${leadId}/fetch-documents`)
+      return data
+    },
+    onSuccess: (_, leadId) => {
+      queryClient.invalidateQueries({ queryKey: ['leads', leadId, 'documents'] })
+    },
+  })
+}

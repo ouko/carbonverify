@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import {
   Target, Search, Filter, ExternalLink, X, ArrowRight, Phone, Mail, MapPin,
-  Activity, Gauge, Clock, CheckCircle, BarChart3, RefreshCw, AlertTriangle, Wifi, WifiOff, ChevronLeft, ChevronRight,
+  Activity, Gauge, Clock, CheckCircle, BarChart3, RefreshCw, AlertTriangle, Wifi, WifiOff, ChevronLeft, ChevronRight, FileText,
 } from 'lucide-react'
-import { useLeads, useUpdateLead, useLeadsStats, useScrapeLeads, useScraperHealth, useScraperHistory } from '../hooks/useLeads'
+import { useLeads, useUpdateLead, useLeadsStats, useScrapeLeads, useScraperHealth, useScraperHistory, useLeadDocuments, useFetchLeadDocuments } from '../hooks/useLeads'
 import LoadingSpinner from '../components/LoadingSpinner'
 import type { Lead, LeadWorkflowStatus, LeadPriority } from '../types'
 
@@ -47,6 +47,8 @@ function StuckScoreBar({ score }: { score: number }) {
 
 function LeadDetailModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const updateLead = useUpdateLead()
+  const { data: documents, isLoading: documentsLoading, isError: documentsError } = useLeadDocuments(lead.id)
+  const fetchDocuments = useFetchLeadDocuments()
   const [notes, setNotes] = useState(lead.notes || '')
   const [leadStatus, setLeadStatus] = useState<LeadWorkflowStatus>(lead.lead_status)
   const [priority, setPriority] = useState<LeadPriority>(lead.priority)
@@ -174,6 +176,77 @@ function LeadDetailModal({ lead, onClose }: { lead: Lead; onClose: () => void })
               <ExternalLink className="h-3.5 w-3.5" /> View on {REGISTRY_LABELS[lead.registry_source]}
             </a>
           )}
+
+          {/* Documents panel */}
+          <div className="border-t border-surface-100 dark:border-surface-800/50 pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Documents</p>
+              <button
+                onClick={() => fetchDocuments.mutate(lead.id)}
+                disabled={fetchDocuments.isPending}
+                className="btn-primary text-xs disabled:opacity-50"
+              >
+                {fetchDocuments.isPending ? (
+                  <><RefreshCw className="h-3.5 w-3.5 mr-1 animate-spin" /> Fetching...</>
+                ) : (
+                  <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Fetch Documents</>
+                )}
+              </button>
+            </div>
+            {documentsLoading ? (
+              <div className="flex items-center justify-center py-4 text-xs text-surface-400">
+                <RefreshCw className="h-4 w-4 mr-1.5 animate-spin" /> Loading documents...
+              </div>
+            ) : documentsError ? (
+              <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3 text-xs text-red-700 dark:text-red-300">
+                Failed to load documents.
+              </div>
+            ) : documents && documents.length > 0 ? (
+              <ul className="space-y-2">
+                {documents.map((doc) => (
+                  <li key={doc.id} className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <FileText className="h-4 w-4 text-surface-400 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
+                            {doc.title || doc.document_type}
+                          </p>
+                          <p className="text-[10px] text-surface-400 dark:text-surface-500 uppercase tracking-wider">
+                            {doc.document_type}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`badge text-[10px] capitalize ${
+                        doc.status === 'fetched'
+                          ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300'
+                          : doc.status === 'failed'
+                          ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
+                          : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
+                      }`}>
+                        {doc.status}
+                      </span>
+                    </div>
+                    <a
+                      href={doc.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" /> View source
+                    </a>
+                    {doc.error_message && (
+                      <p className="mt-1.5 text-[10px] text-red-600 dark:text-red-400">{doc.error_message}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-4 text-center text-xs text-surface-400 dark:text-surface-500">
+                No documents found. Click <strong>Fetch Documents</strong> to discover them.
+              </div>
+            )}
+          </div>
 
           {/* Edit controls */}
           <div className="border-t border-surface-100 dark:border-surface-800/50 pt-4 space-y-3">
