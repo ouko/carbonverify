@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models import Lead, User, LeadDocument, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun, AuditActionEnum
-from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadDocumentOut, LeadDocumentCreate, LeadStats, LeadScrapeRequest
+from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadDocumentOut, LeadStats, LeadScrapeRequest
 from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer, require_admin
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
@@ -131,29 +131,29 @@ async def get_lead(
     return lead
 
 
-@router.get("/{id}/documents", response_model=List[LeadDocumentOut])
+@router.get("/{lead_id}/documents", response_model=List[LeadDocumentOut])
 async def get_lead_documents(
-    id: uuid.UUID,
+    lead_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_viewer),
 ):
     result = await db.execute(
-        select(LeadDocument).where(LeadDocument.lead_id == id).order_by(LeadDocument.created_at)
+        select(LeadDocument).where(LeadDocument.lead_id == lead_id).order_by(LeadDocument.created_at)
     )
     return result.scalars().all()
 
 
-@router.post("/{id}/fetch-documents", status_code=202)
+@router.post("/{lead_id}/fetch-documents", status_code=202)
 async def fetch_lead_documents(
-    id: uuid.UUID,
+    lead_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
 ):
-    lead = await db.get(Lead, id)
+    lead = await db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    fetch_lead_documents_task.delay(str(id))
-    return {"message": "Document fetch queued", "lead_id": str(id)}
+    fetch_lead_documents_task.delay(str(lead_id))
+    return {"message": "Document fetch queued", "lead_id": str(lead_id)}
 
 
 @router.patch("/{lead_id}", response_model=LeadOut)
