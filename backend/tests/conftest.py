@@ -112,6 +112,12 @@ async def db_session(engine):
 
 
 @pytest_asyncio.fixture
+async def async_db_session(db_session):
+    """Alias for db_session used by newer tests."""
+    yield db_session
+
+
+@pytest_asyncio.fixture
 async def client(engine):
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

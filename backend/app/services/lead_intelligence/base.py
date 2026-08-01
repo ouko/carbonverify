@@ -27,6 +27,18 @@ class BaseRegistryScraper(ABC):
         """
         ...
 
+    def fetch_documents(self, lead: "Lead") -> List[Dict[str, Any]]:
+        """Return document metadata discovered on the registry page for this lead.
+
+        Each dict must contain at least:
+        - document_type: str (e.g. "pdd", "monitoring_report", "verification_report")
+        - source_url: str
+        - title: Optional[str]
+
+        Subclasses should override this method.
+        """
+        return []
+
     def close(self) -> None:
         """Clean up any resources (HTTP clients, browsers, etc.)."""
         pass
