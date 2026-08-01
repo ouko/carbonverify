@@ -128,7 +128,29 @@ Return strict JSON:
 }
 ```
 
-### 2.4 Run a workflow against a project
+### 2.4 View and fetch registry documents
+
+When a lead is scraped, CarbonVerify attempts to discover publicly available documents on the registry project page:
+
+- Project Design Document (PDD)
+- Monitoring reports
+- Verification / validation reports
+
+To see discovered documents:
+
+1. Open a lead's detail modal in **Lead Intelligence**.
+2. Scroll to the **Documents** section.
+3. Each document shows its type, title, status (`discovered`, `fetched`, `failed`), and a link to the original registry URL.
+
+To download documents into CarbonVerify:
+
+1. Click **Fetch Documents** in the documents section.
+2. The system queues an async job that downloads each document, scans it, stores it in S3, and records its SHA-256 hash.
+3. Refresh the modal to see updated `fetched` statuses.
+
+Fetched documents can later be converted into project `FileUpload` / `DataSource` records when the lead is promoted to a project.
+
+### 2.5 Run a workflow against a project
 
 Once a workflow exists, you can trigger it:
 
@@ -159,7 +181,7 @@ In the Lead Intelligence page:
 
 - Filter for high priority / high stuck-score leads.
 - Open the lead detail modal.
-- Check the registry URL to see public documents (PDD, monitoring report, verification report).
+- Review discovered documents in the **Documents** section; click **Fetch Documents** to download them.
 - Move promising leads to `qualified` or `proposal_sent`.
 
 ### Step 3 — Create a project
@@ -172,7 +194,7 @@ When a lead is qualified, create a CarbonVerify project:
 
 ### Step 4 — Upload available documents
 
-Download public documents from the registry URL:
+Documents discovered in the lead modal can be downloaded from their source URLs. You can also download public documents directly from the registry URL:
 
 - PDD / Project Design Document
 - Monitoring reports
@@ -185,6 +207,8 @@ Then upload them to the project:
 2. Go to **Documents** or **Data Sources**.
 3. Upload each file. CarbonVerify will virus-scan, hash, and store them in S3.
 4. The system creates `DataSource` records for further processing.
+
+> **Tip:** After Phase 2 is implemented, fetched lead documents will be converted into project documents automatically when a lead is promoted.
 
 ### Step 5 — Run the pre-audit workflow
 
@@ -204,17 +228,18 @@ Open the run detail page:
 
 ---
 
-## 4. Automated workflow (planned)
+## 4. Automated workflow
 
-The design spec at `docs/superpowers/specs/2026-07-18-ai-pre-audit-automation-design.md` describes the fully automated version. In short, the next phase will add:
+Phase 1 (document discovery and download) is now implemented. The Lead Intelligence page automatically discovers and fetches publicly available registry documents for each scraped lead.
 
-- **Automatic document fetching** from registry project pages.
-- **One-click lead → project conversion** with documents already attached.
+The design spec at `docs/superpowers/specs/2026-07-18-ai-pre-audit-automation-design.md` describes the remaining phases, which will add:
+
+- **One-click lead → project conversion** with fetched documents already attached as project `DataSource` records.
 - **Default pre-audit workflow** that runs automatically after conversion.
 - **Readiness score** displayed on the project card.
 - **Gap report routing** to the review queue.
 
-When implemented, the operator workflow will shrink to:
+When fully implemented, the operator workflow will shrink to:
 
 1. Run scrape.
 2. Review projects with a **Pre-Audit Ready** badge.
