@@ -1,10 +1,8 @@
 """Celery tasks for AI pre-audit document discovery and fetching."""
 
 import asyncio
-from datetime import datetime, timezone
 from typing import List
 
-from celery.exceptions import Retry
 from sqlalchemy import select
 
 from app.core.logging import get_logger
@@ -91,8 +89,6 @@ def fetch_lead_documents(self, lead_id: str) -> None:
 
     try:
         run_async(_run())
-    except Retry:
-        raise
     except Exception as exc:
         logger.error("fetch_lead_documents_failed", lead_id=lead_id, error=str(exc))
         raise self.retry(exc=exc, countdown=60)
@@ -116,8 +112,6 @@ def fetch_all_pending_documents(self) -> None:
 
     try:
         run_async(_run())
-    except Retry:
-        raise
     except Exception as exc:
         logger.error("fetch_all_pending_documents_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=60)
