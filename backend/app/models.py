@@ -1298,6 +1298,50 @@ class Lead(Base):
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     assignee: Mapped[Optional["User"]] = relationship("User")
+    documents: Mapped[List["LeadDocument"]] = relationship(
+        "LeadDocument", back_populates="lead", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class LeadDocumentStatusEnum(str, PyEnum):
+    discovered = "discovered"
+    fetched = "fetched"
+    failed = "failed"
+
+
+class LeadDocument(Base):
+    __tablename__ = "lead_documents"
+
+    __table_args__ = (
+        Index("ix_lead_documents_lead_id", "lead_id"),
+        Index("ix_lead_documents_document_type", "document_type"),
+        Index("ix_lead_documents_status", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("leads.id", ondelete="CASCADE"), nullable=False
+    )
+    document_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    file_hash_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    s3_key: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    s3_bucket: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    mime_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[LeadDocumentStatusEnum] = mapped_column(
+        Enum(LeadDocumentStatusEnum, name="lead_document_status"),
+        default=LeadDocumentStatusEnum.discovered,
+        nullable=False,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    lead: Mapped["Lead"] = relationship("Lead", back_populates="documents")
 
 
 class ScraperRun(Base):
