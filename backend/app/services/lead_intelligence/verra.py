@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 import httpx
+from bs4 import BeautifulSoup
 
 from app.services.lead_intelligence.base import BaseRegistryScraper
 from app.core.logging import get_logger
@@ -208,6 +209,42 @@ def _scrape_verra_with_playwright(country: str) -> List[Dict[str, Any]]:
     return leads
 
 
+VERRA_DOCUMENT_TYPE_MAP = {
+    "project description": "pdd",
+    "pdd": "pdd",
+    "monitoring report": "monitoring_report",
+    "verification report": "verification_report",
+    "validation report": "validation_report",
+}
+
+
+def _parse_verra_documents(html: str) -> List[Dict[str, Any]]:
+    """Parse a Verra project detail page for document links."""
+    soup = BeautifulSoup(html, "html.parser")
+    documents = []
+
+    for link in soup.find_all("a", href=True):
+        href = link.get("href", "")
+        text = link.get_text(strip=True).lower()
+        if ".pdf" not in href.lower() and ".docx" not in href.lower():
+            continue
+
+        doc_type = "document"
+        for key, value in VERRA_DOCUMENT_TYPE_MAP.items():
+            if key in text:
+                doc_type = value
+                break
+
+        url = href if href.startswith("http") else f"https://registry.verra.org{href}"
+        documents.append({
+            "document_type": doc_type,
+            "source_url": url,
+            "title": link.get_text(strip=True),
+        })
+
+    return documents
+
+
 class VerraScraper(BaseRegistryScraper):
     source = "verra"
 
@@ -241,6 +278,17 @@ class VerraScraper(BaseRegistryScraper):
                 logger.warning("verra_fetch_error", project_id=project_id, attempt=attempt, error=str(exc))
                 time.sleep(settings.LEAD_SCRAPER_RETRY_DELAY)
         return None
+
+    def fetch_documents(self, lead: "Lead") -> List[Dict[str, Any]]:
+        if not lead.registry_url:
+            return []
+
+        project_id = lead.registry_url.split("/")[-1]
+        html = self._fetch_project_page(project_id)
+        if not html:
+            return []
+
+        return _parse_verra_documents(html)
 
     def health_check(self) -> Dict[str, Any]:
         """Check if Verra scraping is functional."""
