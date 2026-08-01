@@ -222,3 +222,15 @@ def check_lead_deadlines(self):
     except Exception as exc:
         logger.error("task_check_lead_deadlines_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=300)
+
+
+@celery_app.task(bind=True, max_retries=3)
+def fetch_lead_documents_task(self, lead_id: str):
+    """Stub: queue lead document fetching for a single lead.
+
+    Full implementation will scan the lead's registry URL, discover linked
+    documents, persist LeadDocument rows, and fetch them into S3.
+    """
+    logger.info("task_fetch_lead_documents_started", lead_id=lead_id)
+    # TODO: implement document discovery and fetching in Task 6
+    return {"lead_id": lead_id, "status": "queued"}

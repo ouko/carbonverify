@@ -17,6 +17,9 @@ os.environ["SECRET_KEY"] = "test-secret-key-not-for-production"
 os.environ["WHATSAPP_VERIFY_TOKEN"] = "test-whatsapp-token"
 os.environ["IOT_WEBHOOK_API_KEY"] = "test-iot-api-key"
 os.environ["ENVIRONMENT"] = "test"
+os.environ["CELERY_BROKER_URL"] = "memory://"
+os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
 
 # Mock libmagic before any imports
 mock_magic = MagicMock()
@@ -59,6 +62,7 @@ for models_mod in [models_module, validation_models_module]:
 from app.main import app  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.auth.dependencies import get_current_user, get_current_user_or_api_key  # noqa: E402
+from app.auth.security import create_access_token  # noqa: E402
 from app.models import User, UserRoleEnum  # noqa: E402
 
 # Register UUID adapter for sqlite3
@@ -156,3 +160,24 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest_asyncio.fixture
+async def operator_headers(engine):
+    """Return Authorization headers for a freshly-created operator user."""
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    user_id = uuid.uuid4()
+    async with async_session() as session:
+        user = User(
+            id=user_id,
+            email=f"operator{user_id.hex[:8]}@carbonverify.io",
+            email_hash=compute_searchable_hash(f"operator{user_id.hex[:8]}@carbonverify.io"),
+            name="Test Operator",
+            role=UserRoleEnum.operator,
+            mfa_enabled=False,
+            hashed_password="hashed",
+        )
+        session.add(user)
+        await session.commit()
+    token = create_access_token(str(user_id))
+    return {"Authorization": f"Bearer {token}"}

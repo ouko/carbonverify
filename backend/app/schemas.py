@@ -827,6 +827,30 @@ class LeadOut(LeadBase, ORMBase):
     assigned_to: Optional[uuid.UUID] = None
 
 
+class LeadDocumentBase(BaseModel):
+    document_type: str
+    source_url: str
+    title: Optional[str] = None
+    status: Optional[str] = "discovered"
+
+
+class LeadDocumentCreate(LeadDocumentBase):
+    lead_id: uuid.UUID
+
+
+class LeadDocumentOut(LeadDocumentBase, ORMBase):
+    id: uuid.UUID
+    lead_id: uuid.UUID
+    file_hash_sha256: Optional[str] = None
+    s3_key: Optional[str] = None
+    s3_bucket: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+    mime_type: Optional[str] = None
+    error_message: Optional[str] = None
+    fetched_at: Optional[datetime] = None
+    created_at: datetime
+
+
 class LeadScoreRequest(BaseModel):
     recompute_all: bool = False
 
