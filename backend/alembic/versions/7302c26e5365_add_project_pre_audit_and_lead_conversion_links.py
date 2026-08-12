@@ -30,9 +30,9 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('passed', 'gaps', 'failed', name='pre_audit_status'), nullable=False),
     sa.Column('gap_summary', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['lead_id'], ['leads.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['validation_run_id'], ['validation_runs.id']),
+    sa.ForeignKeyConstraint(['lead_id'], ['leads.id'], name='fk_project_pre_audits_lead_id', ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], name='fk_project_pre_audits_project_id', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['validation_run_id'], ['validation_runs.id'], name='fk_project_pre_audits_validation_run_id'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_project_pre_audits_project_id', 'project_pre_audits', ['project_id'], unique=False)
@@ -52,6 +52,9 @@ def downgrade() -> None:
     op.drop_column('lead_documents', 'file_upload_id')
     op.drop_index('ix_project_pre_audits_status', table_name='project_pre_audits')
     op.drop_index('ix_project_pre_audits_project_id', table_name='project_pre_audits')
+    op.drop_constraint('fk_project_pre_audits_validation_run_id', 'project_pre_audits', type_='foreignkey')
+    op.drop_constraint('fk_project_pre_audits_project_id', 'project_pre_audits', type_='foreignkey')
+    op.drop_constraint('fk_project_pre_audits_lead_id', 'project_pre_audits', type_='foreignkey')
     op.drop_table('project_pre_audits')
     postgresql.ENUM('passed', 'gaps', 'failed', name='pre_audit_status').drop(op.get_bind())
     # ### end Alembic commands ###
