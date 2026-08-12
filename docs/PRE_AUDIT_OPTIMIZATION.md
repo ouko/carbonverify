@@ -158,7 +158,28 @@ Keep the existing Playwright fallback so demo mode and blocked networks still wo
 
 ---
 
-## 4. Recommended user workflow for a consultant
+## 4. Where the AI evaluation happens and how to read it
+
+The AI pre-audit is implemented as an `ai_evaluation` step inside the `pre_audit_document_package` Workflow Validation Engine workflow. You can trace it through:
+
+1. **Backend code:** `app/services/lead_intelligence/pre_audit_runner.py` builds document excerpts and calls `ValidationOrchestrator`.
+2. **Workflow definition:** `app/services/lead_intelligence/pre_audit_workflow.py` defines the default `pre_audit_document_package` graph.
+3. **AI executor:** `app/validation_engine/executors/ai_evaluation.py` sends the prompt to the Kimi API and parses the JSON response.
+4. **Results:** `ProjectPreAudit` records are stored in `project_pre_audits`; the latest score and gap summary are returned by `GET /projects/{project_id}/pre-audit` and included in `GET /leads/opportunities/pending`.
+
+### Interpreting the output
+
+| Field | Meaning |
+|-------|---------|
+| `readiness_score` | 0.0–1.0 estimate of how audit-ready the document package is |
+| `status` | `passed` (≥ threshold, typically 0.7), `gaps` (minor issues), or `failed` (major blockers) |
+| `gap_summary.gaps` | List of missing or weak documents/sections |
+| `gap_summary.risk_flags` | Red flags that auditors should investigate |
+| `gap_summary.recommendation` | Actionable next step (e.g., "Ready for auditor assignment" or "Upload monitoring report Q3") |
+
+The threshold is configurable per workflow step via `pass_threshold`. A project does **not** replace a real VVB audit — it is a preparation filter so auditors spend less time on incomplete packages.
+
+## 5. Recommended user workflow for a consultant
 
 If you are a consultant evaluating whether CarbonVerify can help a portfolio of projects, use this workflow:
 
@@ -203,7 +224,7 @@ re-audit-changed-projects  (re-scores converted projects with changed docs)
 
 ---
 
-## 5. Implementation priority
+## 6. Implementation priority
 
 The following optimizations are already implemented:
 
