@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **JWT refresh token uniqueness** — Added `jti` (JWT ID) claim to prevent hash collisions when multiple refresh tokens are issued within the same microsecond
 
 ### Performance
+- **Concurrent pre-audit document extraction** — `PreAuditRunner._build_document_excerpts` now fetches S3 bytes and extracts text from each project document in parallel (max 5 concurrent workers), reducing runtime for projects with multiple registry documents
 - **Redis connection pooling** — `health.py` and `admin.py` now reuse the global pooled connection via `app.auth.sessions._get_redis()` instead of creating/closing a new connection per request
 - **Batched COUNT queries in admin stats** — `GET /admin/stats` now uses `asyncio.gather()` to parallelize role counts and status breakdowns (was ~10 sequential round-trips)
 - **Batched COUNT queries in dashboard stats** — `GET /dashboard/stats` now fully parallelizes all scalar queries with `asyncio.gather()` (was sequential)
