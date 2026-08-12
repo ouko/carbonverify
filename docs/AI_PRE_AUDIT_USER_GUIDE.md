@@ -248,6 +248,36 @@ You can also trigger conversion and pre-audit manually for a single lead:
 
 The daily scrape job (`scrape_registries`) queues the pre-audit pipeline automatically, so the nightly workflow is fully hands-off.
 
+### 4.1 Targeting unaudited / pending-validation opportunities
+
+By default, the scraper imports projects in any status. To focus on the projects where pre-audit saves the most time, configure the pipeline to target *pending* statuses:
+
+1. Open `backend/.env` (or your deployment environment).
+2. Ensure `LEAD_SCRAPER_MODE=live`.
+3. (Optional) Set registry-specific status filters if they are exposed in your deployment's scraper configuration.
+4. Run **Lead Intelligence → Run Scrape**.
+5. Sort the lead table by **Status** and look for:
+   - Verra: `under_validation`, `under_verification`, `registration_requested`, `under_development`
+   - Gold Standard: `under_validation`, `under_certification`
+   - CDM: `validation`, `registration_requested`
+
+For a deeper optimization roadmap — including the Verra UI API, incremental document fetching, batch AI evaluation, and third-party aggregator integrations — see [`docs/PRE_AUDIT_OPTIMIZATION.md`](./PRE_AUDIT_OPTIMIZATION.md).
+
+### 4.2 Consultant workflow: introduce projects from a registry
+
+If you are a consultant who wants to pull projects from a registry, import their documents, and see what is missing before an auditor is assigned:
+
+1. **Scrape the registry.** Go to **Core → Lead Intelligence → Run Scrape**. Select the registry and target country.
+2. **Filter for unaudited projects.** Use the status filters above, or sort by **stuck score** to find projects that have been waiting longest.
+3. **Fetch documents.** Open a lead, scroll to **Documents**, and click **Fetch Documents**. The system downloads PDDs, monitoring reports, validation reports, etc., virus-scans them, and stores them in S3.
+4. **Convert and pre-audit.** With the lead selected, call `POST /leads/{lead_id}/convert-and-pre-audit` (operator role required). The system creates a CarbonVerify `Project`, imports the fetched documents as `FileUpload` / `DataSource` records, and runs the default `pre_audit_document_package` workflow.
+5. **Review the result.** Open **Projects → {project}**. The **Pre-Audit** panel shows:
+   - Readiness score (0.00 – 1.00)
+   - Status badge (`passed`, `gaps`, or `failed`)
+   - Gap list and risk flags
+   - AI recommendation
+6. **Act on gaps.** Export the gap report, request corrected documents from the project developer, and re-run the workflow. Once the score is ≥ 0.80 and no critical risk flags remain, assign an auditor.
+
 ---
 
 ## 5. Interpreting AI pre-audit results
