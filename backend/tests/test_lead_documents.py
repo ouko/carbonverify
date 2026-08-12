@@ -202,3 +202,81 @@ def test_parse_verra_documents():
     assert docs[0]["document_type"] == "pdd"
     assert docs[0]["source_url"] == "https://registry.verra.org/api/file/123/project-description.pdf"
     assert docs[1]["document_type"] == "monitoring_report"
+
+
+@pytest.mark.asyncio
+async def test_fetch_document_sends_conditional_headers(async_db_session, sample_lead):
+    doc = LeadDocument(
+        lead_id=sample_lead.id,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        etag='"abc123"',
+        last_modified="Wed, 01 Jan 2025 00:00:00 GMT",
+    )
+    async_db_session.add(doc)
+    await async_db_session.commit()
+    await async_db_session.refresh(doc)
+
+    mock_scanner = MagicMock()
+    mock_scanner.scan_buffer = AsyncMock(return_value=MagicMock(status="clean"))
+
+    fetcher = RegistryDocumentFetcher()
+    with patch.object(fetcher.client, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(fetcher, "_upload_to_s3", new_callable=AsyncMock) as mock_upload, \
+         patch("app.services.lead_intelligence.document_fetcher.get_scanner", return_value=mock_scanner):
+        mock_response = MagicMock()
+        mock_response.content = b"PDF content"
+        mock_response.headers = {
+            "content-type": "application/pdf",
+            "etag": '"xyz789"',
+            "last-modified": "Thu, 02 Jan 2025 00:00:00 GMT",
+        }
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        result = await fetcher.fetch_document(
+            doc,
+            lead_id=str(sample_lead.id),
+            registry_source=sample_lead.registry_source.value,
+        )
+
+    assert result.status == LeadDocumentStatusEnum.fetched
+    assert result.etag == '"xyz789"'
+    assert result.last_modified == "Thu, 02 Jan 2025 00:00:00 GMT"
+    mock_get.assert_called_once()
+    call_headers = mock_get.call_args.kwargs["headers"]
+    assert call_headers["If-None-Match"] == '"abc123"'
+    assert call_headers["If-Modified-Since"] == "Wed, 01 Jan 2025 00:00:00 GMT"
+    await fetcher.close()
+
+
+@pytest.mark.asyncio
+async def test_fetch_document_not_modified_skips_upload(async_db_session, sample_lead):
+    doc = LeadDocument(
+        lead_id=sample_lead.id,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        etag='"abc123"',
+    )
+    async_db_session.add(doc)
+    await async_db_session.commit()
+    await async_db_session.refresh(doc)
+
+    fetcher = RegistryDocumentFetcher()
+    with patch.object(fetcher.client, "get", new_callable=AsyncMock) as mock_get, \
+         patch.object(fetcher, "_upload_to_s3", new_callable=AsyncMock) as mock_upload:
+        mock_response = MagicMock()
+        mock_response.status_code = 304
+        mock_get.return_value = mock_response
+
+        result = await fetcher.fetch_document(
+            doc,
+            lead_id=str(sample_lead.id),
+            registry_source=sample_lead.registry_source.value,
+        )
+
+    assert result.status == LeadDocumentStatusEnum.fetched
+    assert result.fetched_at is not None
+    mock_upload.assert_not_called()
+    await fetcher.close()

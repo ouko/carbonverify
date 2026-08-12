@@ -53,7 +53,25 @@ class RegistryDocumentFetcher:
                 lead_document_id=str(lead_document.id),
                 attempt=lead_document.fetch_attempts,
             )
-            resp = await self.client.get(lead_document.source_url)
+            headers = {}
+            if lead_document.etag:
+                headers["If-None-Match"] = lead_document.etag
+            if lead_document.last_modified:
+                headers["If-Modified-Since"] = lead_document.last_modified
+
+            resp = await self.client.get(lead_document.source_url, headers=headers)
+
+            if resp.status_code == 304:
+                logger.info(
+                    "lead_document_not_modified",
+                    lead_document_id=str(lead_document.id),
+                    source_url=lead_document.source_url,
+                )
+                lead_document.status = LeadDocumentStatusEnum.fetched
+                lead_document.fetched_at = datetime.now(timezone.utc)
+                lead_document.error_message = None
+                return lead_document
+
             resp.raise_for_status()
             content = resp.content
 
@@ -102,6 +120,8 @@ class RegistryDocumentFetcher:
             lead_document.mime_type = mime_type
             lead_document.fetched_at = datetime.now(timezone.utc)
             lead_document.error_message = None
+            lead_document.etag = resp.headers.get("etag") or lead_document.etag
+            lead_document.last_modified = resp.headers.get("last-modified") or lead_document.last_modified
 
             logger.info(
                 "lead_document_fetched",

@@ -1381,6 +1381,8 @@ class LeadDocument(Base):
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     fetch_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_fetch_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    etag: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_modified: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     file_upload_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("file_uploads.id"), nullable=True
     )
