@@ -3,7 +3,7 @@
 import asyncio
 import hashlib
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Iterable, Optional
 
 import httpx
 
@@ -14,6 +14,21 @@ from app.services.clamav_scanner import get_scanner, ScanStatus
 
 logger = get_logger(__name__)
 settings = get_settings()
+
+
+def compute_document_fingerprint(documents: Iterable[LeadDocument]) -> str:
+    """Return a SHA-256 hash representing the current set of fetched documents.
+
+    The fingerprint changes when a document's source URL or content hash changes,
+    so it can be used to skip redundant pre-audit runs.
+    """
+    parts = []
+    for doc in documents:
+        if doc.status != LeadDocumentStatusEnum.fetched:
+            continue
+        parts.append(f"{doc.source_url}|{doc.file_hash_sha256 or ''}")
+    canonical = "\n".join(sorted(parts))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class RegistryDocumentFetcher:

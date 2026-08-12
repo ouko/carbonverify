@@ -1338,6 +1338,7 @@ class Lead(Base):
     converted_project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )
+    document_fingerprint: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     assignee: Mapped[Optional["User"]] = relationship("User")
     documents: Mapped[List["LeadDocument"]] = relationship(

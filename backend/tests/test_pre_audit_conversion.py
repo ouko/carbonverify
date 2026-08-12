@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
 import json
+import hashlib
 import uuid
 import pytest
 import pytest_asyncio
@@ -11,10 +12,14 @@ from app.models import (
     Lead,
     LeadDocument,
     LeadDocumentStatusEnum,
+    LeadProjectStatusEnum,
     LeadRegistrySourceEnum,
     LeadWorkflowStatusEnum,
+    MethodologyEnum,
     PreAuditStatusEnum,
+    Project,
     ProjectPreAudit,
+    ProjectStatusEnum,
     User,
 )
 from app.services.lead_intelligence.document_text import extract_text_async
@@ -249,6 +254,107 @@ async def test_run_pre_audit_pipeline_pending_only(async_db_session):
     queued_ids = [call[0][0] for call in mock_convert.delay.call_args_list]
     assert str(pending_lead.id) in queued_ids
     assert str(registered_lead.id) not in queued_ids
+
+
+@pytest.mark.asyncio
+async def test_fetch_lead_documents_updates_fingerprint(async_db_session):
+    from app.tasks.pre_audit_jobs import fetch_lead_documents
+
+    lead = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="FP-001",
+        project_name="Fingerprint Lead",
+        lead_status=LeadWorkflowStatusEnum.new,
+    )
+    doc = LeadDocument(
+        lead=lead,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        status=LeadDocumentStatusEnum.discovered,
+    )
+    async_db_session.add_all([lead, doc])
+    await async_db_session.commit()
+    await async_db_session.refresh(lead)
+
+    with patch(
+        "app.tasks.pre_audit_jobs.AsyncSessionLocal",
+        return_value=_FakeSessionContext(async_db_session),
+    ):
+        with patch("app.tasks.pre_audit_jobs.get_scraper") as mock_factory:
+            mock_scraper = MagicMock()
+            mock_scraper.fetch_documents.return_value = [
+                {
+                    "document_type": "pdd",
+                    "source_url": "https://example.com/pdd.pdf",
+                    "title": "PDD",
+                }
+            ]
+            mock_scraper.close = MagicMock()
+            mock_factory.return_value = mock_scraper
+
+            with patch("app.tasks.pre_audit_jobs.RegistryDocumentFetcher") as MockFetcher:
+                async def _fake_fetch(document, lead_id, registry_source):
+                    document.status = LeadDocumentStatusEnum.fetched
+                    document.file_hash_sha256 = "abc123"
+                    return document
+
+                mock_fetcher = MagicMock()
+                mock_fetcher.fetch_document = AsyncMock(side_effect=_fake_fetch)
+                mock_fetcher.close = AsyncMock()
+                MockFetcher.return_value = mock_fetcher
+
+                fetch_lead_documents(str(lead.id))
+
+    await async_db_session.refresh(lead)
+    expected = hashlib.sha256("https://example.com/pdd.pdf|abc123".encode("utf-8")).hexdigest()
+    assert lead.document_fingerprint == expected
+
+
+@pytest.mark.asyncio
+async def test_re_audit_changed_projects(async_db_session):
+    from app.tasks.pre_audit_jobs import re_audit_changed_projects
+
+    developer = await get_or_create_system_developer(async_db_session)
+
+    lead = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="RE-001",
+        project_name="Re-audit Lead",
+        lead_status=LeadWorkflowStatusEnum.converted,
+        status=LeadProjectStatusEnum.under_validation,
+    )
+    project = Project(
+        name="Re-audit Project",
+        developer_id=developer.id,
+        methodology=MethodologyEnum.TPDDTEC_v4,
+        crediting_period_start=date(2024, 1, 1),
+        crediting_period_end=date(2030, 12, 31),
+        status=ProjectStatusEnum.onboarding,
+    )
+    async_db_session.add(project)
+    await async_db_session.flush()
+    lead.converted_project_id = project.id
+    doc = LeadDocument(
+        lead=lead,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        status=LeadDocumentStatusEnum.fetched,
+        file_hash_sha256="oldhash",
+    )
+    async_db_session.add_all([lead, doc])
+    await async_db_session.commit()
+
+    with patch(
+        "app.tasks.pre_audit_jobs.AsyncSessionLocal",
+        return_value=_FakeSessionContext(async_db_session),
+    ):
+        with patch("app.tasks.pre_audit_jobs.run_pre_audit_for_project") as mock_preaudit:
+            mock_preaudit.delay = MagicMock()
+            re_audit_changed_projects()
+
+    mock_preaudit.delay.assert_called_once_with(str(project.id), lead_id=str(lead.id))
+    await async_db_session.refresh(lead)
+    assert lead.document_fingerprint is not None
 
 
 

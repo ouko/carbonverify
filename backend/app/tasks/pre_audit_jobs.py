@@ -11,7 +11,10 @@ from app.core.logging import get_logger
 from app.database import AsyncSessionLocal
 from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadProjectStatusEnum
 from app.services.lead_intelligence.factory import get_scraper
-from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetcher
+from app.services.lead_intelligence.document_fetcher import (
+    RegistryDocumentFetcher,
+    compute_document_fingerprint,
+)
 from app.tasks.celery_app import celery_app
 
 logger = get_logger(__name__)
@@ -92,6 +95,11 @@ def fetch_lead_documents(self, lead_id: str) -> None:
                             registry_source=lead.registry_source.value,
                         )
                         await db.commit()
+
+                    # Update lead fingerprint so the pre-audit pipeline can detect changes
+                    await db.refresh(lead, attribute_names=["documents"])
+                    lead.document_fingerprint = compute_document_fingerprint(lead.documents)
+                    await db.commit()
                 finally:
                     await fetcher.close()
             finally:
@@ -258,4 +266,42 @@ def run_pre_audit_pipeline(self) -> dict:
         return run_async(_run())
     except Exception as exc:
         logger.error("run_pre_audit_pipeline_failed", error=str(exc))
+        raise self.retry(exc=exc, countdown=300)
+
+
+@celery_app.task(bind=True, max_retries=3)
+def re_audit_changed_projects(self) -> dict:
+    """Re-run pre-audit for converted projects whose fetched documents changed.
+
+    Compares each converted lead's current document fingerprint to the stored
+    fingerprint. When they differ, a new pre-audit is queued and the stored
+    fingerprint is updated.
+    """
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(Lead)
+                .where(Lead.converted_project_id.isnot(None))
+                .where(Lead.documents.any(LeadDocument.status == LeadDocumentStatusEnum.fetched))
+            )
+            leads = result.scalars().all()
+
+            queued = []
+            for lead in leads:
+                current = compute_document_fingerprint(lead.documents)
+                if lead.document_fingerprint and lead.document_fingerprint == current:
+                    continue
+
+                run_pre_audit_for_project.delay(str(lead.converted_project_id), lead_id=str(lead.id))
+                lead.document_fingerprint = current
+                queued.append(str(lead.converted_project_id))
+
+            await db.commit()
+            logger.info("re_audit_changed_projects", count=len(queued))
+            return {"queued": queued, "count": len(queued)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("re_audit_changed_projects_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=300)
