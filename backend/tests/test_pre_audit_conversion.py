@@ -186,6 +186,71 @@ async def test_run_pre_audit_pipeline_task(async_db_session, convertible_lead):
     mock_convert.delay.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_run_pre_audit_pipeline_pending_only(async_db_session):
+    from app.models import LeadProjectStatusEnum
+
+    pending_lead = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="PENDING-001",
+        project_name="Pending Project",
+        project_developer="Acme Carbon",
+        methodology="TPDDTEC_v4",
+        crediting_period_start=date(2024, 1, 1),
+        crediting_period_end=date(2030, 12, 31),
+        lead_status=LeadWorkflowStatusEnum.qualified,
+        status=LeadProjectStatusEnum.under_validation,
+    )
+    registered_lead = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="REG-001",
+        project_name="Registered Project",
+        project_developer="Acme Carbon",
+        methodology="TPDDTEC_v4",
+        crediting_period_start=date(2024, 1, 1),
+        crediting_period_end=date(2030, 12, 31),
+        lead_status=LeadWorkflowStatusEnum.qualified,
+        status=LeadProjectStatusEnum.registered,
+    )
+    pending_doc = LeadDocument(
+        lead=pending_lead,
+        document_type="pdd",
+        source_url="https://example.com/pending.pdf",
+        mime_type="application/pdf",
+        s3_key="leads/cdm/pending/pdd.pdf",
+        s3_bucket="bucket",
+        file_size_bytes=1234,
+        file_hash_sha256="abcd",
+        status=LeadDocumentStatusEnum.fetched,
+    )
+    registered_doc = LeadDocument(
+        lead=registered_lead,
+        document_type="pdd",
+        source_url="https://example.com/registered.pdf",
+        mime_type="application/pdf",
+        s3_key="leads/cdm/registered/pdd.pdf",
+        s3_bucket="bucket",
+        file_size_bytes=1234,
+        file_hash_sha256="abcd",
+        status=LeadDocumentStatusEnum.fetched,
+    )
+    async_db_session.add_all([pending_lead, registered_lead, pending_doc, registered_doc])
+    await async_db_session.commit()
+
+    with patch(
+        "app.tasks.pre_audit_jobs.AsyncSessionLocal",
+        return_value=_FakeSessionContext(async_db_session),
+    ):
+        with patch("app.tasks.pre_audit_jobs.convert_lead_to_project") as mock_convert:
+            mock_convert.delay = MagicMock()
+            with patch("app.tasks.pre_audit_jobs.settings.PRE_AUDIT_PENDING_ONLY", True):
+                run_pre_audit_pipeline()
+
+    queued_ids = [call[0][0] for call in mock_convert.delay.call_args_list]
+    assert str(pending_lead.id) in queued_ids
+    assert str(registered_lead.id) not in queued_ids
+
+
 
 @pytest.mark.asyncio
 async def test_convert_and_pre_audit_endpoint(client: AsyncClient, operator_headers, async_db_session, convertible_lead):

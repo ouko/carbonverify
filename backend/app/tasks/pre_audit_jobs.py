@@ -6,14 +6,16 @@ from typing import List
 
 from sqlalchemy import func, select
 
+from app.config import get_settings
 from app.core.logging import get_logger
 from app.database import AsyncSessionLocal
-from app.models import Lead, LeadDocument, LeadDocumentStatusEnum
+from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadProjectStatusEnum
 from app.services.lead_intelligence.factory import get_scraper
 from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetcher
 from app.tasks.celery_app import celery_app
 
 logger = get_logger(__name__)
+settings = get_settings()
 
 MAX_DOCUMENT_FETCH_ATTEMPTS = 5
 DOCUMENT_FETCH_RETRY_MINUTES = 60
@@ -208,21 +210,41 @@ def run_pre_audit_for_project(self, project_id: str, lead_id: str | None = None)
         raise self.retry(exc=exc, countdown=60)
 
 
+def _get_pending_statuses() -> list[LeadProjectStatusEnum]:
+    """Return the registry-status values the pipeline should treat as pending/under audit."""
+    raw = [s.strip().lower() for s in settings.PRE_AUDIT_PENDING_STATUSES.split(",") if s.strip()]
+    statuses = []
+    for value in raw:
+        try:
+            statuses.append(LeadProjectStatusEnum(value))
+        except ValueError:
+            logger.warning("pre_audit_unknown_pending_status", status=value)
+    if not statuses:
+        statuses = [
+            LeadProjectStatusEnum.under_validation,
+            LeadProjectStatusEnum.under_verification,
+            LeadProjectStatusEnum.under_certification,
+        ]
+    return statuses
+
+
 @celery_app.task(bind=True, max_retries=3)
 def run_pre_audit_pipeline(self) -> dict:
     """Daily pipeline: convert qualified leads and run pre-audit."""
     async def _run():
         async with AsyncSessionLocal() as db:
-            from datetime import date
-            result = await db.execute(
-                select(Lead).where(
-                    Lead.lead_status.in_([LeadWorkflowStatusEnum.qualified, LeadWorkflowStatusEnum.proposal_sent]),
-                    Lead.converted_project_id.is_(None),
-                    Lead.crediting_period_start.isnot(None),
-                    Lead.crediting_period_end.isnot(None),
-                    Lead.documents.any(LeadDocument.status == LeadDocumentStatusEnum.fetched),
-                )
-            )
+            filters = [
+                Lead.lead_status.in_([LeadWorkflowStatusEnum.qualified, LeadWorkflowStatusEnum.proposal_sent]),
+                Lead.converted_project_id.is_(None),
+                Lead.crediting_period_start.isnot(None),
+                Lead.crediting_period_end.isnot(None),
+                Lead.documents.any(LeadDocument.status == LeadDocumentStatusEnum.fetched),
+            ]
+            if settings.PRE_AUDIT_PENDING_ONLY:
+                filters.append(Lead.status.in_(_get_pending_statuses()))
+                logger.info("pre_audit_pipeline_pending_only", statuses=[s.value for s in _get_pending_statuses()])
+
+            result = await db.execute(select(Lead).where(*filters))
             leads = result.scalars().all()
             logger.info("pre_audit_pipeline_leads", count=len(leads))
 

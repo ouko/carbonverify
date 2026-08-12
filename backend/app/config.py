@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     LEAD_SCRAPER_MAX_RETRIES: int = 3
     LEAD_SCRAPER_RETRY_DELAY: int = 5
 
+    # Pre-audit pipeline
+    PRE_AUDIT_PENDING_ONLY: bool = False
+    PRE_AUDIT_PENDING_STATUSES: str = "under_validation,under_verification,under_certification"
+
     # Carbon registry API keys
     VERRA_API_KEY: str = ""
     GOLD_STANDARD_API_KEY: str = ""
