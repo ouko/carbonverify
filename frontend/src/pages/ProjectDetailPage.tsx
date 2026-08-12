@@ -1,9 +1,9 @@
 import { useParams } from 'react-router-dom'
-import { ArrowLeft, Database, Calculator, FileText, MapPin, Calendar, Activity } from 'lucide-react'
+import { ArrowLeft, Database, Calculator, FileText, MapPin, Calendar, Activity, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Breadcrumbs from '../components/Breadcrumbs'
-import { useProject } from '../hooks/useProjects'
+import { useProject, useProjectPreAudit } from '../hooks/useProjects'
 
 const statusColor: Record<string, string> = {
   onboarding: 'badge-slate',
@@ -15,9 +15,34 @@ const statusColor: Record<string, string> = {
   monitoring: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300',
 }
 
+const preAuditStatusConfig = {
+  passed: {
+    icon: CheckCircle2,
+    border: 'border-l-emerald-500',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+    text: 'text-emerald-800 dark:text-emerald-200',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+  },
+  gaps: {
+    icon: AlertCircle,
+    border: 'border-l-amber-500',
+    bg: 'bg-amber-50 dark:bg-amber-950/30',
+    text: 'text-amber-800 dark:text-amber-200',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+  },
+  failed: {
+    icon: XCircle,
+    border: 'border-l-red-500',
+    bg: 'bg-red-50 dark:bg-red-950/30',
+    text: 'text-red-800 dark:text-red-200',
+    iconColor: 'text-red-600 dark:text-red-400',
+  },
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data: project, isLoading, isError, error } = useProject(id || '')
+  const { data: preAudit } = useProjectPreAudit(id || '')
 
   if (isLoading) {
     return (
@@ -75,6 +100,42 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Pre-audit Panel */}
+      {preAudit && (
+        <div
+          className={`card border-l-4 ${preAuditStatusConfig[preAudit.status]?.border || 'border-l-surface-400'} ${preAuditStatusConfig[preAudit.status]?.bg || 'bg-surface-50 dark:bg-surface-900'}`}
+        >
+          <div className="flex items-start gap-3">
+            {(() => {
+              const Icon = preAuditStatusConfig[preAudit.status]?.icon || AlertCircle
+              return <Icon className={`w-5 h-5 mt-0.5 ${preAuditStatusConfig[preAudit.status]?.iconColor || 'text-surface-500'}`} />
+            })()}
+            <div className="flex-1 space-y-2">
+              <p className={`font-semibold ${preAuditStatusConfig[preAudit.status]?.text || 'text-surface-800 dark:text-surface-200'}`}>
+                Pre-audit readiness: {Math.round(preAudit.readiness_score * 100)}% ({preAudit.status})
+              </p>
+              {preAudit.gap_summary?.recommendation && (
+                <p className="text-sm text-surface-700 dark:text-surface-300">{preAudit.gap_summary.recommendation}</p>
+              )}
+              {preAudit.gap_summary?.gaps && preAudit.gap_summary.gaps.length > 0 && (
+                <ul className="text-sm list-disc list-inside text-surface-700 dark:text-surface-300 space-y-1">
+                  {preAudit.gap_summary.gaps.map((gap, idx) => (
+                    <li key={idx}>{gap}</li>
+                  ))}
+                </ul>
+              )}
+              {preAudit.gap_summary?.risk_flags && preAudit.gap_summary.risk_flags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {preAudit.gap_summary.risk_flags.map((flag, idx) => (
+                    <span key={idx} className="badge badge-red">{flag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

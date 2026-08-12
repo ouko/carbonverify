@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../services/api'
-import type { Project, ProjectCreate } from '../types'
+import type { Project, ProjectCreate, ProjectPreAudit } from '../types'
 
 export function useProjects() {
   return useQuery<Project[]>({
@@ -18,6 +18,17 @@ export function useProject(id: string) {
     queryFn: async () => {
       const res = await api.get(`/projects/${id}`)
       return res.data as Project
+    },
+    enabled: !!id,
+  })
+}
+
+export function useProjectPreAudit(id: string) {
+  return useQuery<ProjectPreAudit | null>({
+    queryKey: ['projects', id, 'pre-audit'],
+    queryFn: async () => {
+      const res = await api.get(`/projects/${id}/pre-audit`)
+      return res.data as ProjectPreAudit | null
     },
     enabled: !!id,
   })

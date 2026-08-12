@@ -161,6 +161,24 @@ export interface ProjectCreate {
   confidence_threshold?: number
 }
 
+export type PreAuditStatus = 'passed' | 'gaps' | 'failed'
+
+export interface ProjectPreAudit {
+  id: string
+  project_id: string
+  lead_id: string | null
+  validation_run_id: string | null
+  readiness_score: number
+  status: PreAuditStatus
+  gap_summary: {
+    gaps?: string[]
+    risk_flags?: string[]
+    recommendation?: string
+    reasoning?: string
+  }
+  created_at: string
+}
+
 export interface TokenResponse {
   access_token: string
   refresh_token?: string

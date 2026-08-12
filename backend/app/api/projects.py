@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
+from sqlalchemy import select, desc
+from typing import List, Optional
 import uuid
 
 from app.database import get_db
-from app.models import Project, User, AuditActionEnum, ProjectStatusEnum
+from app.models import Project, User, AuditActionEnum, ProjectStatusEnum, ProjectPreAudit
 from app.security.audit_logging import AuditLogger
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut
+from app.schemas import ProjectCreate, ProjectUpdate, ProjectOut, ProjectPreAuditOut
 from app.auth.dependencies import require_operator, require_viewer
 from app.security.project_auth import require_project_access, get_user_developer_id
 
@@ -80,6 +80,21 @@ async def get_project(
     _: User = Depends(require_viewer),
 ):
     return project
+
+
+@router.get("/{project_id}/pre-audit", response_model=Optional[ProjectPreAuditOut])
+async def get_project_pre_audit(
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    result = await db.execute(
+        select(ProjectPreAudit)
+        .where(ProjectPreAudit.project_id == project_id)
+        .order_by(desc(ProjectPreAudit.created_at))
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
