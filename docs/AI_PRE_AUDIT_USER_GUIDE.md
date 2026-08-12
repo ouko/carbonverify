@@ -230,21 +230,23 @@ Open the run detail page:
 
 ## 4. Automated workflow
 
-Phase 1 (document discovery and download) is now implemented. The Lead Intelligence page automatically discovers and fetches publicly available registry documents for each scraped lead.
+Phase 1 (document discovery and download) and Phase 2 (lead-to-project conversion and AI pre-audit) are now implemented. The automated workflow is:
 
-The design spec at `docs/superpowers/specs/2026-07-18-ai-pre-audit-automation-design.md` describes the remaining phases, which will add:
+1. **Run scrape** — `Lead Intelligence → Run Scrape` discovers projects and their public documents.
+2. **Fetch documents** — The system downloads each discovered document, virus-scans it, stores it in S3, and records its SHA-256 hash.
+3. **Auto-convert qualified leads** — For leads that are `qualified` or `proposal_sent`, have crediting-period dates, have at least one fetched document, and are not already converted, the system creates a CarbonVerify `Project` and imports the fetched documents as `FileUpload` / `DataSource` records.
+4. **Run pre-audit** — The default `pre_audit_document_package` validation workflow runs against the converted project. It checks document presence, extracts text excerpts, and asks the Kimi AI to evaluate completeness and consistency.
+5. **Review readiness badge** — Open the project detail page to see the **readiness score** and **gap report**.
+6. **Operator decision** — Projects start in `onboarding`. An operator must explicitly approve before the project moves to `data_collection` / `review`.
 
-- **One-click lead → project conversion** with fetched documents already attached as project `DataSource` records.
-- **Default pre-audit workflow** that runs automatically after conversion.
-- **Readiness score** displayed on the project card.
-- **Gap report routing** to the review queue.
+You can also trigger conversion and pre-audit manually for a single lead:
 
-When fully implemented, the operator workflow will shrink to:
+1. Open **Lead Intelligence**.
+2. Find a lead with fetched documents.
+3. Call `POST /leads/{lead_id}/convert-and-pre-audit` (operator role required).
+4. The system returns the `ProjectPreAudit` result, and the new project appears in **Projects**.
 
-1. Run scrape.
-2. Review projects with a **Pre-Audit Ready** badge.
-3. Approve, request info, or dismiss.
-4. Auditor receives a pre-checked package.
+The daily scrape job (`scrape_registries`) queues the pre-audit pipeline automatically, so the nightly workflow is fully hands-off.
 
 ---
 
