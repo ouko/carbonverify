@@ -11,7 +11,17 @@ from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models import Lead, User, LeadDocument, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun, AuditActionEnum
-from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadDocumentOut, LeadStats, LeadScrapeRequest, ProjectPreAuditOut
+from app.schemas import (
+    LeadCreate,
+    LeadUpdate,
+    LeadOut,
+    LeadDocumentOut,
+    LeadStats,
+    LeadScrapeRequest,
+    LeadBulkImportRequest,
+    LeadBulkImportResponse,
+    ProjectPreAuditOut,
+)
 from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer, require_admin
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
@@ -84,6 +94,110 @@ async def create_lead(
         target_id=lead.id,
     )
     return lead
+
+
+@router.post("/bulk-import", response_model=LeadBulkImportResponse, status_code=status.HTTP_202_ACCEPTED)
+async def bulk_import_leads(
+    payload: LeadBulkImportRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+):
+    """Import a list of registry external IDs and queue document fetching.
+
+    Consultants use this to seed CarbonVerify with projects they want to
+    evaluate. Each lead is created (or updated if it already exists) and a
+    document-fetch task is queued. The nightly pre-audit pipeline will later
+    convert qualified leads and run AI pre-audit; or call
+    `POST /leads/{lead_id}/convert-and-pre-audit` for an immediate result.
+    """
+    try:
+        registry_source_enum = LeadRegistrySourceEnum(payload.registry_source)
+    except ValueError:
+        valid_sources = [e.value for e in LeadRegistrySourceEnum]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid registry_source. Valid values: {valid_sources}",
+        )
+
+    external_ids = [item.external_id for item in payload.items]
+    if len(external_ids) != len(set(external_ids)):
+        raise HTTPException(status_code=400, detail="Duplicate external_ids in request")
+
+    existing_result = await db.execute(
+        select(Lead).where(
+            Lead.registry_source == registry_source_enum,
+            Lead.external_id.in_(external_ids),
+        )
+    )
+    existing_leads = {lead.external_id: lead for lead in existing_result.scalars().all()}
+
+    created = 0
+    updated = 0
+    errors = 0
+    lead_ids: List[uuid.UUID] = []
+
+    for item in payload.items:
+        try:
+            lead = existing_leads.get(item.external_id)
+            if lead:
+                if item.project_name is not None:
+                    lead.project_name = item.project_name
+                if item.registry_url is not None:
+                    lead.registry_url = item.registry_url
+                if item.status is not None:
+                    lead.status = item.status
+                lead.updated_at = datetime.now(timezone.utc)
+                updated += 1
+            else:
+                lead = Lead(
+                    registry_source=registry_source_enum,
+                    external_id=item.external_id,
+                    project_name=item.project_name or item.external_id,
+                    registry_url=item.registry_url,
+                    status=item.status or "unknown",
+                    lead_status=LeadWorkflowStatusEnum.new,
+                    scraped_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                )
+                db.add(lead)
+                created += 1
+            await db.flush()
+            await db.refresh(lead)
+            lead_ids.append(lead.id)
+            existing_leads[item.external_id] = lead
+        except Exception as exc:
+            logger.error("bulk_import_lead_failed", external_id=item.external_id, error=str(exc))
+            errors += 1
+
+    await db.commit()
+
+    for lead_id in lead_ids:
+        fetch_lead_documents_task.delay(str(lead_id))
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.data_ingested,
+        actor_id=current_user.id,
+        target_type="lead",
+        target_id=None,
+        metadata={
+            "event": "bulk_import",
+            "registry_source": registry_source_enum.value,
+            "created": created,
+            "updated": updated,
+            "queued": len(lead_ids),
+            "errors": errors,
+        },
+    )
+
+    return LeadBulkImportResponse(
+        registry_source=registry_source_enum.value,
+        created=created,
+        updated=updated,
+        queued=len(lead_ids),
+        errors=errors,
+        leads=lead_ids,
+    )
 
 
 @router.get("/scraper-history")

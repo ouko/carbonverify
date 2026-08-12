@@ -452,3 +452,68 @@ async def test_pre_audit_runner_end_to_end(async_db_session):
     assert pre_audit.gap_summary["gaps"] == []
     assert pre_audit.gap_summary["risk_flags"] == []
     assert "Ready for auditor" in pre_audit.gap_summary["recommendation"]
+
+
+
+@pytest.mark.asyncio
+async def test_bulk_import_leads_creates_and_queues_fetch(client: AsyncClient, operator_headers, async_db_session):
+    payload = {
+        "registry_source": "cdm",
+        "items": [
+            {"external_id": "BULK-001", "project_name": "Bulk Project 1"},
+            {"external_id": "BULK-002", "registry_url": "https://cdm.unfccc.int/BULK-002"},
+        ],
+    }
+    with patch("app.api.leads.fetch_lead_documents_task") as mock_fetch:
+        mock_fetch.delay = MagicMock()
+        resp = await client.post("/leads/bulk-import", json=payload, headers=operator_headers)
+
+    assert resp.status_code == 202
+    data = resp.json()
+    assert data["registry_source"] == "cdm"
+    assert data["created"] == 2
+    assert data["updated"] == 0
+    assert data["queued"] == 2
+    assert data["errors"] == 0
+    assert len(data["leads"]) == 2
+    assert mock_fetch.delay.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_bulk_import_leads_rejects_invalid_registry(client: AsyncClient, operator_headers):
+    payload = {
+        "registry_source": "not_a_registry",
+        "items": [{"external_id": "BULK-003"}],
+    }
+    resp = await client.post("/leads/bulk-import", json=payload, headers=operator_headers)
+    assert resp.status_code == 400
+    assert "Invalid registry_source" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_bulk_import_leads_updates_existing(client: AsyncClient, operator_headers, async_db_session):
+    existing = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="BULK-004",
+        project_name="Old Name",
+        lead_status=LeadWorkflowStatusEnum.new,
+    )
+    async_db_session.add(existing)
+    await async_db_session.commit()
+    await async_db_session.refresh(existing)
+
+    payload = {
+        "registry_source": "cdm",
+        "items": [{"external_id": "BULK-004", "project_name": "Updated Name"}],
+    }
+    with patch("app.api.leads.fetch_lead_documents_task") as mock_fetch:
+        mock_fetch.delay = MagicMock()
+        resp = await client.post("/leads/bulk-import", json=payload, headers=operator_headers)
+
+    assert resp.status_code == 202
+    data = resp.json()
+    assert data["created"] == 0
+    assert data["updated"] == 1
+    assert data["queued"] == 1
+    await async_db_session.refresh(existing)
+    assert existing.project_name == "Updated Name"

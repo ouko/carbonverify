@@ -871,6 +871,27 @@ class LeadScrapeRequest(BaseModel):
     country: Optional[str] = "Kenya"
 
 
+class LeadBulkImportItem(BaseModel):
+    external_id: str
+    project_name: Optional[str] = None
+    registry_url: Optional[str] = None
+    status: Optional[str] = None
+
+
+class LeadBulkImportRequest(BaseModel):
+    registry_source: str
+    items: List[LeadBulkImportItem]
+
+
+class LeadBulkImportResponse(BaseModel):
+    registry_source: str
+    created: int
+    updated: int
+    queued: int
+    errors: int
+    leads: List[uuid.UUID]
+
+
 class LeadStats(BaseModel):
     total_leads: int
     by_registry: Dict[str, int]

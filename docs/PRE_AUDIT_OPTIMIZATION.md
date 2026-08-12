@@ -169,8 +169,21 @@ If you are a consultant evaluating whether CarbonVerify can help a portfolio of 
    LEAD_SCRAPER_MODE=live   # or demo for testing
    ```
 2. **Start the stack.** With Docker Compose or `./scripts/start-local.sh`, ensure Celery worker and beat are running. Beat automatically schedules the pre-audit tasks daily.
-3. **Run Lead Intelligence → Scrape** (or wait for the nightly `scrape-registries` task). Review leads; sort by `stuck_score` and filter by status.
-4. **Fetch documents** for the top leads, either manually via the Lead Intelligence UI or by waiting for the nightly `fetch-all-pending-documents` task. Confirm that PDDs/validation reports are publicly available.
+3. **Import known projects** (optional). If you already have a list of registry IDs or URLs, call the bulk-import endpoint:
+   ```bash
+   curl -X POST http://localhost:8000/leads/bulk-import \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "registry_source": "cdm",
+       "items": [
+         {"external_id": "1234", "project_name": "Project A"},
+         {"external_id": "5678", "registry_url": "https://cdm.unfccc.int/5678"}
+       ]
+     }'
+   ```
+   The endpoint creates (or updates) the leads and queues document fetching. The response includes `lead_id`s you can check in the UI.
+4. **Fetch documents** for the top leads, either manually via the Lead Intelligence UI (`POST /leads/{lead_id}/fetch-documents`), via the bulk import above, or by waiting for the nightly `fetch-all-pending-documents` task. Confirm that PDDs/validation reports are publicly available.
 5. **Convert and pre-audit.** Either call `POST /leads/{lead_id}/convert-and-pre-audit` for a lead you want to evaluate immediately, or wait for the nightly `run-pre-audit-pipeline` task.
 6. **Open Projects → detail page.** Read the readiness score and gap report.
 7. **Export the gap report** and share it with the project developer. Once corrected documents are uploaded, the nightly `re-audit-changed-projects` task will re-score the project automatically.
@@ -200,12 +213,15 @@ The following optimizations are already implemented:
 4. ✅ **Parallel document extraction** — `PreAuditRunner._build_document_excerpts` runs up to 5 concurrent workers.
 5. ✅ **Scheduled automation** — `fetch_all_pending_documents`, `run_pre_audit_pipeline`, and `re_audit_changed_projects` run daily in Celery Beat.
 
+Additional improvements already implemented:
+
+- ✅ **Consultant bulk-import endpoint** — `POST /leads/bulk-import` accepts a registry source and list of external IDs/URLs, creates or updates leads, and queues document fetching. See the consultant workflow above for the curl example.
+
 Remaining improvements to consider next:
 
 1. **Verra UI API integration** — reduces Playwright fragility.
 2. **Gold Standard API credentials** — unlocks structured data for the registry that currently blocks unauthenticated requests.
-3. **Consultant bulk-import endpoint** — let a user paste a list of registry IDs or URLs and queue fetch + pre-audit in one action.
-4. **Dashboard widget** — show pending unaudited opportunities, fetched-document status, and readiness scores in one view.
+3. **Dashboard widget** — show pending unaudited opportunities, fetched-document status, and readiness scores in one view.
 
 ---
 
