@@ -517,3 +517,68 @@ async def test_bulk_import_leads_updates_existing(client: AsyncClient, operator_
     assert data["queued"] == 1
     await async_db_session.refresh(existing)
     assert existing.project_name == "Updated Name"
+
+
+
+@pytest.mark.asyncio
+async def test_list_pending_opportunities(client: AsyncClient, operator_headers, async_db_session):
+    pending = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="OPP-001",
+        project_name="Pending Opportunity",
+        status=LeadProjectStatusEnum.under_validation,
+        lead_status=LeadWorkflowStatusEnum.qualified,
+        stuck_score=75.0,
+    )
+    registered = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="OPP-002",
+        project_name="Registered Opportunity",
+        status=LeadProjectStatusEnum.registered,
+        lead_status=LeadWorkflowStatusEnum.qualified,
+        stuck_score=95.0,
+    )
+    doc = LeadDocument(
+        lead=pending,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        status=LeadDocumentStatusEnum.fetched,
+    )
+    async_db_session.add_all([pending, registered, doc])
+    await async_db_session.commit()
+
+    resp = await client.get("/leads/opportunities/pending", headers=operator_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["external_id"] == "OPP-001"
+    assert data[0]["document_count"] == 1
+    assert data[0]["fetched_document_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_list_pending_opportunities_filter_by_source(client: AsyncClient, operator_headers, async_db_session):
+    cdm_lead = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="OPP-003",
+        project_name="CDM Opportunity",
+        status=LeadProjectStatusEnum.under_validation,
+        lead_status=LeadWorkflowStatusEnum.new,
+        stuck_score=50.0,
+    )
+    verra_lead = Lead(
+        registry_source=LeadRegistrySourceEnum.verra,
+        external_id="OPP-004",
+        project_name="Verra Opportunity",
+        status=LeadProjectStatusEnum.under_validation,
+        lead_status=LeadWorkflowStatusEnum.new,
+        stuck_score=60.0,
+    )
+    async_db_session.add_all([cdm_lead, verra_lead])
+    await async_db_session.commit()
+
+    resp = await client.get("/leads/opportunities/pending?registry_source=verra", headers=operator_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["external_id"] == "OPP-004"

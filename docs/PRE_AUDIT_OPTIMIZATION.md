@@ -216,6 +216,13 @@ The following optimizations are already implemented:
 Additional improvements already implemented:
 
 - ✅ **Consultant bulk-import endpoint** — `POST /leads/bulk-import` accepts a registry source and list of external IDs/URLs, creates or updates leads, and queues document fetching. See the consultant workflow above for the curl example.
+- ✅ **Pending opportunities endpoint** — `GET /leads/opportunities/pending` returns under-audited leads enriched with document counts and the latest pre-audit readiness score, sorted by stuck score so consultants and auditors can prioritise work.
+
+  Example:
+  ```bash
+  curl -H "Authorization: Bearer $TOKEN" \
+    "http://localhost:8000/leads/opportunities/pending?registry_source=cdm&limit=20"
+  ```
 
 Remaining improvements to consider next:
 

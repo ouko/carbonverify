@@ -892,6 +892,17 @@ class LeadBulkImportResponse(BaseModel):
     leads: List[uuid.UUID]
 
 
+class LeadOpportunityOut(LeadBase):
+    id: uuid.UUID
+    scraped_at: datetime
+    updated_at: datetime
+    document_count: int
+    fetched_document_count: int
+    converted_project_id: Optional[uuid.UUID] = None
+    readiness_score: Optional[float] = None
+    pre_audit_status: Optional[str] = None
+
+
 class LeadStats(BaseModel):
     total_leads: int
     by_registry: Dict[str, int]

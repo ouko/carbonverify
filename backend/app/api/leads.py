@@ -7,15 +7,16 @@ from datetime import datetime, timezone, date as dt_date
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 
 from app.database import get_db
-from app.models import Lead, User, LeadDocument, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun, AuditActionEnum
+from app.models import Lead, User, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum, LeadPriorityEnum, LeadProjectStatusEnum, LeadWorkflowStatusEnum, ProjectPreAudit, ScraperRun, AuditActionEnum
 from app.schemas import (
     LeadCreate,
     LeadUpdate,
     LeadOut,
     LeadDocumentOut,
+    LeadOpportunityOut,
     LeadStats,
     LeadScrapeRequest,
     LeadBulkImportRequest,
@@ -72,6 +73,114 @@ async def list_leads(
     stmt = stmt.order_by(Lead.stuck_score.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.get("/opportunities/pending", response_model=List[LeadOpportunityOut])
+async def list_pending_opportunities(
+    registry_source: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """Return pending/under-audited leads enriched with document and pre-audit summary.
+
+    This is the consultant/auditor prioritization view: projects that are still
+    in the registry validation pipeline, sorted by stuck score, with a quick
+    view of how many documents have been fetched and the latest readiness score.
+    """
+    pending_statuses = [
+        LeadProjectStatusEnum.under_validation,
+        LeadProjectStatusEnum.under_verification,
+        LeadProjectStatusEnum.under_certification,
+    ]
+
+    doc_counts = (
+        select(
+            LeadDocument.lead_id,
+            func.count(LeadDocument.id).label("doc_count"),
+            func.sum(
+                case((LeadDocument.status == LeadDocumentStatusEnum.fetched, 1), else_=0)
+            ).label("fetched_count"),
+        )
+        .group_by(LeadDocument.lead_id)
+        .subquery()
+    )
+
+    latest_pre_audit = (
+        select(
+            ProjectPreAudit.lead_id,
+            ProjectPreAudit.readiness_score,
+            ProjectPreAudit.status.label("pre_audit_status"),
+            func.row_number()
+            .over(partition_by=ProjectPreAudit.lead_id, order_by=ProjectPreAudit.created_at.desc())
+            .label("rn"),
+        )
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Lead,
+            func.coalesce(doc_counts.c.doc_count, 0).label("document_count"),
+            func.coalesce(doc_counts.c.fetched_count, 0).label("fetched_document_count"),
+            latest_pre_audit.c.readiness_score,
+            latest_pre_audit.c.pre_audit_status,
+        )
+        .where(Lead.status.in_(pending_statuses))
+        .where(Lead.lead_status != LeadWorkflowStatusEnum.dismissed)
+        .outerjoin(doc_counts, doc_counts.c.lead_id == Lead.id)
+        .outerjoin(
+            latest_pre_audit,
+            (latest_pre_audit.c.lead_id == Lead.id) & (latest_pre_audit.c.rn == 1),
+        )
+        .order_by(Lead.stuck_score.desc())
+        .limit(limit)
+    )
+
+    if registry_source:
+        stmt = stmt.where(Lead.registry_source == registry_source)
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    opportunities = []
+    for lead, doc_count, fetched_count, readiness_score, pre_audit_status in rows:
+        opportunities.append(
+            LeadOpportunityOut(
+                id=lead.id,
+                registry_source=lead.registry_source.value,
+                external_id=lead.external_id,
+                project_name=lead.project_name,
+                project_developer=lead.project_developer,
+                developer_contact=lead.developer_contact,
+                developer_email=lead.developer_email,
+                country=lead.country,
+                region=lead.region,
+                location_coords=lead.location_coords,
+                methodology=lead.methodology,
+                sector=lead.sector,
+                status=lead.status.value if lead.status else None,
+                crediting_period_start=lead.crediting_period_start,
+                crediting_period_end=lead.crediting_period_end,
+                last_verification_date=lead.last_verification_date,
+                last_monitoring_period_end=lead.last_monitoring_period_end,
+                estimated_credits_per_year=lead.estimated_credits_per_year,
+                registry_url=lead.registry_url,
+                days_in_status=lead.days_in_status,
+                stuck_score=lead.stuck_score,
+                priority=lead.priority.value if lead.priority else None,
+                lead_status=lead.lead_status.value if lead.lead_status else None,
+                notes=lead.notes,
+                scraped_at=lead.scraped_at,
+                updated_at=lead.updated_at,
+                document_count=int(doc_count),
+                fetched_document_count=int(fetched_count or 0),
+                converted_project_id=lead.converted_project_id,
+                readiness_score=readiness_score,
+                pre_audit_status=pre_audit_status.value if pre_audit_status else None,
+            )
+        )
+    return opportunities
 
 
 @router.post("/", response_model=LeadOut, status_code=status.HTTP_201_CREATED)
