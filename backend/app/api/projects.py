@@ -85,12 +85,13 @@ async def get_project(
 @router.get("/{project_id}/pre-audit", response_model=Optional[ProjectPreAuditOut])
 async def get_project_pre_audit(
     project_id: uuid.UUID,
+    project: Project = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
     result = await db.execute(
         select(ProjectPreAudit)
-        .where(ProjectPreAudit.project_id == project_id)
+        .where(ProjectPreAudit.project_id == project.id)
         .order_by(desc(ProjectPreAudit.created_at))
         .limit(1)
     )
