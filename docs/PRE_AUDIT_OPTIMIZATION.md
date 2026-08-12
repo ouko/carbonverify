@@ -93,35 +93,37 @@ If registry-level scraping remains fragile, commercial/aggregated APIs can be us
 
 ## 3. Workflow optimizations
 
-### 3.1 Scrape only the highest-value statuses
+### 3.1 Scrape only the highest-value statuses (implemented)
 
-The current Celery pipeline (`run_pre_audit_pipeline`) auto-converts qualified leads. Reduce noise by teaching the scrapers to accept a `status_filter` that maps to pending/validation statuses per registry. For example:
+The daily `run_pre_audit_pipeline` task can be restricted to leads whose registry status is pending/under audit. Set in `backend/.env`:
 
-```python
-VERRA_PENDING_STATUSES = [
-    "VCS_EX_UNDER_DEVELOPMENT_CLD",
-    "VCS_EX_UNDER_DEVELOPMENT_OPN",
-    "VCS_EX_UNDER_VALIDATION",
-    "VCS_EX_REGISTRATION_REQUESTED",
-    "VCS_EX_REG_VER_APPR_REQUESTED",
-    "VCS_EX_CRD_PRD_VER_REQUESTED",
-]
-
-GOLD_STANDARD_PENDING_STATUSES = ["under_validation", "under_certification"]
+```bash
+PRE_AUDIT_PENDING_ONLY=true
+PRE_AUDIT_PENDING_STATUSES=under_validation,under_verification,under_certification
 ```
 
-This avoids converting already-registered projects and wasting AI tokens on projects that do not need pre-audit help.
+When `PRE_AUDIT_PENDING_ONLY=true`, only leads with one of those statuses and at least one fetched document are converted and pre-audited. The default statuses cover the registries’ high-value pipeline states:
 
-### 3.2 Incremental document fetching
+| Registry | Mapped status values |
+|----------|----------------------|
+| Verra VCS | `under_validation`, `under_verification`, `under_certification` (store these strings in the lead `status` field) |
+| Gold Standard | `under_validation`, `under_certification` |
+| CDM | `validation`, `registration requested` |
 
-`RegistryDocumentFetcher` currently downloads every discovered document on every scrape. For a nightly job this is wasteful. Add incremental behavior:
+If your registry source emits different status strings, add them to the comma-separated list. This avoids converting already-registered projects and wasting AI tokens on projects that do not need pre-audit help.
 
-1. Store `last_modified` / `etag` headers from the registry response in `LeadDocument.raw_data`.
-2. On the next scrape, send `If-None-Match` / `If-Modified-Since` headers.
-3. Skip documents that return `304 Not Modified`.
-4. Use the existing `file_hash_sha256` to deduplicate identical content.
+### 3.2 Incremental document fetching (implemented)
 
-This reduces bandwidth, S3 writes, and virus-scanning load.
+`RegistryDocumentFetcher` stores `etag` and `last_modified` headers on each `LeadDocument`. On subsequent fetches it sends:
+
+```http
+If-None-Match: <stored etag>
+If-Modified-Since: <stored last_modified>
+```
+
+If the registry returns `304 Not Modified`, the document is marked `fetched` again but no S3 upload or virus scan runs. The existing `file_hash_sha256` still deduplicates identical content if the registry does not support conditional requests.
+
+This is automatic; no configuration is required. It reduces bandwidth, S3 writes, and virus-scanning load on nightly re-scrapes.
 
 ### 3.3 Batch and prioritize AI evaluation
 
@@ -131,15 +133,15 @@ The default `pre_audit_document_package` workflow evaluates one project per run.
 - **Chunked prompt strategy:** If a project has many documents, summarize each document individually, then pass the summaries to the final evaluator. This keeps the prompt within the model context window and reduces per-token cost.
 - **Priority queue:** Give `qualified` leads with high `stuck_score` a higher Celery priority so auditors see the most stalled projects first.
 
-### 3.4 Watchlist / change detection
+### 3.4 Watchlist / change detection (implemented)
 
-Most registry pages do not change nightly. Instead of re-running the full pre-audit for every project every day:
+Converted projects are re-audited only when their fetched documents actually change. The `Lead` model stores a `document_fingerprint` — a SHA-256 hash of each fetched document's `source_url` and `file_hash_sha256`. The daily `re_audit_changed_projects` task:
 
-1. Compute a hash of the discovered document list for each lead.
-2. Compare it to the previous scrape.
-3. Only queue `convert-and-pre-audit` when documents have changed or the lead is newly discovered.
+1. Refreshes documents for every converted lead.
+2. Computes the current fingerprint.
+3. If it differs from the stored fingerprint (or no fingerprint exists), it queues `run_pre_audit_for_project` and updates the stored fingerprint.
 
-This turns the pipeline from *scan everything daily* into a *change-driven* workflow.
+This turns the pipeline from *scan everything daily* into a *change-driven* workflow, saving AI tokens and auditor review time.
 
 ### 3.5 Use the API-first path when available
 
@@ -160,26 +162,50 @@ Keep the existing Playwright fallback so demo mode and blocked networks still wo
 
 If you are a consultant evaluating whether CarbonVerify can help a portfolio of projects, use this workflow:
 
-1. **Set scope filters.** In `backend/.env` or via the admin settings, configure the scraper to target pending statuses (see section 3.1).
-2. **Run Lead Intelligence → Scrape.** Review the resulting leads; sort by `stuck_score` and filter by status.
-3. **Fetch documents** for the top leads. Confirm that PDDs/validation reports are publicly available.
-4. **Run `POST /leads/{lead_id}/convert-and-pre-audit`** for each qualified lead, or wait for the nightly pipeline.
-5. **Open Projects → detail page.** Read the readiness score and gap report.
-6. **Export the gap report** and share it with the project developer. Once corrected documents are uploaded, re-trigger the workflow.
-7. **Assign an auditor** only after the project reaches a passing readiness score or the flagged gaps are acceptable.
+1. **Set scope filters.** In `backend/.env` set:
+   ```bash
+   PRE_AUDIT_PENDING_ONLY=true
+   PRE_AUDIT_PENDING_STATUSES=under_validation,under_verification,under_certification
+   LEAD_SCRAPER_MODE=live   # or demo for testing
+   ```
+2. **Start the stack.** With Docker Compose or `./scripts/start-local.sh`, ensure Celery worker and beat are running. Beat automatically schedules the pre-audit tasks daily.
+3. **Run Lead Intelligence → Scrape** (or wait for the nightly `scrape-registries` task). Review leads; sort by `stuck_score` and filter by status.
+4. **Fetch documents** for the top leads, either manually via the Lead Intelligence UI or by waiting for the nightly `fetch-all-pending-documents` task. Confirm that PDDs/validation reports are publicly available.
+5. **Convert and pre-audit.** Either call `POST /leads/{lead_id}/convert-and-pre-audit` for a lead you want to evaluate immediately, or wait for the nightly `run-pre-audit-pipeline` task.
+6. **Open Projects → detail page.** Read the readiness score and gap report.
+7. **Export the gap report** and share it with the project developer. Once corrected documents are uploaded, the nightly `re-audit-changed-projects` task will re-score the project automatically.
+8. **Assign an auditor** only after the project reaches a passing readiness score or the flagged gaps are acceptable.
+
+The daily automation is:
+
+```
+scrape-registries
+    ↓
+fetch-all-pending-documents
+    ↓
+run-pre-audit-pipeline  (converts & pre-audits qualified pending leads)
+    ↓
+re-audit-changed-projects  (re-scores converted projects with changed docs)
+```
 
 ---
 
 ## 5. Implementation priority
 
-If you want to improve the pipeline incrementally, tackle items in this order:
+The following optimizations are already implemented:
 
-1. **Status filtering** — smallest change, biggest reduction in irrelevant conversions.
-2. **Incremental document fetch** — reduces daily cost and runtime.
-3. **Parallel document extraction** — speeds up each pre-audit run.
-4. **Verra UI API integration** — reduces Playwright fragility.
-5. **Gold Standard API credentials** — unlocks structured data for the registry that currently blocks unauthenticated requests.
-6. **Change-driven watchlist** — moves the pipeline from batch to event-driven at scale.
+1. ✅ **Status filtering** — `PRE_AUDIT_PENDING_ONLY` / `PRE_AUDIT_PENDING_STATUSES`.
+2. ✅ **Incremental document fetch** — `etag` / `last_modified` conditional requests.
+3. ✅ **Change-driven re-audit** — `document_fingerprint` + `re_audit_changed_projects`.
+4. ✅ **Parallel document extraction** — `PreAuditRunner._build_document_excerpts` runs up to 5 concurrent workers.
+5. ✅ **Scheduled automation** — `fetch_all_pending_documents`, `run_pre_audit_pipeline`, and `re_audit_changed_projects` run daily in Celery Beat.
+
+Remaining improvements to consider next:
+
+1. **Verra UI API integration** — reduces Playwright fragility.
+2. **Gold Standard API credentials** — unlocks structured data for the registry that currently blocks unauthenticated requests.
+3. **Consultant bulk-import endpoint** — let a user paste a list of registry IDs or URLs and queue fetch + pre-audit in one action.
+4. **Dashboard widget** — show pending unaudited opportunities, fetched-document status, and readiness scores in one view.
 
 ---
 
