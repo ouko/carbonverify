@@ -124,15 +124,25 @@ class LeadDocument(Base):
     lead_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"))
     document_type: Mapped[str]  # e.g. "pdd", "monitoring_report", "verification_report"
     source_url: Mapped[str]
+    title: Mapped[Optional[str]]
     file_hash_sha256: Mapped[Optional[str]]  # after download
+    s3_key: Mapped[Optional[str]]
+    s3_bucket: Mapped[Optional[str]]
+    file_size_bytes: Mapped[Optional[int]]
+    mime_type: Mapped[Optional[str]]
     file_upload_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("file_uploads.id"))
     status: Mapped[str] = mapped_column(default="discovered")  # discovered, fetched, failed
+    error_message: Mapped[Optional[str]]
+    fetched_at: Mapped[Optional[datetime]]
+    fetch_attempts: Mapped[int] = mapped_column(default=0)
+    last_fetch_attempt_at: Mapped[Optional[datetime]]
     created_at: Mapped[datetime]
 
 class ProjectPreAudit(Base):
     """Latest pre-audit result for a project."""
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    lead_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("leads.id"))
     validation_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("validation_runs.id"))
     readiness_score: Mapped[float]  # 0.0 - 1.0
     status: Mapped[str]  # passed, gaps, failed
@@ -172,8 +182,12 @@ def fetch_registry_documents(lead_id: UUID):
 Conversion criteria (configurable):
 - Lead status = `qualified` or `proposal_sent`.
 - Readiness score from metadata-only heuristics ≥ 0.6.
-- At least one downloadable document.
+- At least one downloadable document with status `fetched`.
+- Lead has a non-empty `crediting_period_start` and `crediting_period_end` (required by the `Project` model).
+- Lead has a mappable `methodology` value in `MethodologyEnum`.
 - Not already converted.
+
+Developer mapping: during conversion the system looks for an existing `Developer` record by email/domain. If none exists, it creates one using the lead's `project_developer`, `developer_contact`, and `developer_email` fields.
 
 Human gate: even after auto-conversion, the project stays in `onboarding` status and the pre-audit result is surfaced in the review queue. An operator must explicitly move it to `data_collection` / `review`.
 

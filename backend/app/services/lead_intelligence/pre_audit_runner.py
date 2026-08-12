@@ -1,6 +1,7 @@
 """Run the pre-audit validation workflow for a project and cache the result."""
 
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
@@ -81,8 +82,13 @@ class PreAuditRunner:
         )
         excerpts = []
         for ds in result.scalars().all():
-            file_upload_id = ds.raw_data.get("file_upload_id")
-            if not file_upload_id:
+            raw_id = ds.raw_data.get("file_upload_id")
+            if not raw_id:
+                continue
+            try:
+                file_upload_id = uuid.UUID(raw_id)
+            except ValueError:
+                logger.warning("pre_audit_invalid_file_upload_id", raw_id=raw_id)
                 continue
             upload = await self.db.get(FileUpload, file_upload_id)
             if not upload or not upload.s3_key:

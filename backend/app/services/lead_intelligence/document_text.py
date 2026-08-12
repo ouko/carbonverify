@@ -1,7 +1,6 @@
 """Async helpers to fetch registry documents from S3 and extract text."""
 
 import asyncio
-import io
 from typing import Optional
 
 import httpx

@@ -485,9 +485,6 @@ async def get_scraper_health(
     return health_check_all()
 
 
-
-
-
 @router.post("/{lead_id}/convert-and-pre-audit", response_model=ProjectPreAuditOut, status_code=202)
 async def convert_and_pre_audit_lead(
     lead_id: uuid.UUID,
