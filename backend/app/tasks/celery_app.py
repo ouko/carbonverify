@@ -83,6 +83,18 @@ celery_app.conf.update(
             "task": "app.validation_engine.tasks.check_stalled_escalations",
             "schedule": 900.0,  # every 15 minutes
         },
+        "fetch-all-pending-documents": {
+            "task": "app.tasks.pre_audit_jobs.fetch_all_pending_documents",
+            "schedule": 86400.0,  # daily
+        },
+        "run-pre-audit-pipeline": {
+            "task": "app.tasks.pre_audit_jobs.run_pre_audit_pipeline",
+            "schedule": 86400.0,  # daily
+        },
+        "re-audit-changed-projects": {
+            "task": "app.tasks.pre_audit_jobs.re_audit_changed_projects",
+            "schedule": 86400.0,  # daily
+        },
     },
 )
 
