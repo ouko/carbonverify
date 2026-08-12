@@ -1,7 +1,9 @@
-from datetime import date
-from unittest.mock import patch, AsyncMock
+from datetime import date, datetime, timezone
+from unittest.mock import patch, AsyncMock, MagicMock
+import uuid
 import pytest
 import pytest_asyncio
+from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.models import (
@@ -10,15 +12,18 @@ from app.models import (
     LeadDocumentStatusEnum,
     LeadRegistrySourceEnum,
     LeadWorkflowStatusEnum,
+    PreAuditStatusEnum,
     User,
 )
 from app.services.lead_intelligence.document_text import extract_text_async
 from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
+from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
 from app.services.lead_intelligence.system_developer import (
     SYSTEM_COMPANY_NAME,
     SYSTEM_DEVELOPER_EMAIL,
     get_or_create_system_developer,
 )
+from app.validation_engine.orchestrator import ValidationOrchestrator
 
 
 @pytest.mark.asyncio
@@ -104,3 +109,50 @@ async def test_get_or_create_pre_audit_workflow(async_db_session):
     assert wf.name == "pre_audit_document_package"
     wf2 = await get_or_create_pre_audit_workflow(async_db_session)
     assert wf2.id == wf.id
+
+
+
+@pytest.mark.asyncio
+async def test_pre_audit_runner_parses_output(async_db_session, convertible_lead):
+    from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
+
+    doc = LeadDocument(
+        lead_id=convertible_lead.id,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        mime_type="application/pdf",
+        s3_key="leads/cdm/.../pdd/abc.pdf",
+        s3_bucket="bucket",
+        file_size_bytes=1234,
+        file_hash_sha256="abcd",
+        status=LeadDocumentStatusEnum.fetched,
+    )
+    async_db_session.add(doc)
+    await async_db_session.commit()
+
+    converter = LeadToProjectConverter(async_db_session)
+    project = await converter.convert(convertible_lead)
+
+    runner = PreAuditRunner(async_db_session)
+    with patch.object(runner, "_build_document_excerpts", return_value=[]), \
+         patch.object(ValidationOrchestrator, "create_run", new_callable=AsyncMock) as mock_create, \
+         patch.object(ValidationOrchestrator, "execute_workflow", new_callable=AsyncMock) as mock_exec:
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.output_data = {
+            "ai_evaluation": {
+                "score": 0.85,
+                "passed": True,
+                "gaps": [],
+                "risk_flags": [],
+                "recommendation": "Ready for auditor assignment.",
+                "reasoning": "Documents look complete.",
+            }
+        }
+        mock_create.return_value = run
+        mock_exec.return_value = None
+
+        result = await runner.run_for_project(project, lead_id=str(convertible_lead.id))
+
+    assert result.status == PreAuditStatusEnum.passed
+    assert result.readiness_score == 0.85
