@@ -11,11 +11,13 @@ from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models import Lead, User, LeadDocument, LeadRegistrySourceEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ScraperRun, AuditActionEnum
-from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadDocumentOut, LeadStats, LeadScrapeRequest
+from app.schemas import LeadCreate, LeadUpdate, LeadOut, LeadDocumentOut, LeadStats, LeadScrapeRequest, ProjectPreAuditOut
 from app.security.audit_logging import AuditLogger
 from app.auth.dependencies import require_operator, require_viewer, require_admin
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 from app.services.lead_intelligence.factory import get_scraper, list_scrapers, health_check_all
+from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
+from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
 from app.tasks.pre_audit_jobs import fetch_lead_documents as fetch_lead_documents_task
 from app.core.logging import get_logger
 
@@ -483,3 +485,34 @@ async def get_scraper_health(
     return health_check_all()
 
 
+
+
+
+@router.post("/{lead_id}/convert-and-pre-audit", response_model=ProjectPreAuditOut, status_code=202)
+async def convert_and_pre_audit_lead(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+):
+    lead = await db.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    try:
+        converter = LeadToProjectConverter(db)
+        project = await converter.convert(lead)
+    except LeadConversionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    runner = PreAuditRunner(db)
+    pre_audit = await runner.run_for_project(project, lead_id=str(lead_id))
+
+    audit = AuditLogger(db)
+    await audit.log(
+        action_type=AuditActionEnum.user_created,
+        actor_id=current_user.id,
+        target_type="project_pre_audit",
+        target_id=pre_audit.id,
+        metadata={"lead_id": str(lead_id), "project_id": str(project.id)},
+    )
+    return pre_audit

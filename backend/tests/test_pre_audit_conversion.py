@@ -182,3 +182,38 @@ async def test_run_pre_audit_pipeline_task(async_db_session, convertible_lead):
             run_pre_audit_pipeline()
     # If no fetched docs, no conversion queued
     mock_convert.delay.assert_not_called()
+
+
+
+@pytest.mark.asyncio
+async def test_convert_and_pre_audit_endpoint(client: AsyncClient, operator_headers, async_db_session, convertible_lead):
+    doc = LeadDocument(
+        lead_id=convertible_lead.id,
+        document_type="pdd",
+        source_url="https://example.com/pdd.pdf",
+        mime_type="application/pdf",
+        s3_key="leads/cdm/.../pdd/abc.pdf",
+        s3_bucket="bucket",
+        file_size_bytes=1234,
+        file_hash_sha256="abcd",
+        status=LeadDocumentStatusEnum.fetched,
+    )
+    async_db_session.add(doc)
+    await async_db_session.commit()
+
+    with patch("app.services.lead_intelligence.pre_audit_runner.PreAuditRunner.run_for_project", new_callable=AsyncMock) as mock_run:
+        mock_run.return_value = MagicMock(
+            id=uuid.uuid4(),
+            project_id=uuid.uuid4(),
+            lead_id=convertible_lead.id,
+            validation_run_id=None,
+            readiness_score=0.75,
+            status="gaps",
+            gap_summary={},
+            created_at=datetime.now(timezone.utc),
+        )
+        resp = await client.post(f"/leads/{convertible_lead.id}/convert-and-pre-audit", headers=operator_headers)
+
+    assert resp.status_code == 202
+    data = resp.json()
+    assert data["readiness_score"] == 0.75

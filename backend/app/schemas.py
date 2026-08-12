@@ -851,6 +851,17 @@ class LeadDocumentOut(LeadDocumentBase, ORMBase):
     created_at: datetime
 
 
+class ProjectPreAuditOut(ORMBase):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    lead_id: Optional[uuid.UUID] = None
+    validation_run_id: Optional[uuid.UUID] = None
+    readiness_score: float
+    status: str
+    gap_summary: Dict[str, Any] = {}
+    created_at: datetime
+
+
 class LeadScoreRequest(BaseModel):
     recompute_all: bool = False
 
