@@ -10,7 +10,7 @@ from app.database import AsyncSessionLocal
 from app.models import Lead, LeadWorkflowStatusEnum, ScraperRun
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 from app.services.lead_intelligence.factory import get_scraper, list_scrapers
-from app.tasks.pre_audit_jobs import fetch_lead_documents
+from app.tasks.pre_audit_jobs import fetch_lead_documents, run_pre_audit_pipeline
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -149,6 +149,8 @@ def scrape_registries(self, country: str = "Kenya"):
 
             for lead in created_or_updated:
                 fetch_lead_documents.delay(str(lead.id))
+
+            run_pre_audit_pipeline.delay()
 
             logger.info("task_scrape_registries_completed", created=total_created, updated=total_updated)
             return {"created": total_created, "updated": total_updated}

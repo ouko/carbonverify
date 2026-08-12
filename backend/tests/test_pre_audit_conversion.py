@@ -18,6 +18,7 @@ from app.models import (
 from app.services.lead_intelligence.document_text import extract_text_async
 from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
 from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
+from app.tasks.pre_audit_jobs import run_pre_audit_pipeline
 from app.services.lead_intelligence.system_developer import (
     SYSTEM_COMPANY_NAME,
     SYSTEM_DEVELOPER_EMAIL,
@@ -156,3 +157,28 @@ async def test_pre_audit_runner_parses_output(async_db_session, convertible_lead
 
     assert result.status == PreAuditStatusEnum.passed
     assert result.readiness_score == 0.85
+
+
+
+class _FakeSessionContext:
+    def __init__(self, session):
+        self.session = session
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_run_pre_audit_pipeline_task(async_db_session, convertible_lead):
+    with patch(
+        "app.tasks.pre_audit_jobs.AsyncSessionLocal",
+        return_value=_FakeSessionContext(async_db_session),
+    ):
+        with patch("app.tasks.pre_audit_jobs.convert_lead_to_project") as mock_convert:
+            mock_convert.delay = MagicMock()
+            run_pre_audit_pipeline()
+    # If no fetched docs, no conversion queued
+    mock_convert.delay.assert_not_called()

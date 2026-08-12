@@ -144,3 +144,96 @@ def fetch_all_pending_documents(self) -> None:
     except Exception as exc:
         logger.error("fetch_all_pending_documents_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=60)
+
+
+
+from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
+from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
+from app.models import LeadWorkflowStatusEnum, Project
+
+
+@celery_app.task(bind=True, max_retries=3)
+def convert_lead_to_project(self, lead_id: str) -> dict:
+    """Convert a single qualified lead into a CarbonVerify project."""
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            lead = await db.get(Lead, lead_id)
+            if not lead:
+                logger.warning("convert_lead_not_found", lead_id=lead_id)
+                return {"error": "lead not found"}
+
+            try:
+                converter = LeadToProjectConverter(db)
+                project = await converter.convert(lead)
+                run_pre_audit_for_project.delay(str(project.id), lead_id=str(lead.id))
+                return {"project_id": str(project.id), "lead_id": lead_id}
+            except LeadConversionError as exc:
+                logger.warning("convert_lead_skipped", lead_id=lead_id, reason=str(exc))
+                return {"error": str(exc)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("convert_lead_failed", lead_id=lead_id, error=str(exc))
+        raise self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(bind=True, max_retries=3)
+def run_pre_audit_for_project(self, project_id: str, lead_id: str | None = None) -> dict:
+    """Run pre-audit workflow for a project."""
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            project = await db.get(Project, project_id)
+            if not project:
+                logger.warning("pre_audit_project_not_found", project_id=project_id)
+                return {"error": "project not found"}
+
+            runner = PreAuditRunner(db)
+            try:
+                result = await runner.run_for_project(project, lead_id=lead_id)
+                return {
+                    "pre_audit_id": str(result.id),
+                    "project_id": project_id,
+                    "status": result.status.value,
+                    "score": result.readiness_score,
+                }
+            except Exception as exc:
+                logger.error("pre_audit_run_failed", project_id=project_id, error=str(exc))
+                raise
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("run_pre_audit_for_project_failed", project_id=project_id, error=str(exc))
+        raise self.retry(exc=exc, countdown=60)
+
+
+@celery_app.task(bind=True, max_retries=3)
+def run_pre_audit_pipeline(self) -> dict:
+    """Daily pipeline: convert qualified leads and run pre-audit."""
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            from datetime import date
+            result = await db.execute(
+                select(Lead).where(
+                    Lead.lead_status.in_([LeadWorkflowStatusEnum.qualified, LeadWorkflowStatusEnum.proposal_sent]),
+                    Lead.converted_project_id.is_(None),
+                    Lead.crediting_period_start.isnot(None),
+                    Lead.crediting_period_end.isnot(None),
+                    Lead.documents.any(LeadDocument.status == LeadDocumentStatusEnum.fetched),
+                )
+            )
+            leads = result.scalars().all()
+            logger.info("pre_audit_pipeline_leads", count=len(leads))
+
+            queued = []
+            for lead in leads:
+                convert_lead_to_project.delay(str(lead.id))
+                queued.append(str(lead.id))
+            return {"queued": queued, "count": len(queued)}
+
+    try:
+        return run_async(_run())
+    except Exception as exc:
+        logger.error("run_pre_audit_pipeline_failed", error=str(exc))
+        raise self.retry(exc=exc, countdown=300)
