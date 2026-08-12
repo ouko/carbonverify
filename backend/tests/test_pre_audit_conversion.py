@@ -93,3 +93,14 @@ async def test_convert_lead_to_project(async_db_session, convertible_lead):
     assert len(project.file_uploads) == 1
     assert project.file_uploads[0].s3_key == "leads/cdm/.../pdd/abc.pdf"
     assert convertible_lead.lead_status == LeadWorkflowStatusEnum.converted
+
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_pre_audit_workflow(async_db_session):
+    from app.services.lead_intelligence.pre_audit_workflow import get_or_create_pre_audit_workflow
+
+    wf = await get_or_create_pre_audit_workflow(async_db_session)
+    assert wf.name == "pre_audit_document_package"
+    wf2 = await get_or_create_pre_audit_workflow(async_db_session)
+    assert wf2.id == wf.id
