@@ -310,6 +310,45 @@ class Project(Base):
     agent_runs: Mapped[List["AgentRun"]] = relationship("AgentRun", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
     enumerators: Mapped[List["Enumerator"]] = relationship("Enumerator", back_populates="project", cascade="all, delete-orphan", passive_deletes=True)
     orchestrator_events: Mapped[List["OrchestratorEvent"]] = relationship("OrchestratorEvent", back_populates="project")
+    pre_audits: Mapped[List["ProjectPreAudit"]] = relationship(
+        "ProjectPreAudit", back_populates="project", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class PreAuditStatusEnum(str, PyEnum):
+    passed = "passed"
+    gaps = "gaps"
+    failed = "failed"
+
+
+class ProjectPreAudit(Base):
+    __tablename__ = "project_pre_audits"
+
+    __table_args__ = (
+        Index("ix_project_pre_audits_project_id", "project_id"),
+        Index("ix_project_pre_audits_status", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    lead_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("leads.id", ondelete="SET NULL"), nullable=True
+    )
+    validation_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("validation_runs.id"), nullable=True
+    )
+    readiness_score: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[PreAuditStatusEnum] = mapped_column(
+        Enum(PreAuditStatusEnum, name="pre_audit_status"), nullable=False
+    )
+    gap_summary: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    project: Mapped["Project"] = relationship("Project", back_populates="pre_audits")
 
 
 class FileUpload(Base):
@@ -1296,6 +1335,9 @@ class Lead(Base):
     )
     last_scored_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    converted_project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
 
     assignee: Mapped[Optional["User"]] = relationship("User")
     documents: Mapped[List["LeadDocument"]] = relationship(
@@ -1339,6 +1381,9 @@ class LeadDocument(Base):
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     fetch_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_fetch_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    file_upload_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("file_uploads.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
