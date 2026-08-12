@@ -15,7 +15,7 @@ from app.validation_engine.models import (
     ValidationRun,
     ValidationStepExecution,
 )
-from app.validation_engine.schemas import WorkflowStep
+from app.validation_engine.schemas import WorkflowStep, WorkflowStepType
 from app.services.s3 import upload_bytes
 
 
@@ -317,13 +317,13 @@ class ProofGenerator:
             }
 
             # Submit to Radix (using the existing blockchain client)
-            tx_ref = await self._radix_client.anchor_data(
-                data=json.dumps(anchor_payload, sort_keys=True),
-                metadata={
-                    "type": "validation_proof",
-                    "run_id": str(run.id),
-                },
+            anchor_result = await self._radix_client.anchor_audit_log(
+                audit_data=anchor_payload,
+                memo=f"validation_proof:{str(run.id)}",
             )
+            if not anchor_result.success:
+                raise RuntimeError(f"Radix anchoring failed: {anchor_result.error}")
+            tx_ref = anchor_result.tx_ref
 
             run.radix_tx_ref = tx_ref
             await db.commit()

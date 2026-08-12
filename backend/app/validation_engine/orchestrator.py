@@ -15,6 +15,7 @@ from app.validation_engine.models import (
     HumanEscalation,
     RemediationStatus,
     StepExecutionStatus,
+    ValidationRemediation,
     ValidationRun,
     ValidationRunTransition,
     ValidationStepExecution,
@@ -273,7 +274,9 @@ class ValidationOrchestrator:
                                 f"Step '{step.id}' failed and no remediation or fallback path succeeded"
                             )
 
-            # All steps completed
+            # Persist final outputs and complete the run
+            run.output_data = context["outputs"]
+            await self.db.commit()
             await self._generate_final_proofs(run)
             await self.advance_state(run, WorkflowRunStatus.completed, reason="All steps executed successfully")
 

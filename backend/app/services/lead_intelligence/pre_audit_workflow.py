@@ -25,8 +25,8 @@ def build_pre_audit_graph() -> WorkflowGraph:
                 "name": "Required Documents Present",
                 "type": "database_query",
                 "config": {
-                    "query": "SELECT document_type FROM data_sources WHERE project_id = :project_id AND source_type = 'document'",
-                    "params": {"project_id": "${project_id}"},
+                    "query": "SELECT id FROM data_sources WHERE project_id = :project_id AND source_type = 'document'",
+                    "params": {"project_id": "${input.project_id}"},
                     "snapshot_result": True,
                 },
                 "next_on_success": ["ai_evaluation"],
@@ -48,9 +48,9 @@ def build_pre_audit_graph() -> WorkflowGraph:
                         "reasoning (string including a short gap list and risk flags), recommendation (string)."
                     ),
                     "input_data": {
-                        "project_name": "${project_name}",
-                        "methodology": "${methodology}",
-                        "document_excerpts": "${document_excerpts}",
+                        "project_name": "${input.project_name}",
+                        "methodology": "${input.methodology}",
+                        "document_excerpts": "${input.document_excerpts}",
                     },
                     "pass_threshold": 0.7,
                     "temperature": 0.2,
@@ -65,7 +65,7 @@ def build_pre_audit_graph() -> WorkflowGraph:
                 "name": "Readiness Decision Gate",
                 "type": "decision_gate",
                 "config": {
-                    "condition_expression": "${ai_evaluation.passed} == True",
+                    "condition_expression": "${outputs.ai_evaluation.passed} == True",
                     "require_human_approval": False,
                     "auto_approve_threshold": 0.95,
                     "escalation_level": "l1_operator",

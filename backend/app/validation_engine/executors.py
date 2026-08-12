@@ -119,11 +119,12 @@ class DatabaseQueryExecutor:
         cfg = DatabaseQueryConfig.model_validate(config)
         self._validate_query(cfg.query)
 
+        from sqlalchemy import text
         from app.database import AsyncSessionLocal
         started = time.monotonic()
         async with AsyncSessionLocal() as session:
-            result = await session.execute(cfg.query, cfg.params)
-            rows = [dict(row._mapping) for row in result.mappings().all()]
+            result = await session.execute(text(cfg.query), cfg.params)
+            rows = [dict(row) for row in result.mappings().all()]
             execution_time_ms = int((time.monotonic() - started) * 1000)
 
         if cfg.expected_row_count is not None and len(rows) != cfg.expected_row_count:
@@ -395,10 +396,32 @@ class DecisionGateExecutor:
 
     def _evaluate_condition(self, condition: str, context: Dict[str, Any]) -> bool:
         """Safely evaluate a simple condition expression using a restricted AST visitor."""
-        # Replace context references
+        import re
+
+        def _resolve_ref(ref: str) -> Any:
+            parts = ref.split(".")
+            # Explicit namespaces: input, variables, outputs
+            if parts[0] in ("input", "variables", "outputs"):
+                current = context
+                for part in parts:
+                    if isinstance(current, dict) and part in current:
+                        current = current[part]
+                    else:
+                        return None
+                return current
+            # Bare key: legacy behavior, look in variables
+            return context.get("variables", {}).get(ref)
+
+        # Replace ${input.x}, ${variables.y}, ${outputs.step.z}, and legacy ${key} references
         expr = condition
-        for key, val in context.get("variables", {}).items():
-            expr = expr.replace(f"${{{key}}}", repr(val))
+        for match in re.finditer(r"\$\{([^}]+)\}", condition):
+            full = match.group(0)
+            ref = match.group(1)
+            value = _resolve_ref(ref)
+            if value is None:
+                logger.warning("decision_gate_unresolved_reference", reference=full, condition=condition)
+                return False
+            expr = expr.replace(full, repr(value))
 
         try:
             tree = ast.parse(expr, mode="eval")

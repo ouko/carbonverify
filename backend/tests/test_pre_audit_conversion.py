@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
+import json
 import uuid
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ from app.models import (
     LeadRegistrySourceEnum,
     LeadWorkflowStatusEnum,
     PreAuditStatusEnum,
+    ProjectPreAudit,
     User,
 )
 from app.services.lead_intelligence.document_text import extract_text_async
@@ -217,3 +219,65 @@ async def test_convert_and_pre_audit_endpoint(client: AsyncClient, operator_head
     assert resp.status_code == 202
     data = resp.json()
     assert data["readiness_score"] == 0.75
+
+
+class _FakeKimiAPIClient:
+    """Deterministic AI client that returns a passing pre-audit JSON response."""
+
+    async def chat_completion(self, messages, temperature=0.3, max_tokens=2048):
+        return {
+            "success": True,
+            "content": json.dumps({
+                "score": 0.85,
+                "passed": True,
+                "reasoning": "Documents are complete and consistent. No gaps identified.",
+                "recommendation": "Ready for auditor assignment.",
+            }),
+            "usage": {},
+        }
+
+
+@pytest.mark.asyncio
+async def test_pre_audit_runner_end_to_end(async_db_session):
+    """Create a lead, convert it, and run the real pre-audit workflow with mocked AI/S3."""
+    lead = Lead(
+        registry_source=LeadRegistrySourceEnum.cdm,
+        external_id="E2E-001",
+        project_name="End-to-End Project",
+        project_developer="Acme Carbon",
+        methodology="TPDDTEC_v4",
+        crediting_period_start=date(2024, 1, 1),
+        crediting_period_end=date(2030, 12, 31),
+        lead_status=LeadWorkflowStatusEnum.qualified,
+    )
+    doc = LeadDocument(
+        document_type="pdd",
+        source_url="https://example.com/pdd.html",
+        mime_type="text/html",
+        s3_key="leads/cdm/e2e/pdd.html",
+        s3_bucket="bucket",
+        file_size_bytes=1234,
+        file_hash_sha256="abcd",
+        status=LeadDocumentStatusEnum.fetched,
+    )
+    lead.documents = [doc]
+    async_db_session.add(lead)
+    await async_db_session.commit()
+    await async_db_session.refresh(lead)
+
+    converter = LeadToProjectConverter(async_db_session)
+    project = await converter.convert(lead)
+
+    runner = PreAuditRunner(async_db_session)
+    with patch("app.services.lead_intelligence.pre_audit_runner.fetch_s3_bytes", new_callable=AsyncMock, return_value=b"<html><body>PDD content</body></html>"), \
+         patch("app.services.kimi_api.KimiAPIClient", _FakeKimiAPIClient), \
+         patch("app.database.AsyncSessionLocal", return_value=_FakeSessionContext(async_db_session)):
+        pre_audit = await runner.run_for_project(project, lead_id=str(lead.id))
+
+    assert isinstance(pre_audit, ProjectPreAudit)
+    assert pre_audit.project_id == project.id
+    assert pre_audit.status == PreAuditStatusEnum.passed
+    assert pre_audit.readiness_score == pytest.approx(0.85)
+    assert pre_audit.gap_summary["gaps"] == []
+    assert pre_audit.gap_summary["risk_flags"] == []
+    assert "Ready for auditor" in pre_audit.gap_summary["recommendation"]
