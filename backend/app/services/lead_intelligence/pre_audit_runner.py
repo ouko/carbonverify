@@ -1,9 +1,10 @@
 """Run the pre-audit validation workflow for a project and cache the result."""
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,7 @@ from app.validation_engine.orchestrator import ValidationOrchestrator
 logger = get_logger(__name__)
 
 MAX_TEXT_CHARS_PER_DOC = 8000
+MAX_CONCURRENT_DOC_EXTRACT = 5
 
 
 class PreAuditRunner:
@@ -80,7 +82,9 @@ class PreAuditRunner:
                 DataSource.source_type == SourceTypeEnum.document,
             )
         )
-        excerpts = []
+
+        # Collect valid (data_source, file_upload) pairs before doing any I/O.
+        items: List[Tuple[DataSource, FileUpload]] = []
         for ds in result.scalars().all():
             raw_id = ds.raw_data.get("file_upload_id")
             if not raw_id:
@@ -93,15 +97,31 @@ class PreAuditRunner:
             upload = await self.db.get(FileUpload, file_upload_id)
             if not upload or not upload.s3_key:
                 continue
-            try:
-                content = await fetch_s3_bytes(upload.s3_key, upload.s3_bucket)
-                text = await extract_text_async(content, upload.mime_type)
-                excerpts.append({
-                    "document_type": ds.raw_data.get("document_type", "unknown"),
-                    "text": text[:MAX_TEXT_CHARS_PER_DOC],
-                })
-            except Exception as exc:
-                logger.warning("pre_audit_text_extraction_failed", file_upload_id=file_upload_id, error=str(exc))
+            items.append((ds, upload))
+
+        # Fetch and extract text from each document concurrently.
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_DOC_EXTRACT)
+
+        async def _process_one(ds: DataSource, upload: FileUpload) -> Dict[str, Any] | None:
+            async with semaphore:
+                try:
+                    content = await fetch_s3_bytes(upload.s3_key, upload.s3_bucket)
+                    text = await extract_text_async(content, upload.mime_type)
+                    return {
+                        "document_type": ds.raw_data.get("document_type", "unknown"),
+                        "text": text[:MAX_TEXT_CHARS_PER_DOC],
+                    }
+                except Exception as exc:
+                    logger.warning(
+                        "pre_audit_text_extraction_failed",
+                        file_upload_id=str(upload.id),
+                        s3_key=upload.s3_key,
+                        error=str(exc),
+                    )
+                    return None
+
+        tasks = [_process_one(ds, upload) for ds, upload in items]
+        excerpts = [excerpt for excerpt in await asyncio.gather(*tasks) if excerpt is not None]
         return excerpts
 
     def _parse_run_output(self, output_data: Dict[str, Any]) -> Dict[str, Any]:
