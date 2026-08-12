@@ -406,6 +406,24 @@ High scores (>70) indicate urgent renewal/reverification opportunities.
 
 Every scrape execution is recorded in the `scraper_runs` table with per-source counts, timestamps, and status. The frontend displays last-scraped timestamps and allows manual re-scraping.
 
+#### AI Pre-Audit Automation
+
+Qualified leads with fetched registry documents can be converted into CarbonVerify projects and run through an AI pre-audit. The pipeline is also scheduled to run automatically:
+
+1. `scrape-registries` discovers new leads daily.
+2. `fetch-all-pending-documents` downloads PDDs, monitoring reports, and verification reports (with `etag`/`last_modified` incremental fetch).
+3. `run-pre-audit-pipeline` converts qualified *pending* leads and runs the `pre_audit_document_package` validation workflow.
+4. `re-audit-changed-projects` re-scores converted projects only when their fetched documents actually change.
+
+Configure the scope with:
+
+```bash
+PRE_AUDIT_PENDING_ONLY=true
+PRE_AUDIT_PENDING_STATUSES=under_validation,under_verification,under_certification
+```
+
+See `docs/PRE_AUDIT_OPTIMIZATION.md` for the full consultant workflow and registry data-source recommendations.
+
 #### API Endpoints (Leads)
 
 | Method | Path | Description |
@@ -417,9 +435,13 @@ Every scrape execution is recorded in the `scraper_runs` table with per-source c
 | `DELETE` | `/leads/{id}` | Delete a lead |
 | `POST` | `/leads/{id}/score` | Re-calculate stuck score |
 | `POST` | `/leads/scrape` | Run scrapers (all or per-registry) |
+| `POST` | `/leads/bulk-import` | Import a list of registry IDs/URLs and queue document fetch |
+| `GET` | `/leads/opportunities/pending` | Under-audited leads with document/pre-audit summary |
 | `GET` | `/leads/stats/dashboard` | Lead aggregate stats |
 | `GET` | `/leads/health/scrapers` | Scraper health check |
 | `GET` | `/leads/scraper-history` | Per-source last scrape timestamps |
+| `POST` | `/leads/{id}/fetch-documents` | Queue document fetch for a lead |
+| `POST` | `/leads/{id}/convert-and-pre-audit` | Convert lead to project and run AI pre-audit immediately |
 
 ### API Endpoints (Core)
 
