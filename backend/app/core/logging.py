@@ -121,6 +121,9 @@ class StructLogger:
     def _log(self, level: int, msg: str, **kwargs: Any) -> None:
         extra = {"event": msg}
         extra.update(kwargs)
+        # Sanitize reserved LogRecord keys
+        if 'message' in extra:
+            extra['log_message'] = extra.pop('message')
         self._logger.log(level, msg, extra=extra)
 
     def debug(self, msg: str, **kwargs: Any) -> None:
