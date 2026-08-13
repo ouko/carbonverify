@@ -149,7 +149,7 @@ async def request_size_limit(request: Request, call_next):
 # TrustedHostMiddleware — prevent Host header attacks
 # Skip in test environment to avoid breaking test clients
 if settings.ENVIRONMENT != "test":
-    allowed_hosts = ["carbonverify.io", "*.carbonverify.io"]
+    allowed_hosts = ["carbonverify.io", "*.carbonverify.io", "localhost", "127.0.0.1", "carbonverify.space"]
     if settings.ENVIRONMENT == "development":
         allowed_hosts.extend(["localhost", "127.0.0.1"])
     app.add_middleware(
