@@ -38,10 +38,13 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml ps
 
 poll_health() {
   local url="$1"
-  local max_attempts="${2:-18}"
+  local host="${2:-}"
+  local max_attempts="${3:-18}"
   local attempt=1
+  local host_arg=""
+  [[ -n "$host" ]] && host_arg="-H Host:$host"
   while [[ $attempt -le $max_attempts ]]; do
-    if curl -fsSk "$url" >/dev/null 2>&1; then
+    if curl -fsSk $host_arg "$url" >/dev/null 2>&1; then
       echo "OK ($attempt/$max_attempts)"
       return 0
     fi
@@ -57,7 +60,7 @@ echo "--- Backend health (HTTP) ---"
 poll_health "http://localhost:8000/health/"
 
 echo "--- Frontend via reverse proxy (HTTPS, self-signed cert OK) ---"
-poll_health "https://localhost/health/"
+poll_health "https://localhost/health/" "carbonverify.space"
 
 echo "--- Frontend container direct (HTTP) ---"
 curl -fsS http://localhost:8080/index.html >/dev/null && echo "OK" || echo "FRONTEND DIRECT HEALTH FAILED"

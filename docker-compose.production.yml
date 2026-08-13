@@ -74,6 +74,10 @@ services:
       dockerfile: Dockerfile
     container_name: cv-celery-worker
     restart: always
+    # The backend Dockerfile's healthcheck targets port 8000; Celery does not
+    # expose that port, so disable it here.
+    healthcheck:
+      disable: true
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
       --without-gossip --without-mingle --without-heartbeat
     environment:
@@ -105,6 +109,10 @@ services:
       dockerfile: Dockerfile
     container_name: cv-celery-beat
     restart: always
+    # The backend Dockerfile's healthcheck targets port 8000; Celery beat does
+    # not expose that port, so disable it here.
+    healthcheck:
+      disable: true
     command: celery -A app.tasks.celery_app beat --loglevel=info --scheduler app.tasks.beat_scheduler.LeaderElectionScheduler
     environment:
       DATABASE_URL: ${DATABASE_URL}
