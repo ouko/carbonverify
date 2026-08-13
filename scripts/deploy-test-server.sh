@@ -36,13 +36,30 @@ sleep 10
 echo "==> Health checks"
 docker compose -f docker-compose.yml -f docker-compose.production.yml ps
 
+poll_health() {
+  local url="$1"
+  local max_attempts="${2:-18}"
+  local attempt=1
+  while [[ $attempt -le $max_attempts ]]; do
+    if curl -fsSk "$url" >/dev/null 2>&1; then
+      echo "OK ($attempt/$max_attempts)"
+      return 0
+    fi
+    echo "    attempt $attempt/$max_attempts..."
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+  echo "FAILED"
+  return 1
+}
+
 echo "--- Backend health (HTTP) ---"
-curl -fsS http://localhost:8000/health/ || echo "BACKEND HEALTH FAILED"
+poll_health "http://localhost:8000/health/"
 
 echo "--- Frontend via reverse proxy (HTTPS, self-signed cert OK) ---"
-curl -fsSk https://localhost/health/ || echo "PROXY HEALTH FAILED"
+poll_health "https://localhost/health/"
 
 echo "--- Frontend container direct (HTTP) ---"
-curl -fsS http://localhost:8080/index.html || echo "FRONTEND DIRECT HEALTH FAILED"
+curl -fsS http://localhost:8080/index.html >/dev/null && echo "OK" || echo "FRONTEND DIRECT HEALTH FAILED"
 
 echo "==> Done"
