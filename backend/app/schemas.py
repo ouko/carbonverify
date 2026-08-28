@@ -914,6 +914,77 @@ class LeadStats(BaseModel):
     critical_count: int
 
 
+# ─── AI Application Pipeline ────────────────────────────────────────────────────
+
+class ApplicationBase(BaseModel):
+    applicant_email_hash: str
+    applicant_email_encrypted: Optional[str] = None
+    organization_name: Optional[str] = None
+    project_title: str
+    country: Optional[str] = None
+    region: Optional[str] = None
+    sector: Optional[str] = None
+    proposed_methodology: Optional[str] = None
+    status: str = "intake"
+    confidence_score: float = 0.0
+
+
+class ApplicationCreate(ApplicationBase):
+    pass
+
+
+class ApplicationUpdate(BaseModel):
+    organization_name: Optional[str] = None
+    project_title: Optional[str] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    sector: Optional[str] = None
+    proposed_methodology: Optional[str] = None
+    status: Optional[str] = None
+    confidence_score: Optional[float] = None
+    converted_project_id: Optional[uuid.UUID] = None
+    validation_run_id: Optional[uuid.UUID] = None
+
+
+class ApplicationOut(ApplicationBase, ORMBase):
+    id: uuid.UUID
+    converted_project_id: Optional[uuid.UUID] = None
+    validation_run_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ApplicationDocumentOut(BaseModel):
+    id: uuid.UUID
+    application_id: uuid.UUID
+    source_type: str
+    source_url: Optional[str] = None
+    s3_key: Optional[str] = None
+    original_filename: Optional[str] = None
+    mime_type: Optional[str] = None
+    file_size_bytes: Optional[int] = None
+    file_hash_sha256: Optional[str] = None
+    document_type: Optional[str] = None
+    status: str
+    extracted_text: Optional[str] = None
+    extracted_entities: dict = Field(default_factory=dict)
+    gap_findings: dict = Field(default_factory=dict)
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationIntakeRequest(BaseModel):
+    applicant_email: EmailStr
+    organization_name: Optional[str] = None
+    project_title: str
+    country: Optional[str] = None
+    sector: Optional[str] = None
+    proposed_methodology: Optional[str] = None
+
+
 # ─── Admin ────────────────────────────────────────────────────────────────────
 
 class AdminStats(BaseModel):

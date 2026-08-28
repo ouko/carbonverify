@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import select
 from app.models import Application, ApplicationStatusEnum
+from app.schemas import ApplicationCreate, ApplicationOut
 
 
 @pytest.mark.asyncio
@@ -20,3 +21,15 @@ async def test_application_model_exists(client, db_session):
     fetched = result.scalar_one()
     assert fetched.project_title == "Test Stove Project"
     assert fetched.status == ApplicationStatusEnum.intake
+
+
+def test_application_schema_roundtrip():
+    data = {
+        "applicant_email_hash": "test@example.com",
+        "project_title": "Test",
+        "country": "Kenya",
+        "sector": "cookstoves",
+        "status": "intake",
+    }
+    created = ApplicationCreate.model_validate(data)
+    assert created.project_title == "Test"
