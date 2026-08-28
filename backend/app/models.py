@@ -7,6 +7,7 @@ from sqlalchemy import (
     String,
     Text,
     Float,
+    BigInteger,
     Date,
     DateTime,
     Boolean,
@@ -201,6 +202,46 @@ class LeadProjectStatusEnum(str, PyEnum):
     rejected = "rejected"
     completed = "completed"
     unknown = "unknown"
+
+
+class ApplicationStatusEnum(str, PyEnum):
+    intake = "intake"
+    documents_pending = "documents_pending"
+    pre_audit = "pre_audit"
+    gaps = "gaps"
+    ready_for_calculation = "ready_for_calculation"
+    ready_for_review = "ready_for_review"
+    approved = "approved"
+    submitted = "submitted"
+    rejected = "rejected"
+
+
+class ApplicationDocumentSourceEnum(str, PyEnum):
+    upload = "upload"
+    email = "email"
+    drive = "drive"
+    dropbox = "dropbox"
+    registry = "registry"
+    api = "api"
+
+
+class ApplicationDocumentTypeEnum(str, PyEnum):
+    pdd = "pdd"
+    monitoring_report = "monitoring_report"
+    kpt_results = "kpt_results"
+    sales_receipt = "sales_receipt"
+    survey_form = "survey_form"
+    gps_data = "gps_data"
+    stove_inventory = "stove_inventory"
+    other = "other"
+
+
+class ApplicationDocumentStatusEnum(str, PyEnum):
+    discovered = "discovered"
+    fetched = "fetched"
+    scanning = "scanning"
+    processed = "processed"
+    failed = "failed"
 
 
 class User(Base):
@@ -1276,6 +1317,100 @@ class PortfolioHolding(Base):
 
     portfolio: Mapped["CorporatePortfolio"] = relationship("CorporatePortfolio")
     token: Mapped["CarbonCreditToken"] = relationship("CarbonCreditToken")
+
+
+# ─── AI Application Pipeline ────────────────────────────────────────────────────
+
+class Application(Base):
+    __tablename__ = "applications"
+
+    __table_args__ = (
+        Index("ix_applications_status", "status"),
+        Index("ix_applications_country", "country"),
+        Index("ix_applications_sector", "sector"),
+        Index("ix_applications_applicant_email_hash", "applicant_email_hash"),
+        Index("ix_applications_converted_project_id", "converted_project_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    applicant_email_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    applicant_email_encrypted: Mapped[Optional[str]] = mapped_column(EncryptedString(255), nullable=True)
+    organization_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    project_title: Mapped[str] = mapped_column(String(500), nullable=False)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    region: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    proposed_methodology: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[ApplicationStatusEnum] = mapped_column(
+        Enum(ApplicationStatusEnum, name="application_status"), nullable=False, default=ApplicationStatusEnum.intake
+    )
+    confidence_score: Mapped[float] = mapped_column(Float, default=0.0)
+    converted_project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True
+    )
+    validation_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("validation_runs.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    documents: Mapped[List["ApplicationDocument"]] = relationship(
+        "ApplicationDocument", back_populates="application", cascade="all, delete-orphan"
+    )
+
+
+class ApplicationDocument(Base):
+    __tablename__ = "application_documents"
+
+    __table_args__ = (
+        Index("ix_application_documents_application_id", "application_id"),
+        Index("ix_application_documents_status", "status"),
+        Index("ix_application_documents_document_type", "document_type"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("applications.id"), nullable=False
+    )
+    source_type: Mapped[ApplicationDocumentSourceEnum] = mapped_column(
+        Enum(ApplicationDocumentSourceEnum, name="application_document_source"), nullable=False
+    )
+    source_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    s3_key: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    original_filename: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    mime_type: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    file_hash_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    document_type: Mapped[Optional[ApplicationDocumentTypeEnum]] = mapped_column(
+        Enum(ApplicationDocumentTypeEnum, name="application_document_type"), nullable=True
+    )
+    status: Mapped[ApplicationDocumentStatusEnum] = mapped_column(
+        Enum(ApplicationDocumentStatusEnum, name="application_document_status"),
+        nullable=False,
+        default=ApplicationDocumentStatusEnum.discovered,
+    )
+    extracted_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    extracted_entities: Mapped[dict] = mapped_column(JSONB, default=dict)
+    gap_findings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    application: Mapped["Application"] = relationship("Application", back_populates="documents")
 
 
 # ─── Lead Intelligence ──────────────────────────────────────────────────────────
