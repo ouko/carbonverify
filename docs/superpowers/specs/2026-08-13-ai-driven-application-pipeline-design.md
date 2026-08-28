@@ -23,7 +23,10 @@ The existing CarbonVerify codebase already contains the core building blocks. Th
 
 ## 2. Assumptions
 
-- **Primary actors:** Project developers use a public/self-service intake portal; CarbonVerify consultants use the same pipeline as an internal case-management view.
+- **Primary actors:**
+  - **Project developers / owners** apply directly through a public/self-service intake portal on CarbonVerify.
+  - **CarbonVerify consultants** use the same pipeline as an internal case-management view.
+  - **Discovered registry leads** can be promoted into applications automatically or by a consultant.
 - **Automation level:** Hybrid by confidence. The system auto-advances high-confidence steps, queues human review for medium-confidence steps, and escalates low-confidence or blocked steps.
 - **Scope:** Inbound application processing and audit readiness. Outbound marketing and sales outreach are out of scope.
 - **Compliance:** Human approval remains mandatory before registry submission and before any legally binding representation.
