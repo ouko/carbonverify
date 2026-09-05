@@ -13,6 +13,8 @@ import MFAPage from './pages/MFAPage';
 const InviteAcceptPage = lazy(() => import('./pages/InviteAcceptPage').then(m => ({ default: m.default })));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(m => ({ default: m.default })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(m => ({ default: m.default })));
+const ApplicationIntakePage = lazy(() => import('./pages/ApplicationIntakePage').then(m => ({ default: m.default })));
+const ApplicationIntakeSuccessPage = lazy(() => import('./pages/ApplicationIntakeSuccessPage').then(m => ({ default: m.default })));
 
 // Core dashboard pages (eager — visited on every login)
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.default })));
@@ -70,6 +72,8 @@ function App() {
             <Route path="/register" element={<InviteAcceptPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/apply" element={<ApplicationIntakePage />} />
+            <Route path="/apply/success" element={<ApplicationIntakeSuccessPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><DashboardPage /></Suspense>} />
