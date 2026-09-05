@@ -3,6 +3,7 @@
 import asyncio
 import ast
 import time
+import uuid
 from typing import Any, Dict, List, Optional, Protocol
 
 import httpx
@@ -676,6 +677,48 @@ class SubflowExecutor:
             "input_mapping": cfg.input_mapping,
             "output_mapping": cfg.output_mapping,
             "subflow": True,
+        }
+
+
+class ApplicationIntakeExecutor:
+    """Create an Application record from workflow config."""
+
+    async def execute(
+        self,
+        config: Dict[str, Any],
+        context: Dict[str, Any],
+        run: ValidationRun,
+    ) -> Dict[str, Any]:
+        from app.database import get_db_context
+        from app.models import Application, ApplicationStatusEnum
+        from app.core.encryption import compute_searchable_hash
+        from app.validation_engine.schemas import ApplicationIntakeConfig
+
+        cfg = ApplicationIntakeConfig.model_validate(config)
+        email_hash = compute_searchable_hash(cfg.applicant_email)
+
+        application = Application(
+            applicant_email_hash=email_hash,
+            applicant_email_encrypted=cfg.applicant_email,
+            organization_name=cfg.organization_name,
+            project_title=cfg.project_title,
+            country=cfg.country,
+            sector=cfg.sector,
+            proposed_methodology=cfg.proposed_methodology,
+            status=ApplicationStatusEnum.intake,
+            confidence_score=0.95,
+        )
+
+        async with get_db_context() as db:
+            db.add(application)
+            await db.commit()
+            await db.refresh(application)
+
+        return {
+            "application_id": str(application.id),
+            "project_title": application.project_title,
+            "status": application.status.value,
+            "confidence_score": application.confidence_score,
         }
 
 

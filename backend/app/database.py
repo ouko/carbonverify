@@ -1,6 +1,7 @@
 """Async SQLAlchemy engine + session factory with read replica support."""
 
-from typing import AsyncGenerator, Optional
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, AsyncIterator, Optional
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -105,6 +106,22 @@ def get_read_replica_session_maker() -> Optional[async_sessionmaker]:
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency for write-primary DB sessions."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+@asynccontextmanager
+async def get_db_context() -> AsyncIterator[AsyncSession]:
+    """Standalone async context manager yielding a write-primary DB session.
+
+    Used by validation engine executors that run outside FastAPI request scope.
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
