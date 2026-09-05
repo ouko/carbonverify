@@ -196,6 +196,12 @@ class WorkflowStep(BaseModel):
             ParallelConfig.model_validate(v)
         elif step_type == WorkflowStepType.subflow:
             SubflowConfig.model_validate(v)
+        elif step_type == WorkflowStepType.application_intake:
+            ApplicationIntakeConfig.model_validate(v)
+        elif step_type == WorkflowStepType.document_collection:
+            DocumentCollectionConfig.model_validate(v)
+        elif step_type == WorkflowStepType.document_ai_classification:
+            DocumentAiClassificationConfig.model_validate(v)
         return v
 
 
