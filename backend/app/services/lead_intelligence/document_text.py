@@ -39,7 +39,7 @@ async def fetch_url_bytes(url: str) -> bytes:
 
 
 def extract_text_from_bytes(content: bytes, mime_type: str) -> str:
-    """Extract plain text from PDF or HTML bytes."""
+    """Extract plain text from PDF, HTML, or text-like bytes."""
     if mime_type == "application/pdf":
         text = extract_text_pdfplumber(content)
         if not text.strip():
@@ -48,6 +48,8 @@ def extract_text_from_bytes(content: bytes, mime_type: str) -> str:
     if mime_type == "text/html":
         from bs4 import BeautifulSoup
         return BeautifulSoup(content, "html.parser").get_text(separator="\n")
+    if mime_type.startswith("text/") or mime_type in ("application/csv", "application/json"):
+        return content.decode("utf-8", errors="ignore")
     return ""
 
 
