@@ -853,6 +853,9 @@ class StepExecutorRegistry:
             WorkflowStepType.wait: WaitExecutor(),
             WorkflowStepType.parallel: ParallelExecutor(),
             WorkflowStepType.subflow: SubflowExecutor(),
+            WorkflowStepType.application_intake: ApplicationIntakeExecutor(),
+            WorkflowStepType.document_collection: DocumentCollectionExecutor(),
+            WorkflowStepType.document_ai_classification: DocumentAiClassificationExecutor(),
         }
 
     def get_executor(self, step_type: WorkflowStepType) -> StepExecutor:

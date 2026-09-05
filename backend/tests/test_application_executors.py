@@ -128,3 +128,12 @@ async def test_document_ai_classification_executor(db_session, patch_db_context,
 
     assert "classified_documents" in result
     assert result["classified_documents"][0]["document_type"] == "other"
+
+
+def test_application_executors_registered():
+    from app.validation_engine.executors import StepExecutorRegistry
+
+    registry = StepExecutorRegistry()
+    assert registry.get_executor(WorkflowStepType.application_intake) is not None
+    assert registry.get_executor(WorkflowStepType.document_collection) is not None
+    assert registry.get_executor(WorkflowStepType.document_ai_classification) is not None
