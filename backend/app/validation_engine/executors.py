@@ -722,6 +722,58 @@ class ApplicationIntakeExecutor:
         }
 
 
+class DocumentCollectionExecutor:
+    """Record discovered document slots for an application and await uploads."""
+
+    async def execute(
+        self,
+        config: Dict[str, Any],
+        context: Dict[str, Any],
+        run: ValidationRun,
+    ) -> Dict[str, Any]:
+        from sqlalchemy import select
+        from app.database import get_db_context
+        from app.models import (
+            Application,
+            ApplicationDocument,
+            ApplicationDocumentSourceEnum,
+            ApplicationDocumentStatusEnum,
+            ApplicationStatusEnum,
+        )
+        from app.validation_engine.schemas import DocumentCollectionConfig
+
+        cfg = DocumentCollectionConfig.model_validate(config)
+        application_id = uuid.UUID(context.get("application_id"))
+
+        async with get_db_context() as db:
+            result = await db.execute(select(Application).where(Application.id == application_id))
+            application = result.scalar_one_or_none()
+            if not application:
+                raise RuntimeError(f"Application {application_id} not found")
+
+            collected = []
+            for source in cfg.sources:
+                doc = ApplicationDocument(
+                    application_id=application_id,
+                    source_type=ApplicationDocumentSourceEnum(source.get("type", "upload")),
+                    source_url=source.get("url"),
+                    status=ApplicationDocumentStatusEnum.discovered,
+                )
+                db.add(doc)
+                collected.append({"document_id": str(doc.id), "status": "discovered"})
+
+            application.status = ApplicationStatusEnum.documents_pending
+            await db.commit()
+
+        return {
+            "application_id": str(application_id),
+            "collected_documents": collected,
+            "required_document_types": cfg.required_document_types,
+            "status": "awaiting_documents",
+            "confidence_score": 0.7,
+        }
+
+
 class StepExecutorRegistry:
     """Registry mapping step types to their executors."""
 

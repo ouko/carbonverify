@@ -4,6 +4,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 import pytest
+import pytest_asyncio
 
 from app.validation_engine.models import WorkflowStepType
 
@@ -51,3 +52,41 @@ async def test_application_intake_executor(db_session, patch_db_context):
     assert result["project_title"] == "Test Project"
     assert result["status"] == "intake"
     assert "application_id" in result
+
+
+@pytest_asyncio.fixture
+async def sample_application(db_session):
+    from app.models import Application, ApplicationStatusEnum
+
+    application = Application(
+        applicant_email_hash="owner@example.com",
+        project_title="Sample Project",
+        country="Kenya",
+        sector="cookstoves",
+        status=ApplicationStatusEnum.intake,
+    )
+    db_session.add(application)
+    await db_session.commit()
+    await db_session.refresh(application)
+    return application
+
+
+@pytest.mark.asyncio
+async def test_document_collection_executor(db_session, patch_db_context, sample_application):
+    from app.validation_engine.executors import DocumentCollectionExecutor
+    from app.validation_engine.schemas import DocumentCollectionConfig
+    from app.validation_engine.models import ValidationRun
+
+    executor = DocumentCollectionExecutor()
+    config = DocumentCollectionConfig(
+        sources=[{"type": "upload", "folder_id": None}],
+        required_document_types=["pdd"],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_application.id)}
+
+    result = await executor.execute(config, context, run)
+
+    assert "collected_documents" in result
+    assert result["status"] == "awaiting_documents"
+    assert len(result["collected_documents"]) == 1
