@@ -58,7 +58,11 @@ def build_ai_application_pipeline_graph() -> Dict[str, Any]:
                 "name": "Document AI Classification",
                 "type": "document_ai_classification",
                 "description": "Classify uploaded documents and extract entities with Kimi AI.",
-                "config": {"classify_with_kimi": True, "extract_entities": True},
+                "config": {
+                    "classify_with_kimi": True,
+                    "extract_entities": True,
+                    "required_document_types": ["pdd"],
+                },
                 "next_on_success": ["end"],
             },
         ],

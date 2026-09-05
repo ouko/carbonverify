@@ -953,6 +953,7 @@ class ApplicationOut(ApplicationBase, ORMBase):
     created_at: datetime
     updated_at: datetime
     applicant_token: Optional[str] = None
+    gap_findings: dict = Field(default_factory=dict)
 
 
 class ApplicationDocumentOut(BaseModel):

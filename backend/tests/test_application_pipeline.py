@@ -63,3 +63,39 @@ async def test_full_intake_to_classification_flow(client, authenticated_client, 
     trigger_response = await auth_client.post(f"/applications/{app_id}/trigger-pipeline")
     assert trigger_response.status_code == 200
     assert trigger_response.json()["status"] == "intake"
+
+
+@pytest.mark.asyncio
+async def test_full_pipeline_execution_via_orchestrator(db_session, patch_db_context, sample_application):
+    """Execute the ai_application_pipeline end-to-end through the orchestrator."""
+    from app.models import ApplicationStatusEnum
+    from app.services.application_pipeline import ensure_default_application_pipeline
+    from app.validation_engine.models import ValidationRun, WorkflowRunStatus
+    from app.validation_engine.orchestrator import ValidationOrchestrator
+
+    workflow = await ensure_default_application_pipeline(db_session)
+    orchestrator = ValidationOrchestrator(db_session)
+    run = await orchestrator.create_run(
+        workflow_id=str(workflow.id),
+        trigger_event="application_pipeline",
+        input_data={
+            "application_id": str(sample_application.id),
+            "applicant_email": "owner@example.com",
+            "project_title": "Sample Project",
+        },
+    )
+    # The trigger endpoint links the run to the application before executing
+    sample_application.validation_run_id = run.id
+    await db_session.commit()
+
+    result: ValidationRun = await orchestrator.execute_workflow(str(run.id))
+
+    assert result.status == WorkflowRunStatus.completed
+
+    # Intake step must not have duplicated the application; collection +
+    # classification must have run and advanced the application status
+    await db_session.refresh(sample_application)
+    assert sample_application.status in (
+        ApplicationStatusEnum.gaps,
+        ApplicationStatusEnum.pre_audit,
+    )

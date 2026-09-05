@@ -168,6 +168,41 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture
+def patch_db_context(db_session, monkeypatch):
+    """Route app.database.get_db_context to the test session.
+
+    Executors import get_db_context at call time, so monkeypatching the
+    app.database module attribute is picked up. Without this, executors
+    would open sessions on the app's own engine (a separate empty SQLite
+    in-memory database in tests).
+    """
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _ctx():
+        yield db_session
+
+    monkeypatch.setattr("app.database.get_db_context", _ctx)
+
+
+@pytest_asyncio.fixture
+async def sample_application(db_session):
+    from app.models import Application, ApplicationStatusEnum
+
+    application = Application(
+        applicant_email_hash="owner@example.com",
+        project_title="Sample Project",
+        country="Kenya",
+        sector="cookstoves",
+        status=ApplicationStatusEnum.intake,
+    )
+    db_session.add(application)
+    await db_session.commit()
+    await db_session.refresh(application)
+    return application
+
+
 @pytest_asyncio.fixture
 async def operator_headers(engine):
     """Return Authorization headers for a freshly-created operator user."""

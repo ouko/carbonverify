@@ -145,6 +145,7 @@ class DocumentCollectionConfig(BaseModel):
 class DocumentAiClassificationConfig(BaseModel):
     classify_with_kimi: bool = True
     extract_entities: bool = True
+    required_document_types: List[str] = Field(default_factory=list)
 
 
 class WorkflowStep(BaseModel):

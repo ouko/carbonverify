@@ -38,6 +38,27 @@ class StepExecutor(Protocol):
         ...
 
 
+def _resolve_application_id(context: Dict[str, Any], required: bool = True) -> Optional[uuid.UUID]:
+    """Resolve the target application ID from executor context.
+
+    Supports direct injection (unit tests), run input data (pipeline triggered
+    for an existing application), and outputs of previously executed steps.
+    """
+    raw = context.get("application_id")
+    if raw is None:
+        raw = context.get("input", {}).get("application_id")
+    if raw is None:
+        for output in context.get("outputs", {}).values():
+            if isinstance(output, dict) and output.get("application_id"):
+                raw = output["application_id"]
+                break
+    if raw is None:
+        if required:
+            raise RuntimeError("application_id not found in workflow context")
+        return None
+    return uuid.UUID(str(raw))
+
+
 class HttpRequestExecutor:
     """Execute HTTP request steps."""
 
@@ -695,6 +716,24 @@ class ApplicationIntakeExecutor:
         from app.validation_engine.schemas import ApplicationIntakeConfig
 
         cfg = ApplicationIntakeConfig.model_validate(config)
+
+        existing_id = _resolve_application_id(context, required=False)
+        if existing_id is not None:
+            # Pipeline was triggered for an existing application — do not duplicate it
+            async with get_db_context() as db:
+                from sqlalchemy import select
+                result = await db.execute(select(Application).where(Application.id == existing_id))
+                application = result.scalar_one_or_none()
+                if application is None:
+                    raise RuntimeError(f"Application {existing_id} not found")
+                return {
+                    "application_id": str(application.id),
+                    "project_title": application.project_title,
+                    "status": application.status.value,
+                    "confidence_score": application.confidence_score,
+                    "existing": True,
+                }
+
         email_hash = compute_searchable_hash(cfg.applicant_email)
 
         application = Application(
@@ -743,7 +782,7 @@ class DocumentCollectionExecutor:
         from app.validation_engine.schemas import DocumentCollectionConfig
 
         cfg = DocumentCollectionConfig.model_validate(config)
-        application_id = uuid.UUID(context.get("application_id"))
+        application_id = _resolve_application_id(context)
 
         async with get_db_context() as db:
             result = await db.execute(select(Application).where(Application.id == application_id))
@@ -794,7 +833,7 @@ class DocumentAiClassificationExecutor:
         from app.validation_engine.schemas import DocumentAiClassificationConfig
 
         cfg = DocumentAiClassificationConfig.model_validate(config)
-        application_id = uuid.UUID(context.get("application_id"))
+        application_id = _resolve_application_id(context)
 
         async with get_db_context() as db:
             result = await db.execute(
@@ -828,13 +867,54 @@ class DocumentAiClassificationExecutor:
                     "status": doc.status.value,
                 })
 
+            # Gap analysis: compare classified documents against requirements
+            classified_types = {c["document_type"] for c in classified}
+            missing = [t for t in cfg.required_document_types if t not in classified_types]
+            gap_findings = {
+                "required_document_types": cfg.required_document_types,
+                "classified_document_types": sorted(classified_types),
+                "missing_document_types": missing,
+                "has_gaps": len(missing) > 0,
+                "remediation": [_gap_remediation(t) for t in missing],
+            }
+
+            from app.models import Application, ApplicationStatusEnum
+            app_result = await db.execute(select(Application).where(Application.id == application_id))
+            application = app_result.scalar_one_or_none()
+            if application is not None:
+                application.gap_findings = gap_findings
+                application.status = (
+                    ApplicationStatusEnum.gaps if missing else ApplicationStatusEnum.pre_audit
+                )
+
             await db.commit()
 
         return {
             "application_id": str(application_id),
             "classified_documents": classified,
+            "gap_findings": gap_findings,
             "confidence_score": 0.85 if cfg.classify_with_kimi else 0.6,
         }
+
+
+_GAP_REMEDIATION_GUIDANCE = {
+    "pdd": "Upload the Project Design Document (PDD) for the proposed methodology.",
+    "monitoring_report": "Upload the most recent monitoring report for the project.",
+    "kpt_results": "Upload kitchen performance test (KPT) results.",
+    "sales_receipt": "Upload sales receipts or invoices for the technology distributed.",
+    "survey_form": "Upload completed household/beneficiary survey forms.",
+    "gps_data": "Upload GPS coordinates of installation sites.",
+    "stove_inventory": "Upload the stove inventory or distribution list.",
+}
+
+
+def _gap_remediation(document_type: str) -> Dict[str, str]:
+    return {
+        "document_type": document_type,
+        "guidance": _GAP_REMEDIATION_GUIDANCE.get(
+            document_type, f"Upload a document of type '{document_type}'."
+        ),
+    }
 
 
 class StepExecutorRegistry:
