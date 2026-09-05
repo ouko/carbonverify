@@ -204,3 +204,86 @@ async def test_create_application_sends_welcome_email(client, db_session, monkey
     call_kwargs = mock_service.send_email.await_args.kwargs
     assert call_kwargs["to"] == "owner@example.com"
     assert "/apply/portal" in call_kwargs["body_text"]
+
+
+# ─── Phase 3: automatic re-classification after upload ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_upload_retriggers_pipeline_after_first_run(
+    client, authenticated_client, db_session, monkeypatch
+):
+    """Once a pipeline run exists, a new applicant upload queues a fresh run."""
+    from unittest.mock import patch
+
+    from sqlalchemy import select
+
+    from app.config import get_settings
+    from app.models import Application, ApplicationStatusEnum
+    from app.services.application_tokens import create_applicant_token
+    from app.validation_engine.models import ValidationRun
+
+    monkeypatch.setattr(get_settings(), "S3_BUCKET_NAME", "test-bucket")
+    _mock_clean_scanner(monkeypatch)
+
+    intake_response = await client.post("/applications", json={
+        "applicant_email": "owner@example.com",
+        "project_title": "Kenya Stoves",
+        "country": "Kenya",
+        "sector": "cookstoves",
+    })
+    app_id = intake_response.json()["id"]
+
+    auth_client, _ = authenticated_client
+    # First pipeline run (operator-triggered)
+    with patch("app.validation_engine.tasks.execute_validation_run") as first_task:
+        first_task.delay.return_value = None
+        trigger_response = await auth_client.post(f"/applications/{app_id}/trigger-pipeline")
+    assert trigger_response.status_code == 200
+
+    # Applicant uploads a new document → pipeline re-queues automatically
+    token = create_applicant_token(__import__("uuid").UUID(app_id))
+    with patch("app.validation_engine.tasks.execute_validation_run") as second_task:
+        second_task.delay.return_value = None
+        with patch("app.services.s3.upload_bytes", return_value=None):
+            upload_response = await client.post(
+                f"/applications/{app_id}/documents",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"file": ("notes.txt", b"extra evidence", "text/plain")},
+            )
+    assert upload_response.status_code == 201
+    second_task.delay.assert_called_once()
+
+    run_result = await db_session.execute(select(ValidationRun))
+    runs = run_result.scalars().all()
+    assert len(runs) == 2
+
+    application = await db_session.get(Application, __import__("uuid").UUID(app_id))
+    assert application.validation_run_id == runs[-1].id
+    assert application.status == ApplicationStatusEnum.documents_pending
+
+
+@pytest.mark.asyncio
+async def test_upload_does_not_retrigger_before_first_pipeline_run(
+    client, db_session, sample_application, monkeypatch
+):
+    """Before any pipeline run, uploads are stored without queueing a run."""
+    from unittest.mock import patch
+
+    from app.config import get_settings
+    from app.services.application_tokens import create_applicant_token
+
+    monkeypatch.setattr(get_settings(), "S3_BUCKET_NAME", "test-bucket")
+    _mock_clean_scanner(monkeypatch)
+
+    token = create_applicant_token(sample_application.id)
+    with patch("app.validation_engine.tasks.execute_validation_run") as mock_task:
+        with patch("app.services.s3.upload_bytes", return_value=None):
+            response = await client.post(
+                f"/applications/{sample_application.id}/documents",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"file": ("notes.txt", b"extra evidence", "text/plain")},
+            )
+
+    assert response.status_code == 201
+    mock_task.delay.assert_not_called()

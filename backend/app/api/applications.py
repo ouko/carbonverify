@@ -13,6 +13,7 @@ from app.models import (
     ApplicationDocument,
     ApplicationDocumentSourceEnum,
     ApplicationDocumentStatusEnum,
+    ApplicationStatusEnum,
     User,
 )
 from app.schemas import (
@@ -288,6 +289,20 @@ async def upload_application_document(
         document_id=str(document.id),
         filename=filename,
     )
+
+    # Auto re-classification: if the pipeline has already run for this
+    # application, queue a fresh run so new uploads are classified and
+    # gap-checked without waiting for an operator.
+    if application.validation_run_id:
+        try:
+            await _queue_pipeline_run(db, application)
+        except Exception as exc:  # noqa: BLE001 - upload must not fail on re-trigger
+            logger.warning(
+                "application_auto_retrigger_failed",
+                application_id=str(application_id),
+                error=str(exc),
+            )
+
     return document
 
 
@@ -311,12 +326,7 @@ async def applicant_portal(
     }
 
 
-@router.post("/{application_id}/trigger-pipeline", response_model=ApplicationOut)
-async def trigger_application_pipeline(
-    application_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
-):
+async def _queue_pipeline_run(db: AsyncSession, application: Application):
     """Create a ValidationRun against the ai_application_pipeline template and queue it.
 
     The Celery worker executes intake (binds the existing application) →
@@ -324,11 +334,6 @@ async def trigger_application_pipeline(
     """
     from app.validation_engine.orchestrator import ValidationOrchestrator
     from app.validation_engine.tasks import execute_validation_run
-
-    result = await db.execute(select(Application).where(Application.id == application_id))
-    application = result.scalar_one_or_none()
-    if not application:
-        raise HTTPException(status_code=404, detail="Application not found")
 
     workflow = await ensure_default_application_pipeline(db)
     orchestrator = ValidationOrchestrator(db)
@@ -346,12 +351,29 @@ async def trigger_application_pipeline(
         },
     )
     application.validation_run_id = run.id
+    application.status = ApplicationStatusEnum.documents_pending
     await db.commit()
 
     execute_validation_run.delay(str(run.id))
     logger.info(
         "application_pipeline_triggered",
-        application_id=str(application_id),
+        application_id=str(application.id),
         run_id=str(run.id),
     )
+    return run
+
+
+@router.post("/{application_id}/trigger-pipeline", response_model=ApplicationOut)
+async def trigger_application_pipeline(
+    application_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    """Create a ValidationRun against the ai_application_pipeline template and queue it."""
+    result = await db.execute(select(Application).where(Application.id == application_id))
+    application = result.scalar_one_or_none()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    await _queue_pipeline_run(db, application)
     return application

@@ -62,7 +62,8 @@ async def test_full_intake_to_classification_flow(client, authenticated_client, 
     auth_client, _ = authenticated_client
     trigger_response = await auth_client.post(f"/applications/{app_id}/trigger-pipeline")
     assert trigger_response.status_code == 200
-    assert trigger_response.json()["status"] == "intake"
+    # Triggering marks the application as awaiting document processing
+    assert trigger_response.json()["status"] == "documents_pending"
 
 
 @pytest.mark.asyncio

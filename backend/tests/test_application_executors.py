@@ -176,3 +176,79 @@ async def test_classification_executor_no_gaps_advances_to_pre_audit(db_session,
     assert result["gap_findings"]["has_gaps"] is False
     application = await db_session.get(Application, sample_document.application_id)
     assert application.status == ApplicationStatusEnum.pre_audit
+
+
+# ─── Phase 3: AI-drafted gap remediation ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_classification_executor_ai_drafts_gap_remediation(
+    db_session, patch_db_context, sample_document, monkeypatch
+):
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    # Without extracted text the classification path skips Kimi, so the only
+    # AI call in this test is the remediation drafter.
+    sample_document.extracted_text = None
+    await db_session.commit()
+
+    class _FakeKimi:
+        async def chat_completion(self, messages):
+            return {"content": "Obtain the signed PDD from your project developer."}
+
+    monkeypatch.setattr("app.services.kimi_api.KimiAPIClient", lambda: _FakeKimi())
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=True,
+        required_document_types=["pdd"],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    result = await executor.execute(config, context, run)
+
+    remediation = result["gap_findings"]["remediation"]
+    assert remediation[0]["document_type"] == "pdd"
+    assert remediation[0]["ai_drafted"] is True
+    assert "signed PDD" in remediation[0]["guidance"]
+
+
+@pytest.mark.asyncio
+async def test_classification_executor_remediation_falls_back_when_ai_fails(
+    db_session, patch_db_context, sample_document, monkeypatch
+):
+    from app.models import Application, ApplicationStatusEnum
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    sample_document.extracted_text = None
+    await db_session.commit()
+
+    class _FailingKimi:
+        async def chat_completion(self, messages):
+            raise RuntimeError("kimi unavailable")
+
+    monkeypatch.setattr("app.services.kimi_api.KimiAPIClient", lambda: _FailingKimi())
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=True,
+        required_document_types=["pdd"],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    result = await executor.execute(config, context, run)
+
+    remediation = result["gap_findings"]["remediation"]
+    assert remediation[0]["ai_drafted"] is False
+    assert remediation[0]["guidance"] == (
+        "Upload the Project Design Document (PDD) for the proposed methodology."
+    )
+
+    application = await db_session.get(Application, sample_document.application_id)
+    assert application.status == ApplicationStatusEnum.gaps

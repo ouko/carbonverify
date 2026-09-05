@@ -870,17 +870,23 @@ class DocumentAiClassificationExecutor:
             # Gap analysis: compare classified documents against requirements
             classified_types = {c["document_type"] for c in classified}
             missing = [t for t in cfg.required_document_types if t not in classified_types]
+
+            from app.models import Application, ApplicationStatusEnum
+            app_result = await db.execute(select(Application).where(Application.id == application_id))
+            application = app_result.scalar_one_or_none()
+
+            remediation = [
+                await _draft_gap_remediation(application, t, cfg.classify_with_kimi)
+                for t in missing
+            ]
             gap_findings = {
                 "required_document_types": cfg.required_document_types,
                 "classified_document_types": sorted(classified_types),
                 "missing_document_types": missing,
                 "has_gaps": len(missing) > 0,
-                "remediation": [_gap_remediation(t) for t in missing],
+                "remediation": remediation,
             }
 
-            from app.models import Application, ApplicationStatusEnum
-            app_result = await db.execute(select(Application).where(Application.id == application_id))
-            application = app_result.scalar_one_or_none()
             if application is not None:
                 application.gap_findings = gap_findings
                 application.status = (
@@ -915,6 +921,56 @@ def _gap_remediation(document_type: str) -> Dict[str, str]:
             document_type, f"Upload a document of type '{document_type}'."
         ),
     }
+
+
+async def _draft_gap_remediation(
+    application: Any,
+    document_type: str,
+    use_ai: bool,
+) -> Dict[str, Any]:
+    """Draft remediation guidance for a missing document type.
+
+    Uses the Kimi API to produce project-specific guidance when AI is enabled,
+    falling back to the static per-type guidance on any failure.
+    """
+    base = _gap_remediation(document_type)
+    base["ai_drafted"] = False
+    if not use_ai:
+        return base
+    try:
+        from app.services.kimi_api import KimiAPIClient
+
+        project_bits = []
+        if application is not None:
+            for attr in ("project_title", "sector", "country", "proposed_methodology"):
+                value = getattr(application, attr, None)
+                if value:
+                    project_bits.append(f"{attr.replace('_', ' ')}: {value}")
+        project_context = "\n".join(project_bits) if project_bits else "No project context available."
+        default_hint = base["guidance"]
+
+        prompt = (
+            "A carbon-credit project application is missing a required document type: "
+            f"'{document_type}'.\n\nProject context:\n{project_context}\n\n"
+            "Write 2-3 short, concrete sentences telling a non-technical applicant "
+            "exactly what document to gather, what it must contain, and how to obtain "
+            "or prepare it. Do not use jargon without explaining it. "
+            f"If unsure, fall back to: {default_hint}"
+        )
+        response = await KimiAPIClient().chat_completion(
+            messages=[{"role": "user", "content": prompt}]
+        )
+        guidance = (response.get("content", "") or "").strip()
+        if guidance:
+            base["guidance"] = guidance
+            base["ai_drafted"] = True
+    except Exception as exc:  # noqa: BLE001 - AI drafting is best-effort
+        logger.warning(
+            "gap_remediation_ai_fallback",
+            document_type=document_type,
+            error=str(exc),
+        )
+    return base
 
 
 class StepExecutorRegistry:
