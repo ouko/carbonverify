@@ -33,3 +33,19 @@ def test_application_schema_roundtrip():
     }
     created = ApplicationCreate.model_validate(data)
     assert created.project_title == "Test"
+
+
+@pytest.mark.asyncio
+async def test_create_application(client, db_session):
+    payload = {
+        "applicant_email": "dev@example.com",
+        "project_title": "Kenya Cookstoves",
+        "country": "Kenya",
+        "sector": "cookstoves",
+    }
+    response = await client.post("/applications", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["project_title"] == "Kenya Cookstoves"
+    assert data["status"] == "intake"
+    assert "applicant_token" in data

@@ -51,6 +51,7 @@ from app.api.api_keys import router as api_keys_router
 from app.api.oauth import router as oauth_router
 from app.api.methodology_generator import router as methodology_generator_router
 from app.api.methodology_templates import router as methodology_templates_router
+from app.api.applications import router as applications_router
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -211,6 +212,7 @@ app.include_router(tokenization_router)
 app.include_router(corporate_router)
 app.include_router(leads_router)
 app.include_router(validation_engine_router)
+app.include_router(applications_router)
 app.include_router(admin_router)
 app.include_router(api_keys_router)
 app.include_router(oauth_router)

@@ -952,6 +952,7 @@ class ApplicationOut(ApplicationBase, ORMBase):
     validation_run_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
+    applicant_token: Optional[str] = None
 
 
 class ApplicationDocumentOut(BaseModel):
