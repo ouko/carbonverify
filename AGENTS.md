@@ -185,7 +185,8 @@ The `app/validation_engine/` package provides an enterprise-grade autonomous QA 
 - **Auto-remediation**: Pattern-based failure recovery — retry with exponential backoff, rollback, skip, patch, circuit break, or escalate
 - **Human escalation gates**: `HumanEscalation` records with SLA deadlines, severity scoring, and 4 escalation levels (L1 operator → L2 engineer → L3 architect → Executive). Celery task `check_stalled_escalations` auto-escalates every 15 minutes
 - **AI-led evaluation**: `ai_evaluation` step type calls the Kimi API to score workflow artifacts against a configurable `pass_threshold`; produces `ai_evaluation_request` and `ai_evaluation_response` proof artifacts
-- **API endpoints**: All under `/validation/*` — workflows, runs, steps, proofs, certificates, synthetic actors, escalations
+- **AI application pipeline**: `application_intake`, `document_collection`, and `document_ai_classification` step types power the public applicant intake flow (`/apply` → `POST /applications` → `ai_application_pipeline` workflow template); see `docs/AI_APPLICATION_PIPELINE.md`
+- **API endpoints**: All under `/validation/*` — workflows, runs, steps, proofs, certificates, synthetic actors, escalations. Application intake endpoints under `/applications/*`
 
 ### Celery Graceful Shutdown
 
