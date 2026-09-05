@@ -128,6 +128,25 @@ class SubflowConfig(BaseModel):
     output_mapping: Dict[str, str] = Field(default_factory=dict)
 
 
+class ApplicationIntakeConfig(BaseModel):
+    applicant_email: str
+    project_title: str
+    organization_name: Optional[str] = None
+    country: Optional[str] = None
+    sector: Optional[str] = None
+    proposed_methodology: Optional[str] = None
+
+
+class DocumentCollectionConfig(BaseModel):
+    sources: List[Dict[str, Any]] = Field(default_factory=list)
+    required_document_types: List[str] = Field(default_factory=list)
+
+
+class DocumentAiClassificationConfig(BaseModel):
+    classify_with_kimi: bool = True
+    extract_entities: bool = True
+
+
 class WorkflowStep(BaseModel):
     id: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_\-]+$")
     name: str = Field(..., min_length=1, max_length=255)

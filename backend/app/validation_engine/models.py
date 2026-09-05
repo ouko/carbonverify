@@ -49,6 +49,9 @@ class WorkflowStepType(str, PyEnum):
     wait = "wait"
     parallel = "parallel"
     subflow = "subflow"
+    application_intake = "application_intake"
+    document_collection = "document_collection"
+    document_ai_classification = "document_ai_classification"
 
 
 class StepExecutionStatus(str, PyEnum):
