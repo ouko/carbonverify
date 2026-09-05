@@ -90,3 +90,41 @@ async def test_document_collection_executor(db_session, patch_db_context, sample
     assert "collected_documents" in result
     assert result["status"] == "awaiting_documents"
     assert len(result["collected_documents"]) == 1
+
+
+@pytest_asyncio.fixture
+async def sample_document(db_session, sample_application):
+    from app.models import (
+        ApplicationDocument,
+        ApplicationDocumentSourceEnum,
+        ApplicationDocumentStatusEnum,
+    )
+
+    document = ApplicationDocument(
+        application_id=sample_application.id,
+        source_type=ApplicationDocumentSourceEnum.upload,
+        original_filename="project-doc.pdf",
+        status=ApplicationDocumentStatusEnum.fetched,
+        extracted_text="Project design document for improved cookstoves.",
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+@pytest.mark.asyncio
+async def test_document_ai_classification_executor(db_session, patch_db_context, sample_document):
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(classify_with_kimi=False).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    result = await executor.execute(config, context, run)
+
+    assert "classified_documents" in result
+    assert result["classified_documents"][0]["document_type"] == "other"
