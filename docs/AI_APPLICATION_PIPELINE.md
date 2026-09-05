@@ -69,8 +69,12 @@ Applicants follow the secure link from the welcome email:
 - No account is required — the applicant JWT (7-day) authenticates every request.
 - Uploaded documents are virus-scanned (ClamAV), stored in S3, and text-extracted
   (PDF, HTML, plain text, CSV, JSON) so the AI classification step can read them.
-- After uploading, an operator triggers (or re-triggers) the pipeline; the portal
-  then shows the status and any gap findings.
+- Once the pipeline has run at least once, every new applicant upload
+  **automatically queues a fresh pipeline run** — the new document is classified
+  and gap-checked without any operator action. While the run is queued the
+  application shows `documents_pending`, so the portal never displays a stale
+  result. The very first run is still operator-triggered
+  (`POST /applications/{id}/trigger-pipeline`).
 - An intake submitted directly at `/apply` is detected by the pipeline, which
   reuses the existing `Application` record instead of creating a duplicate.
 
@@ -82,23 +86,33 @@ default template). The results are stored on `application.gap_findings`:
 
 ```json
 {
-  "required": ["pdd"],
-  "classified": ["pdd", "sales_receipt"],
-  "missing": [],
+  "required_document_types": ["pdd"],
+  "classified_document_types": ["pdd", "sales_receipt"],
+  "missing_document_types": [],
   "has_gaps": false,
-  "remediation": {}
+  "remediation": []
 }
 ```
 
 - `has_gaps: true` → application status becomes `gaps`; each missing type gets a
-  human-readable remediation hint in `remediation`, also shown on the portal.
+  remediation entry `{"document_type", "guidance", "ai_drafted"}` in
+  `remediation`, shown on the portal.
 - `has_gaps: false` → application status advances to `pre_audit`.
 
-## Phase 3 (Roadmap)
+### AI-drafted remediation
 
-- Automatic re-classification after new applicant uploads (today an operator
-  re-triggers the pipeline from the portal or API).
-- AI-drafted gap remediation beyond the per-type guidance text.
+Remediation guidance is drafted by the Kimi API using the project's context
+(title, sector, country, proposed methodology), written for non-technical
+applicants — what to gather, what it must contain, and how to obtain it. If the
+AI call fails (or AI classification is disabled), the step falls back to static
+per-type guidance with `ai_drafted: false`.
+
+## Next Steps (Roadmap)
+
+- Wire `pre_audit` applications into the VVB/auditor hand-off (assign a VVB
+  liaison, schedule the real audit).
+- Applicant notifications when gap findings change (email/SMS nudge with the
+  portal link).
 
 ## Automation Levels
 
