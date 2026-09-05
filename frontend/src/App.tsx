@@ -15,6 +15,7 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(m => ({ default: m.default })));
 const ApplicationIntakePage = lazy(() => import('./pages/ApplicationIntakePage').then(m => ({ default: m.default })));
 const ApplicationIntakeSuccessPage = lazy(() => import('./pages/ApplicationIntakeSuccessPage').then(m => ({ default: m.default })));
+const ApplicationPortalPage = lazy(() => import('./pages/ApplicationPortalPage').then(m => ({ default: m.default })));
 
 // Core dashboard pages (eager — visited on every login)
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.default })));
@@ -74,6 +75,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/apply" element={<ApplicationIntakePage />} />
             <Route path="/apply/success" element={<ApplicationIntakeSuccessPage />} />
+            <Route path="/apply/portal" element={<ApplicationPortalPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Suspense fallback={<LoadingSpinner />}><DashboardPage /></Suspense>} />
