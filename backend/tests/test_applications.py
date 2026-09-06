@@ -287,3 +287,40 @@ async def test_upload_does_not_retrigger_before_first_pipeline_run(
 
     assert response.status_code == 201
     mock_task.delay.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_applicant_email_encrypted_at_rest(client, db_session, monkeypatch):
+    """The applicant email must be ciphertext in the database, plaintext in the ORM."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    import app.services.email as email_module
+
+    mock_service = MagicMock()
+    mock_service.send_email = AsyncMock()
+    monkeypatch.setattr(email_module, "get_email_service", lambda: mock_service)
+
+    response = await client.post("/applications", json={
+        "applicant_email": "secret-owner@example.com",
+        "project_title": "Kenya Stoves",
+    })
+    assert response.status_code == 201
+    app_id = response.json()["id"]
+
+    # Raw column read bypassing the ORM type decorator
+    from sqlalchemy import text
+
+    raw = await db_session.execute(
+        text("SELECT applicant_email_encrypted FROM applications WHERE id = :id"),
+        {"id": app_id},
+    )
+    raw_value = raw.scalar_one()
+
+    assert raw_value != "secret-owner@example.com"
+    assert raw_value.startswith("gAAAA")  # Fernet token
+
+    # ORM read decrypts transparently
+    from app.models import Application
+
+    application = await db_session.get(Application, __import__("uuid").UUID(app_id))
+    assert application.applicant_email_encrypted == "secret-owner@example.com"
