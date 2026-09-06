@@ -103,6 +103,29 @@ class FieldEncryption:
             logger.error("field_encryption_decrypt_failed", error=str(exc))
             raise
 
+    def decrypt_fallback(self, ciphertext: Optional[str]) -> Optional[str]:
+        """Decrypt a value, falling back to the raw value on failure.
+
+        For legacy rows written before field encryption was enabled (plaintext
+        at rest) or rows written under a rotated key: strict decryption would
+        raise and break the whole read, so column types use this instead and
+        log loudly. Callers that must fail closed should use decrypt().
+        """
+        if ciphertext is None:
+            return None
+        if not self.enabled:
+            return ciphertext
+        try:
+            plaintext = self._fernet.decrypt(ciphertext.encode("utf-8"))
+            return plaintext.decode("utf-8")
+        except Exception as exc:
+            logger.warning(
+                "field_encryption_decrypt_fallback",
+                error=str(exc),
+                hint="value is not decryptable with the configured key; returning raw value",
+            )
+            return ciphertext
+
 
 # Global instance
 _field_encryption: Optional[FieldEncryption] = None

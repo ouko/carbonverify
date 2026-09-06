@@ -30,5 +30,4 @@ class EncryptedString(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is None:
             return None
-        decrypted = self._enc.decrypt(value)
-        return decrypted
+        return self._enc.decrypt_fallback(value)

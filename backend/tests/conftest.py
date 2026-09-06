@@ -3,6 +3,12 @@ import os
 import sys
 import uuid
 from unittest.mock import MagicMock
+
+# Ensure field-level encryption is active during tests even when no .env is
+# present (CI sets its own key via the environment; this covers local runs
+# from any directory). Must be set before any app module is imported.
+os.environ.setdefault("ENCRYPTION_KEY_HEX", "0" * 64)
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport

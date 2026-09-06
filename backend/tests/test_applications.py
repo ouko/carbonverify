@@ -324,3 +324,38 @@ async def test_applicant_email_encrypted_at_rest(client, db_session, monkeypatch
 
     application = await db_session.get(Application, __import__("uuid").UUID(app_id))
     assert application.applicant_email_encrypted == "secret-owner@example.com"
+
+
+@pytest.mark.asyncio
+async def test_legacy_plaintext_email_row_reads_via_fallback(client, db_session, monkeypatch):
+    """Rows written before encryption existed (plaintext at rest) must still read."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    import app.services.email as email_module
+
+    mock_service = MagicMock()
+    mock_service.send_email = AsyncMock()
+    monkeypatch.setattr(email_module, "get_email_service", lambda: mock_service)
+
+    response = await client.post("/applications", json={
+        "applicant_email": "legacy-owner@example.com",
+        "project_title": "Kenya Stoves",
+    })
+    assert response.status_code == 201
+    app_id = response.json()["id"]
+
+    # Simulate a legacy row: overwrite the column with plaintext, bypassing
+    # the encrypted type (as a pre-encryption deployment would have stored it).
+    from sqlalchemy import text
+
+    await db_session.execute(
+        text("UPDATE applications SET applicant_email_encrypted = :raw WHERE id = :id"),
+        {"raw": "legacy-owner@example.com", "id": app_id},
+    )
+    await db_session.commit()
+
+    db_session.expunge_all()
+    from app.models import Application
+
+    application = await db_session.get(Application, __import__("uuid").UUID(app_id))
+    assert application.applicant_email_encrypted == "legacy-owner@example.com"
