@@ -871,9 +871,21 @@ class DocumentAiClassificationExecutor:
             classified_types = {c["document_type"] for c in classified}
             missing = [t for t in cfg.required_document_types if t not in classified_types]
 
-            from app.models import Application, ApplicationStatusEnum
+            from app.models import (
+                Application,
+                ApplicationStatusEnum,
+                HumanReviewQueue,
+                QueueItemTypeEnum,
+                QueueStatusEnum,
+            )
             app_result = await db.execute(select(Application).where(Application.id == application_id))
             application = app_result.scalar_one_or_none()
+
+            previous_missing: List[str] = []
+            if application is not None:
+                previous_missing = list(
+                    (application.gap_findings or {}).get("missing_document_types") or []
+                )
 
             remediation = [
                 await _draft_gap_remediation(application, t, cfg.classify_with_kimi)
@@ -893,7 +905,50 @@ class DocumentAiClassificationExecutor:
                     ApplicationStatusEnum.gaps if missing else ApplicationStatusEnum.pre_audit
                 )
 
+                # Auditor hand-off: a document-complete application enters the
+                # human review queue so an auditor can pick up the pre-audit.
+                if not missing:
+                    existing = await db.execute(
+                        select(HumanReviewQueue).where(
+                            HumanReviewQueue.item_type == QueueItemTypeEnum.application,
+                            HumanReviewQueue.item_id == application.id,
+                            HumanReviewQueue.status == QueueStatusEnum.pending,
+                        )
+                    )
+                    if existing.scalar_one_or_none() is None:
+                        db.add(HumanReviewQueue(
+                            item_type=QueueItemTypeEnum.application,
+                            item_id=application.id,
+                            reason=(
+                                f"Application '{application.project_title}' is document-complete "
+                                "and ready for pre-audit review."
+                            ),
+                            priority=3,
+                            suggested_action="Assign an auditor/VVB to review the classified application.",
+                            context_json={
+                                "project_title": application.project_title,
+                                "sector": application.sector,
+                                "country": application.country,
+                                "proposed_methodology": application.proposed_methodology,
+                                "gap_findings": gap_findings,
+                            },
+                        ))
+
+            # Capture plain values for the post-commit notification; the ORM
+            # object is detached once the session closes.
+            notify_target = None
+            if application is not None and sorted(previous_missing) != sorted(missing):
+                notify_target = {
+                    "id": application.id,
+                    "email": application.applicant_email_encrypted,
+                    "project_title": application.project_title,
+                }
+
             await db.commit()
+
+        # Best-effort applicant notification when the gap set changes.
+        if notify_target:
+            await _notify_gap_change(notify_target, previous_missing, missing)
 
         return {
             "application_id": str(application_id),
@@ -921,6 +976,79 @@ def _gap_remediation(document_type: str) -> Dict[str, str]:
             document_type, f"Upload a document of type '{document_type}'."
         ),
     }
+
+
+async def _notify_gap_change(
+    application: Dict[str, Any],
+    previous_missing: List[str],
+    new_missing: List[str],
+) -> None:
+    """Email the applicant when the set of missing documents changes.
+
+    Best-effort: any failure is logged and swallowed so classification never
+    breaks on a notification problem.
+    """
+    try:
+        from app.config import get_settings
+        from app.services.application_tokens import create_applicant_token
+        from app.services.email import get_email_service
+
+        email = application.get("email")
+        if not email:
+            return
+
+        labels = {
+            "pdd": "Project Design Document (PDD)",
+            "monitoring_report": "Monitoring Report",
+            "kpt_results": "Kitchen Performance Test (KPT) results",
+            "sales_receipt": "Sales Receipts",
+            "survey_form": "Survey Forms",
+            "gps_data": "GPS Data",
+            "stove_inventory": "Stove Inventory",
+        }
+        token = create_applicant_token(application["id"])
+        portal_url = (
+            f"{get_settings().FRONTEND_URL or ''}/apply/portal"
+            f"?application_id={application['id']}&token={token}"
+        )
+        project_title = application.get("project_title") or "your project"
+
+        if new_missing:
+            lines = "\n".join(
+                f"- {labels.get(t, t)}" for t in new_missing
+            )
+            subject = f"Action needed: documents missing for {project_title}"
+            body_text = (
+                f"Hello,\n\nOur AI has reviewed the documents for your application "
+                f"'{project_title}'. The following required documents are "
+                f"still missing:\n\n{lines}\n\n"
+                f"Upload them here: {portal_url}\n\n"
+                f"Once uploaded, our AI will re-check them automatically.\n\n"
+                f"— CarbonVerify"
+            )
+        else:
+            subject = f"All required documents received: {project_title}"
+            body_text = (
+                f"Hello,\n\nGood news — our AI confirms all required documents for "
+                f"'{project_title}' have been received. Your application is "
+                f"now queued for pre-audit review.\n\n"
+                f"Track progress here: {portal_url}\n\n"
+                f"— CarbonVerify"
+            )
+
+        await get_email_service().send_email(to=email, subject=subject, body_text=body_text)
+        logger.info(
+            "applicant_gap_notification_sent",
+            application_id=str(application["id"]),
+            previous_missing=previous_missing,
+            new_missing=new_missing,
+        )
+    except Exception as exc:  # noqa: BLE001 - notification is best-effort
+        logger.warning(
+            "applicant_gap_notification_failed",
+            application_id=str(application.get("id")),
+            error=str(exc),
+        )
 
 
 async def _draft_gap_remediation(

@@ -87,6 +87,7 @@ class QueueItemTypeEnum(str, PyEnum):
     vvb_response = "vvb_response"
     data_anomaly = "data_anomaly"
     agent_review = "agent_review"
+    application = "application"
 
 
 class QueueStatusEnum(str, PyEnum):

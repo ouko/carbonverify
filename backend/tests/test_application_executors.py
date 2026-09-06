@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 
 from app.validation_engine.models import WorkflowStepType
 
@@ -252,3 +253,165 @@ async def test_classification_executor_remediation_falls_back_when_ai_fails(
 
     application = await db_session.get(Application, sample_document.application_id)
     assert application.status == ApplicationStatusEnum.gaps
+
+
+# ─── Phase 4: auditor hand-off and gap-change notifications ────────────────────
+
+
+def _mock_email_service(monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+
+    import app.services.email as email_module
+
+    mock_service = MagicMock()
+    mock_service.send_email = AsyncMock()
+    monkeypatch.setattr(email_module, "get_email_service", lambda: mock_service)
+    return mock_service
+
+
+@pytest.mark.asyncio
+async def test_pre_audit_queues_human_review_item(db_session, patch_db_context, sample_document):
+    from app.models import HumanReviewQueue, QueueItemTypeEnum, QueueStatusEnum
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=False,
+        required_document_types=[],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    await executor.execute(config, context, run)
+
+    result = await db_session.execute(
+        select(HumanReviewQueue).where(
+            HumanReviewQueue.item_type == QueueItemTypeEnum.application,
+            HumanReviewQueue.item_id == sample_document.application_id,
+        )
+    )
+    item = result.scalar_one_or_none()
+    assert item is not None
+    assert item.status == QueueStatusEnum.pending
+    assert item.priority == 3
+    assert "pre-audit" in item.reason
+    assert item.context_json["project_title"] == "Sample Project"
+
+
+@pytest.mark.asyncio
+async def test_pre_audit_does_not_duplicate_review_item(
+    db_session, patch_db_context, sample_document
+):
+    from app.models import HumanReviewQueue, QueueItemTypeEnum
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=False,
+        required_document_types=[],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    await executor.execute(config, context, run)
+    await executor.execute(config, context, run)
+
+    result = await db_session.execute(
+        select(HumanReviewQueue).where(
+            HumanReviewQueue.item_type == QueueItemTypeEnum.application,
+            HumanReviewQueue.item_id == sample_document.application_id,
+        )
+    )
+    assert len(result.scalars().all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_gap_notification_sent_when_documents_missing(
+    db_session, patch_db_context, sample_document, sample_application, monkeypatch
+):
+    mock_email = _mock_email_service(monkeypatch)
+
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    sample_application.applicant_email_encrypted = "owner@example.com"
+    await db_session.commit()
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=False,
+        required_document_types=["pdd"],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    await executor.execute(config, context, run)
+
+    mock_email.send_email.assert_awaited_once()
+    call_kwargs = mock_email.send_email.await_args.kwargs
+    assert call_kwargs["to"] == "owner@example.com"
+    assert "documents missing" in call_kwargs["subject"]
+    assert "Project Design Document (PDD)" in call_kwargs["body_text"]
+    assert "/apply/portal" in call_kwargs["body_text"]
+
+
+@pytest.mark.asyncio
+async def test_gap_notification_sent_when_gaps_resolve(
+    db_session, patch_db_context, sample_document, sample_application, monkeypatch
+):
+    mock_email = _mock_email_service(monkeypatch)
+
+    from app.models import Application
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    sample_application.applicant_email_encrypted = "owner@example.com"
+    sample_application.gap_findings = {"missing_document_types": ["pdd"]}
+    await db_session.commit()
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=False,
+        required_document_types=[],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    await executor.execute(config, context, run)
+
+    mock_email.send_email.assert_awaited_once()
+    call_kwargs = mock_email.send_email.await_args.kwargs
+    assert "All required documents received" in call_kwargs["subject"]
+
+
+@pytest.mark.asyncio
+async def test_no_notification_when_gap_set_unchanged(
+    db_session, patch_db_context, sample_document, sample_application, monkeypatch
+):
+    mock_email = _mock_email_service(monkeypatch)
+
+    from app.validation_engine.executors import DocumentAiClassificationExecutor
+    from app.validation_engine.schemas import DocumentAiClassificationConfig
+    from app.validation_engine.models import ValidationRun
+
+    sample_application.applicant_email_encrypted = "owner@example.com"
+    sample_application.gap_findings = {"missing_document_types": ["pdd"]}
+    await db_session.commit()
+
+    executor = DocumentAiClassificationExecutor()
+    config = DocumentAiClassificationConfig(
+        classify_with_kimi=False,
+        required_document_types=["pdd"],
+    ).model_dump()
+    run = ValidationRun(id=uuid.uuid4())
+    context = {"application_id": str(sample_document.application_id)}
+
+    await executor.execute(config, context, run)
+
+    mock_email.send_email.assert_not_awaited()

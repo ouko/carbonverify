@@ -107,12 +107,34 @@ applicants — what to gather, what it must contain, and how to obtain it. If th
 AI call fails (or AI classification is disabled), the step falls back to static
 per-type guidance with `ai_drafted: false`.
 
+## Applicant Notifications
+
+Whenever the set of missing documents changes between runs, the classification
+step emails the applicant automatically (best-effort — a send failure never
+breaks classification):
+
+- **New gaps** → "Action needed: documents missing for …" listing the missing
+  documents and a fresh secure portal link.
+- **Gaps resolved** → "All required documents received …" confirming the
+  application is queued for pre-audit review.
+
+No email is sent when the gap set is unchanged, so repeated uploads of the same
+document set do not spam the applicant.
+
+## Auditor Hand-off
+
+When an application becomes document-complete (`pre_audit`), the classification
+step creates a `human_review_queue` item (`item_type: application`,
+`priority: 3`) with the project context and gap findings attached. Auditors see
+it in the Command Center review queue with the suggested action "Assign an
+auditor/VVB to review the classified application." Duplicate pending items are
+not created for the same application.
+
 ## Next Steps (Roadmap)
 
-- Wire `pre_audit` applications into the VVB/auditor hand-off (assign a VVB
-  liaison, schedule the real audit).
-- Applicant notifications when gap findings change (email/SMS nudge with the
-  portal link).
+- Auditor assignment workflow: claim/assign review-queue items to specific VVBs
+  and track the audit outcome back onto the application status.
+- SMS/WhatsApp applicant notifications in addition to email.
 
 ## Automation Levels
 
