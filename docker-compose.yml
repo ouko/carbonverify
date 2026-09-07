@@ -69,6 +69,12 @@ services:
     # Dev volume mount for hot reload — remove in production
     volumes:
       - ./backend:/app
+    networks:
+      default: {}
+      # Fixed IP on the proxy network so the managed nginx upstreams never
+      # go stale when this container is recreated.
+      proxy:
+        ipv4_address: 192.168.100.10
     depends_on:
       db:
         condition: service_healthy
@@ -162,6 +168,53 @@ services:
       - "8080:8080"
     volumes:
       - ./infrastructure/nginx/frontend-nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      default: {}
+      proxy:
+        ipv4_address: 192.168.100.11
+
+  # Reverse proxy for carbonverify.space (and the other sites defined in
+  # infrastructure/nginx/nginx.conf). Managed by compose so it is recreated
+  # with the stack; upstreams use the fixed proxy-network IPs, so routing
+  # survives app/frontend recreation without a manual restart.
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: cv-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt/live/carbonverify.space/fullchain.pem:/etc/nginx/cert.pem:ro
+      - /etc/letsencrypt/live/carbonverify.space/privkey.pem:/etc/nginx/key.pem:ro
+      - /etc/letsencrypt/live/afrobeats.space/fullchain.pem:/etc/letsencrypt/live/afrobeats.space/fullchain.pem:ro
+      - /etc/letsencrypt/live/afrobeats.space/privkey.pem:/etc/letsencrypt/live/afrobeats.space/privkey.pem:ro
+      - /etc/letsencrypt/live/vibe2.afrobeats.space/fullchain.pem:/etc/letsencrypt/live/vibe2.afrobeats.space/fullchain.pem:ro
+      - /etc/letsencrypt/live/vibe2.afrobeats.space/privkey.pem:/etc/letsencrypt/live/vibe2.afrobeats.space/privkey.pem:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      app:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+networks:
+  # Dedicated network for nginx → app/frontend with fixed IPs (see the
+  # ipv4_address assignments). Chosen from 192.168.100.0/24 to avoid
+  # clashing with Docker's default 172.x address pools.
+  proxy:
+    ipam:
+      config:
+        - subnet: 192.168.100.0/24
+          ip_range: 192.168.100.0/24
 
 volumes:
   postgres_data:
