@@ -64,6 +64,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - ENCRYPTION_KEY_HEX=${ENCRYPTION_KEY_HEX}
       - CLAMAV_HOST=clamav
       - CLAMAV_PORT=3310
     # Dev volume mount for hot reload — remove in production
@@ -103,6 +104,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - ENCRYPTION_KEY_HEX=${ENCRYPTION_KEY_HEX}
       - CLAMAV_HOST=clamav
       - CLAMAV_PORT=3310
     depends_on:
@@ -133,6 +135,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - ENCRYPTION_KEY_HEX=${ENCRYPTION_KEY_HEX}
     depends_on:
       db:
         condition: service_healthy
