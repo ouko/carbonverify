@@ -11,7 +11,7 @@ from app.core.client_ip import get_client_ip as _get_client_ip_helper
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_
 
-from app.core.encryption import compute_searchable_hash
+from app.core.encryption import compute_searchable_hash, legacy_searchable_hash
 from app.database import get_db
 from app.models import User, RefreshToken, UserInvite, UserRoleEnum, AuditActionEnum
 from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, MFAConfirmResponse, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
@@ -135,7 +135,8 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ):
     email_hash = compute_searchable_hash(payload.email)
-    result = await db.execute(select(User).where(User.email_hash == email_hash))
+    email_hash_candidates = {email_hash, legacy_searchable_hash(payload.email)}
+    result = await db.execute(select(User).where(User.email_hash.in_(email_hash_candidates)))
     existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -186,6 +187,19 @@ async def login(
     email_hash = compute_searchable_hash(payload.email)
     result = await db.execute(select(User).where(User.email_hash == email_hash))
     user = result.scalar_one_or_none()
+
+    # Legacy rows were hashed with raw SHA-256 before ENCRYPTION_KEY_HEX was
+    # configured; match them and heal the stored hash to the keyed value.
+    if not user:
+        legacy_hash = legacy_searchable_hash(payload.email)
+        if legacy_hash != email_hash:
+            legacy_result = await db.execute(
+                select(User).where(User.email_hash == legacy_hash)
+            )
+            user = legacy_result.scalar_one_or_none()
+            if user:
+                user.email_hash = email_hash
+                logger.info("login_legacy_hash_healed", user_id=str(user.id))
 
     # Fallback: if no user found by email_hash, check for legacy users
     # with missing email_hash by querying with a single LIMIT to avoid
@@ -766,7 +780,8 @@ async def forgot_password(
 ):
     """Request a password reset email. Always returns 200 to prevent email enumeration."""
     email_hash = compute_searchable_hash(payload.email)
-    result = await db.execute(select(User).where(User.email_hash == email_hash))
+    email_hash_candidates = {email_hash, legacy_searchable_hash(payload.email)}
+    result = await db.execute(select(User).where(User.email_hash.in_(email_hash_candidates)))
     user = result.scalar_one_or_none()
 
     if user and user.is_active:

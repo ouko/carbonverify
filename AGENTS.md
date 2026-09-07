@@ -327,7 +327,7 @@ celery -A app.tasks.celery_app beat --loglevel=info
 - **Port 5432 already allocated / login fails with DB errors**: Another Postgres container (or process) is using `localhost:5432`. `scripts/start-local.sh` and `scripts/setup-local.sh` now detect this up front. Fix by stopping the conflicting container/process, or reconfigure CarbonVerify to use a different host port by editing `docker-compose.local.yml` and `.env.local`.
 - **Port 8001 or 5173 already in use**: The startup scripts now refuse to start if the FastAPI or Vite ports are occupied. Run `./scripts/stop-local.sh` first, or stop the other process manually.
 - **`ENCRYPTION_KEY_HEX must be exactly 64 hexadecimal characters`**: Field-level encryption and searchable email hashes require a 32-byte key. Generate one with `python3 -c "import secrets; print(secrets.token_hex(32))"` and set it in `.env.local` (and keep `backend/.env` in sync if you run backend commands directly in `backend/`).
-- **`Invalid credentials` on first login after setup**: Usually means the demo users were seeded with a different `ENCRYPTION_KEY_HEX` than the one currently loaded. Reset the local DB (`dropdb`/`createdb` inside the `cv-db` container), rerun migrations, and re-seed.
+- **`Invalid credentials` on first login after setup**: Usually means the users were seeded with a different `ENCRYPTION_KEY_HEX` than the one currently loaded. Login automatically matches the legacy raw-SHA256 hash and heals the stored hash to the keyed value on success, so it self-recovers on the first successful login. If it persists, reset the local DB (`dropdb`/`createdb` inside the `cv-db` container), rerun migrations, and re-seed.
 
 ### Demo Data Seeding
 

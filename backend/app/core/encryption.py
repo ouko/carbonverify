@@ -36,9 +36,19 @@ def compute_searchable_hash(value: str, key_hex: Optional[str] = None) -> str:
                 "ENCRYPTION_KEY_HEX is required in production/staging to compute keyed searchable hashes"
             )
         # Fallback only in dev/test: return raw SHA-256 (deterministic but not keyed)
-        return hashlib.sha256(value.lower().encode("utf-8")).hexdigest()
+        return legacy_searchable_hash(value)
     key_bytes = bytes.fromhex(raw_key)
     return hmac.new(key_bytes, value.lower().encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def legacy_searchable_hash(value: str) -> str:
+    """Raw SHA-256 of the lowercased value, as stored by pre-key deployments.
+
+    Rows written before ENCRYPTION_KEY_HEX was configured carry this hash in
+    their *_hash columns; lookups must match it (and can heal it to the keyed
+    hash) or those rows become unreachable once a key is configured.
+    """
+    return hashlib.sha256(value.lower().encode("utf-8")).hexdigest()
 
 
 class FieldEncryption:

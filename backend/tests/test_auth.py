@@ -58,6 +58,37 @@ class TestLogin:
         assert response.json()["detail"] == "Invalid credentials"
 
     @pytest.mark.asyncio
+    async def test_login_heals_legacy_hash(self, client, db_session):
+        """Users hashed before ENCRYPTION_KEY_HEX existed (raw SHA-256) can log in."""
+        from app.core.encryption import legacy_searchable_hash
+
+        email = "legacy@carbonverify.io"
+        user = User(
+            email=email,
+            email_hash=legacy_searchable_hash(email),
+            name="Legacy User",
+            role=UserRoleEnum.admin,
+            mfa_enabled=False,
+            hashed_password=get_password_hash("Testpassword123!"),
+        )
+        db_session.add(user)
+        await db_session.commit()
+
+        response = await client.post("/auth/login", json={
+            "email": email,
+            "password": "Testpassword123!",
+        })
+        assert response.status_code == 200
+        assert "access_token" in response.json()
+
+        # The stored hash was healed to the keyed hash on successful login
+        result = await db_session.execute(
+            select(User).where(User.email_hash == compute_searchable_hash(email))
+        )
+        healed = result.scalar_one()
+        assert healed.name == "Legacy User"
+
+    @pytest.mark.asyncio
     async def test_login_account_lockout(self, client, test_user):
         # Fail login 5 times
         for _ in range(5):
