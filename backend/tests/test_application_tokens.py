@@ -1,6 +1,11 @@
 import uuid
+
 import pytest
-from app.services.application_tokens import create_applicant_token, verify_applicant_token
+
+from app.services.application_tokens import (
+    create_applicant_token,
+    verify_applicant_token,
+)
 
 
 @pytest.mark.asyncio

@@ -3,13 +3,13 @@
 import hashlib
 import json
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.validation_engine.models import ValidationWorkflow
 from app.core.logging import get_logger
+from app.validation_engine.models import ValidationWorkflow
 
 logger = get_logger(__name__)
 
@@ -17,7 +17,7 @@ DEFAULT_PIPELINE_NAME = "ai_application_pipeline"
 DEFAULT_PIPELINE_VERSION = "1.0.0"
 
 
-def build_ai_application_pipeline_graph() -> Dict[str, Any]:
+def build_ai_application_pipeline_graph() -> dict[str, Any]:
     """Build the default 3-step AI application pipeline graph.
 
     intake -> collect_documents -> classify_documents -> end

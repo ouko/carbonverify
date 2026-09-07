@@ -1,6 +1,5 @@
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 
@@ -23,7 +22,7 @@ def create_applicant_token(application_id: uuid.UUID, expires_days: int = TOKEN_
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
-def verify_applicant_token(token: str) -> Optional[uuid.UUID]:
+def verify_applicant_token(token: str) -> uuid.UUID | None:
     """Verify an applicant token and return the application_id, or None."""
     settings = get_settings()
     try:

@@ -21,8 +21,10 @@ def test_encrypt_decrypt_roundtrip():
 
 
 def test_decrypt_raises_on_undecryptable_value():
+    from cryptography.fernet import InvalidToken
+
     enc = get_field_encryption()
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidToken):
         enc.decrypt("not-a-fernet-token")
 
 

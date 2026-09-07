@@ -1,12 +1,23 @@
 """Application intake API routes for the AI-driven application pipeline."""
 
 import uuid
-from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Header, UploadFile, File, Form
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import require_admin, require_operator, require_viewer
+from app.core.encryption import compute_searchable_hash
+from app.core.logging import get_logger
 from app.database import get_db
 from app.models import (
     Application,
@@ -17,16 +28,16 @@ from app.models import (
     User,
 )
 from app.schemas import (
-    ApplicationUpdate,
-    ApplicationOut,
     ApplicationDocumentOut,
     ApplicationIntakeRequest,
+    ApplicationOut,
+    ApplicationUpdate,
 )
-from app.auth.dependencies import require_viewer, require_operator, require_admin
-from app.services.application_tokens import create_applicant_token, verify_applicant_token
 from app.services.application_pipeline import ensure_default_application_pipeline
-from app.core.encryption import compute_searchable_hash
-from app.core.logging import get_logger
+from app.services.application_tokens import (
+    create_applicant_token,
+    verify_applicant_token,
+)
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -38,7 +49,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 async def get_current_applicant(
     application_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    authorization: Optional[str] = Header(None),
+    authorization: str | None = Header(None),
 ) -> Application:
     """Authenticate an applicant via their bearer token and return the application."""
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -113,11 +124,11 @@ async def _send_applicant_welcome_email(email: str, application: Application, to
         logger.warning("applicant_welcome_email_failed", application_id=str(application.id), error=str(exc))
 
 
-@router.get("", response_model=List[ApplicationOut])
+@router.get("", response_model=list[ApplicationOut])
 async def list_applications(
-    status: Optional[str] = Query(None),
-    country: Optional[str] = Query(None),
-    sector: Optional[str] = Query(None),
+    status: str | None = Query(None),
+    country: str | None = Query(None),
+    sector: str | None = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -183,7 +194,7 @@ async def delete_application(
     await db.commit()
 
 
-@router.get("/{application_id}/documents", response_model=List[ApplicationDocumentOut])
+@router.get("/{application_id}/documents", response_model=list[ApplicationDocumentOut])
 async def list_application_documents(
     application_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -211,7 +222,7 @@ async def upload_application_document(
     document against the application for the AI classification step.
     """
     from app.config import get_settings
-    from app.services.clamav_scanner import get_scanner, ScanStatus
+    from app.services.clamav_scanner import ScanStatus, get_scanner
     from app.services.file_detector import compute_sha256, generate_s3_key
     from app.services.lead_intelligence.document_text import extract_text_async
     from app.services.s3 import upload_bytes
