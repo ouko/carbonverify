@@ -6,7 +6,7 @@ snapshot without recomputation.
 """
 
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 from app import database as app_database
 from app.core.logging import get_logger
@@ -18,9 +18,9 @@ logger = get_logger(__name__)
 
 
 @celery_app.task(name="app.tasks.learning_jobs.generate_weekly_learning_report")
-def generate_weekly_learning_report() -> Dict[str, Any]:
+def generate_weekly_learning_report() -> dict[str, Any]:
     """Generate the weekly agent retraining report and store it."""
-    async def _generate() -> Dict[str, Any]:
+    async def _generate() -> dict[str, Any]:
         async with app_database.get_db_context() as db:
             service = LearningLoopService(db)
             report = await service.weekly_retraining_report(persist=True)

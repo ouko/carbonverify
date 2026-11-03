@@ -15,8 +15,8 @@ a snapshot at or above the threshold resets it to 0. The deploy gate blocks on a
 streak of ``STREAK_LIMIT`` (7) consecutive below-threshold snapshots.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +44,7 @@ WEIGHT_ESCALATIONS = 0.20
 _ESCALATION_PENALTY = 20.0
 
 
-def journey_success_percent(run_stats: Dict[str, Dict[str, int]]) -> float:
+def journey_success_percent(run_stats: dict[str, dict[str, int]]) -> float:
     """Aggregate completed/(completed+failed) across journeys, as a percent.
 
     Journeys with no runs in the window do not drag the score down.
@@ -63,8 +63,8 @@ def escalation_backlog_percent(open_escalations: int) -> float:
 
 
 def compute_health_score(
-    run_stats: Dict[str, Dict[str, int]],
-    remediation_resolution_rate: Optional[float],
+    run_stats: dict[str, dict[str, int]],
+    remediation_resolution_rate: float | None,
     open_escalations: int,
 ) -> int:
     """Weighted composite score. ``remediation_resolution_rate`` is 0..1 or
@@ -77,10 +77,10 @@ def compute_health_score(
         + WEIGHT_REMEDIATION * remediation
         + WEIGHT_ESCALATIONS * backlog
     )
-    return int(round(max(0.0, min(100.0, score))))
+    return round(max(0.0, min(100.0, score)))
 
 
-def next_streak(previous: Optional[int], score: int) -> int:
+def next_streak(previous: int | None, score: int) -> int:
     """Increment the below-threshold streak, or reset at/above the threshold."""
     if score < HEALTH_THRESHOLD:
         return (previous or 0) + 1
@@ -89,11 +89,11 @@ def next_streak(previous: Optional[int], score: int) -> int:
 
 async def compute_journey_stats(
     db: AsyncSession, window: timedelta = JOURNEY_WINDOW
-) -> Dict[str, Dict[str, int]]:
+) -> dict[str, dict[str, int]]:
     """Per-journey completed/failed counts for synthetic runs in the window."""
-    cutoff = datetime.now(timezone.utc) - window
+    cutoff = datetime.now(UTC) - window
     names = get_journey_names()
-    stats: Dict[str, Dict[str, int]] = {name: {"completed": 0, "failed": 0} for name in names}
+    stats: dict[str, dict[str, int]] = {name: {"completed": 0, "failed": 0} for name in names}
 
     result = await db.execute(
         select(ValidationWorkflow.name, ValidationRun.status)
@@ -113,14 +113,15 @@ async def compute_journey_stats(
 
 async def compute_and_store_snapshot(db: AsyncSession) -> ValidationHealthSnapshot:
     """Collect statistics, compute the score, and append a snapshot row."""
+    from sqlalchemy import func
+
     from app.escalations.models import EscalationEvent, EscalationStatus
     from app.remediation.engine import RemediationEngine
-    from sqlalchemy import func
 
     run_stats = await compute_journey_stats(db)
 
     remediation_stats = await RemediationEngine(db).stats()
-    resolution_rate: Optional[float] = (
+    resolution_rate: float | None = (
         float(remediation_stats["resolution_rate"])
         if remediation_stats.get("total_attempts")
         else None
@@ -170,7 +171,7 @@ async def recent_snapshots(
     db: AsyncSession, window: timedelta = HISTORY_WINDOW
 ) -> list[ValidationHealthSnapshot]:
     """Snapshots within the history window, oldest first."""
-    cutoff = datetime.now(timezone.utc) - window
+    cutoff = datetime.now(UTC) - window
     result = await db.execute(
         select(ValidationHealthSnapshot)
         .where(ValidationHealthSnapshot.created_at >= cutoff)
@@ -179,7 +180,7 @@ async def recent_snapshots(
     return list(result.scalars().all())
 
 
-def snapshot_to_dict(snapshot: ValidationHealthSnapshot) -> Dict[str, Any]:
+def snapshot_to_dict(snapshot: ValidationHealthSnapshot) -> dict[str, Any]:
     return {
         "id": str(snapshot.id),
         "score": snapshot.score,

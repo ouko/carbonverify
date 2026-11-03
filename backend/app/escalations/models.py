@@ -1,9 +1,8 @@
 """ORM models for the human escalation & notification service."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum as PyEnum
-from typing import Optional
 
 from sqlalchemy import (
     DateTime,
@@ -22,7 +21,7 @@ from app.database import Base
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class EscalationStatus(str, PyEnum):
@@ -51,7 +50,7 @@ class EscalationEvent(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,
@@ -73,16 +72,16 @@ class EscalationEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
-    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    acknowledged_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+    acknowledged_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(
+    resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
-    resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)

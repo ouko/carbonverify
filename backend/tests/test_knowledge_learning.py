@@ -1,13 +1,14 @@
 """Tests for the Phase 5 methodology knowledge base and agent learning loop."""
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import select, update
 
 import app.knowledge as knowledge_pkg
+import app.orchestrator.orchestrator as orchestrator_module
 from app.agents import AgentResult
 from app.core.encryption import compute_searchable_hash
 from app.knowledge.embeddings import LocalHashEmbedder, top_k
@@ -28,8 +29,6 @@ from app.models import (
     UserRoleEnum,
 )
 from app.orchestrator.audit_chain import record_decision
-
-import app.orchestrator.orchestrator as orchestrator_module
 from app.orchestrator.orchestrator import KimiClawOrchestrator
 
 # ─── Knowledge base: ingest / embeddings / search ────────────────────────────
@@ -157,7 +156,7 @@ async def test_query_knowledge_base_rag_with_mocked_kimi(db_session, monkeypatch
 
     class FakeKimi:
         async def reason(self, prompt, context, tools=None, response_schema=None):
-            assert "passages" in context and context["passages"]
+            assert context.get("passages")
             assert response_schema is not None
             return {
                 "answer": "Fuelwood consumption must follow the Kitchen Performance Test protocol.",
@@ -178,8 +177,8 @@ async def test_query_knowledge_base_rag_with_mocked_kimi(db_session, monkeypatch
 def test_knowledge_package_exposes_remediation_probe_names():
     # The remediation rule vvb_clarification → kb_draft_response probes
     # app.knowledge for query_knowledge_base / search_knowledge / query.
-    assert callable(getattr(knowledge_pkg, "query_knowledge_base"))
-    assert callable(getattr(knowledge_pkg, "search_knowledge"))
+    assert callable(knowledge_pkg.query_knowledge_base)
+    assert callable(knowledge_pkg.search_knowledge)
 
 
 # ─── Knowledge API ───────────────────────────────────────────────────────────
@@ -202,6 +201,16 @@ async def test_knowledge_api_requires_auth(client):
     assert (
         await client.post("/api/v1/knowledge/query", json={"question": "what?"})
     ).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_knowledge_api_rejects_oversized_document(client, operator_headers):
+    """Ingest bodies are capped (CWE-400): oversized content is rejected with 422."""
+    payload = {**DOCUMENT_PAYLOAD, "content": "x" * 500_001}
+    response = await client.post(
+        "/api/v1/knowledge/documents", json=payload, headers=operator_headers
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -603,7 +612,7 @@ async def test_check_methodology_updates_stub(db_session, patch_db_context):
     assert "disabled" in fresh["fetching"]
 
     # Age the document past the 90-day refresh horizon.
-    stale = datetime.now(timezone.utc) - timedelta(days=120)
+    stale = datetime.now(UTC) - timedelta(days=120)
     await db_session.execute(
         update(MethodologyDocument)
         .where(MethodologyDocument.id == document.id)

@@ -8,7 +8,7 @@ Redis client, and the escalation beat jobs.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -33,7 +33,11 @@ from app.knowledge.embeddings import (
 )
 from app.knowledge.service import KnowledgeBaseService, chunk_text
 from app.models import AgentDecision, HumanReviewQueue, User, UserRoleEnum
-from app.orchestrator.audit_chain import compute_record_hash, hash_fields_for, record_decision
+from app.orchestrator.audit_chain import (
+    compute_record_hash,
+    hash_fields_for,
+    record_decision,
+)
 from app.orchestrator.pubsub import AgentPubSub
 from app.remediation.models import RemediationAttempt
 
@@ -41,15 +45,15 @@ pytestmark = pytest.mark.asyncio
 
 
 def _fake_event(**overrides):
-    base = dict(
-        id=uuid.uuid4(),
-        project_id=None,
-        source="agent:validation",
-        title="Test escalation",
-        detail="Something needs attention",
-        priority=1,
-        severity_score=0.8,
-    )
+    base = {
+        "id": uuid.uuid4(),
+        "project_id": None,
+        "source": "agent:validation",
+        "title": "Test escalation",
+        "detail": "Something needs attention",
+        "priority": 1,
+        "severity_score": 0.8,
+    }
     base.update(overrides)
     return SimpleNamespace(**base)
 
@@ -84,7 +88,7 @@ async def test_decisions_filters_verify_chain_and_get_by_id(
             context_package=None,
             prev_hash=prev_hash,
             actor="agent:test",
-            created_at=datetime.now(timezone.utc) - timedelta(microseconds=i),
+            created_at=datetime.now(UTC) - timedelta(microseconds=i),
         )
         decision.record_hash = compute_record_hash(hash_fields_for(decision))
         prev_hash = decision.record_hash
@@ -167,7 +171,7 @@ async def escalation_set(db_session):
             severity_score=0.8,
             status=EscalationStatus.open if i < 2 else EscalationStatus.resolved,
             channels_sent={},
-            created_at=datetime.now(timezone.utc) - timedelta(minutes=i),
+            created_at=datetime.now(UTC) - timedelta(minutes=i),
         )
         for i in range(4)
     ]
@@ -857,8 +861,9 @@ async def ingestion_project(db_session):
     developer = Developer(id=uuid.uuid4(), user_id=user.id, company_name="Acme")
     db_session.add(developer)
     await db_session.flush()
-    from app.models import MethodologyEnum, Project, ProjectStatusEnum
     from datetime import date
+
+    from app.models import MethodologyEnum, Project, ProjectStatusEnum
 
     project = Project(
         id=uuid.uuid4(),
@@ -877,17 +882,17 @@ async def ingestion_project(db_session):
 def _upload(project_id, filename, **kwargs):
     from app.models import DetectedFileTypeEnum, FileUpload
 
-    defaults = dict(
-        id=uuid.uuid4(),
-        project_id=project_id,
-        original_filename=filename,
-        detected_type=DetectedFileTypeEnum.excel,
-        mime_type="application/vnd.ms-excel",
-        s3_key=f"uploads/{filename}",
-        s3_bucket="bucket",
-        file_size_bytes=1024,
-        file_hash_sha256=uuid.uuid4().hex * 4,
-    )
+    defaults = {
+        "id": uuid.uuid4(),
+        "project_id": project_id,
+        "original_filename": filename,
+        "detected_type": DetectedFileTypeEnum.excel,
+        "mime_type": "application/vnd.ms-excel",
+        "s3_key": f"uploads/{filename}",
+        "s3_bucket": "bucket",
+        "file_size_bytes": 1024,
+        "file_hash_sha256": uuid.uuid4().hex * 4,
+    }
     defaults.update(kwargs)
     return FileUpload(**defaults)
 
@@ -895,20 +900,21 @@ def _upload(project_id, filename, **kwargs):
 def _source(project_id, **kwargs):
     from app.models import DataSource, SourceTypeEnum
 
-    defaults = dict(
-        id=uuid.uuid4(),
-        project_id=project_id,
-        source_type=SourceTypeEnum.mobile_survey,
-        schema_version="v1",
-        processed_data={"records_extracted": 10},
-        confidence_score=0.9,
-    )
+    defaults = {
+        "id": uuid.uuid4(),
+        "project_id": project_id,
+        "source_type": SourceTypeEnum.mobile_survey,
+        "schema_version": "v1",
+        "processed_data": {"records_extracted": 10},
+        "confidence_score": 0.9,
+    }
     defaults.update(kwargs)
     return DataSource(**defaults)
 
 
 async def test_ingestion_agent_anomaly_branches(db_session, ingestion_project, monkeypatch):
     from datetime import date  # noqa: F401  (kept close to usage site)
+
     from app.agents import IngestionAgent
     from app.models import (
         DetectedFileTypeEnum,
@@ -916,7 +922,7 @@ async def test_ingestion_agent_anomaly_branches(db_session, ingestion_project, m
         ValidationStatusEnum,
     )
 
-    stale = datetime.now(timezone.utc) - timedelta(days=10)
+    stale = datetime.now(UTC) - timedelta(days=10)
     db_session.add_all(
         [
             # Queued upload stuck for 10 days → stale_source + queued_count.
@@ -990,7 +996,7 @@ async def test_ingestion_agent_stale_source_anomalies(db_session, ingestion_proj
     from app.agents import IngestionAgent
     from app.models import FileUploadStatusEnum, ValidationStatusEnum
 
-    stale = datetime.now(timezone.utc) - timedelta(days=10)
+    stale = datetime.now(UTC) - timedelta(days=10)
     db_session.add_all(
         [
             _upload(
@@ -1039,8 +1045,9 @@ async def test_ingestion_agent_sources_only_completeness(db_session, ingestion_p
 
 @pytest_asyncio.fixture
 async def orch_project(db_session):
-    from app.models import Developer, MethodologyEnum, Project, ProjectStatusEnum
     from datetime import date
+
+    from app.models import Developer, MethodologyEnum, Project, ProjectStatusEnum
 
     email = f"orch-{uuid.uuid4().hex[:8]}@carbonverify.io"
     user = User(
@@ -1185,7 +1192,7 @@ async def test_sla_auto_approve_guard_branches(db_session, orch_project):
         priority=3,
         status=QueueStatusEnum.pending,
         context_json={},
-        created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        created_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add_all([resolved_item, fresh_item])
     await db_session.commit()
@@ -1248,7 +1255,7 @@ def test_latest_success_naive_and_missing_timestamps():
     from app.tasks.escalation_jobs import _latest_success
 
     event = _fake_event()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Naive timestamp is normalized to UTC instead of crashing.
     event.channels_sent = {"email": {"success": True, "sent_at": now.replace(tzinfo=None).isoformat()}}
     latest = _latest_success(event)

@@ -2,7 +2,7 @@ import re
 import uuid
 from datetime import date, datetime
 from enum import Enum as PyEnum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -80,11 +80,11 @@ class UserCreateByAdmin(BaseModel):
 
 
 class UserUpdateByAdmin(BaseModel):
-    name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
-    mfa_enabled: Optional[bool] = None
+    name: str | None = None
+    email: EmailStr | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    mfa_enabled: bool | None = None
 
 
 class UserOut(UserBase, ORMBase):
@@ -95,10 +95,10 @@ class UserOut(UserBase, ORMBase):
 
 
 class UserDetailOut(UserOut):
-    last_login_at: Optional[datetime] = None
-    last_activity_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
+    last_activity_at: datetime | None = None
     failed_login_count: int = 0
-    locked_until: Optional[datetime] = None
+    locked_until: datetime | None = None
 
 
 class UserInDB(UserOut):
@@ -109,7 +109,7 @@ class UserInviteCreate(BaseModel):
     email: EmailStr
     name: str
     role: str = "viewer"
-    permissions: List[str] = []
+    permissions: list[str] = []
 
 
 class UserInviteOut(BaseModel):
@@ -121,13 +121,13 @@ class UserInviteOut(BaseModel):
     role: str
     expires_at: datetime
     created_at: datetime
-    used_at: Optional[datetime] = None
+    used_at: datetime | None = None
 
 
 class InviteAcceptRequest(BaseModel):
     token: str
     password: str = Field(..., min_length=12)
-    name: Optional[str] = None
+    name: str | None = None
 
     @field_validator("password")
     @classmethod
@@ -149,8 +149,8 @@ class InviteAcceptRequest(BaseModel):
 
 class DeveloperBase(BaseModel):
     company_name: str
-    contact_phone: Optional[str] = None
-    location: Optional[str] = None
+    contact_phone: str | None = None
+    location: str | None = None
 
 
 class DeveloperCreate(DeveloperBase):
@@ -169,8 +169,8 @@ class ProjectBase(BaseModel):
     methodology: str
     crediting_period_start: date
     crediting_period_end: date
-    status: Optional[str] = "onboarding"
-    complexity_score: Optional[float] = None
+    status: str | None = "onboarding"
+    complexity_score: float | None = None
     confidence_threshold: float = 0.85
 
 
@@ -186,14 +186,14 @@ class ProjectCreate(ProjectBase):
 
 
 class ProjectUpdate(BaseModel):
-    name: Optional[str] = None
-    status: Optional[str] = None
-    complexity_score: Optional[float] = None
-    confidence_threshold: Optional[float] = None
-    brokerage_enabled: Optional[bool] = None
-    tokenization_enabled: Optional[bool] = None
-    crediting_period_start: Optional[date] = None
-    crediting_period_end: Optional[date] = None
+    name: str | None = None
+    status: str | None = None
+    complexity_score: float | None = None
+    confidence_threshold: float | None = None
+    brokerage_enabled: bool | None = None
+    tokenization_enabled: bool | None = None
+    crediting_period_start: date | None = None
+    crediting_period_end: date | None = None
 
     @model_validator(mode='after')
     def check_dates(self):
@@ -224,11 +224,11 @@ class FileUploadOut(ORMBase):
     file_size_bytes: int
     file_hash_sha256: str
     status: str
-    processing_result: Optional[Dict[str, Any]] = None
-    validation_errors: Optional[List[str]] = None
-    confidence_score: Optional[float] = None
+    processing_result: dict[str, Any] | None = None
+    validation_errors: list[str] | None = None
+    confidence_score: float | None = None
     created_at: datetime
-    processed_at: Optional[datetime] = None
+    processed_at: datetime | None = None
 
 
 class FileUploadResponse(BaseModel):
@@ -247,11 +247,11 @@ class FileUploadResponse(BaseModel):
 class DataSourceBase(BaseModel):
     source_type: SourceTypeEnum
     schema_version: str
-    raw_data: Dict[str, Any] = {}
-    processed_data: Dict[str, Any] = {}
-    validation_status: Optional[str] = "pending"
-    validation_errors: Optional[List[str]] = None
-    provenance: Dict[str, Any] = {}
+    raw_data: dict[str, Any] = {}
+    processed_data: dict[str, Any] = {}
+    validation_status: str | None = "pending"
+    validation_errors: list[str] | None = None
+    provenance: dict[str, Any] = {}
 
 
 class DataSourceCreate(DataSourceBase):
@@ -259,17 +259,17 @@ class DataSourceCreate(DataSourceBase):
 
 
 class DataSourceUpdate(BaseModel):
-    validation_status: Optional[str] = None
-    validation_errors: Optional[List[str]] = None
-    processed_data: Optional[Dict[str, Any]] = None
-    provenance: Optional[Dict[str, Any]] = None
-    confidence_score: Optional[float] = None
+    validation_status: str | None = None
+    validation_errors: list[str] | None = None
+    processed_data: dict[str, Any] | None = None
+    provenance: dict[str, Any] | None = None
+    confidence_score: float | None = None
 
 
 class DataSourceOut(DataSourceBase, ORMBase):
     id: uuid.UUID
     project_id: uuid.UUID
-    confidence_score: Optional[float] = None
+    confidence_score: float | None = None
     created_at: datetime
 
 
@@ -278,13 +278,13 @@ class DataSourceOut(DataSourceBase, ORMBase):
 class CalculationRunBase(BaseModel):
     monitoring_period_start: date
     monitoring_period_end: date
-    fNRB_value: Optional[float] = None
-    emissions_reduction_tCO2e: Optional[float] = None
-    uncertainty_95CI: Optional[float] = None
-    leakage_assessment: Dict[str, Any] = {}
-    methodology_compliance_score: Optional[float] = None
-    confidence_score: Optional[float] = None
-    status: Optional[str] = "draft"
+    fNRB_value: float | None = None
+    emissions_reduction_tCO2e: float | None = None
+    uncertainty_95CI: float | None = None
+    leakage_assessment: dict[str, Any] = {}
+    methodology_compliance_score: float | None = None
+    confidence_score: float | None = None
+    status: str | None = "draft"
 
 
 class CalculationRunCreate(CalculationRunBase):
@@ -292,20 +292,20 @@ class CalculationRunCreate(CalculationRunBase):
 
 
 class CalculationRunUpdate(BaseModel):
-    fNRB_value: Optional[float] = None
-    emissions_reduction_tCO2e: Optional[float] = None
-    uncertainty_95CI: Optional[float] = None
-    leakage_assessment: Optional[Dict[str, Any]] = None
-    methodology_compliance_score: Optional[float] = None
-    confidence_score: Optional[float] = None
-    status: Optional[str] = None
-    approved_by: Optional[uuid.UUID] = None
+    fNRB_value: float | None = None
+    emissions_reduction_tCO2e: float | None = None
+    uncertainty_95CI: float | None = None
+    leakage_assessment: dict[str, Any] | None = None
+    methodology_compliance_score: float | None = None
+    confidence_score: float | None = None
+    status: str | None = None
+    approved_by: uuid.UUID | None = None
 
 
 class CalculationRunOut(CalculationRunBase, ORMBase):
     id: uuid.UUID
     project_id: uuid.UUID
-    approved_by: Optional[uuid.UUID] = None
+    approved_by: uuid.UUID | None = None
     created_at: datetime
 
 
@@ -313,10 +313,10 @@ class CalculationRunOut(CalculationRunBase, ORMBase):
 
 class ReportBase(BaseModel):
     template_type: str
-    draft_content: Dict[str, Any] = {}
-    final_pdf: Optional[str] = None
-    status: Optional[str] = "draft"
-    vvb_feedback: Optional[Dict[str, Any]] = None
+    draft_content: dict[str, Any] = {}
+    final_pdf: str | None = None
+    status: str | None = "draft"
+    vvb_feedback: dict[str, Any] | None = None
 
 
 class ReportCreate(ReportBase):
@@ -325,10 +325,10 @@ class ReportCreate(ReportBase):
 
 
 class ReportUpdate(BaseModel):
-    draft_content: Optional[Dict[str, Any]] = None
-    final_pdf: Optional[str] = None
-    status: Optional[str] = None
-    vvb_feedback: Optional[Dict[str, Any]] = None
+    draft_content: dict[str, Any] | None = None
+    final_pdf: str | None = None
+    status: str | None = None
+    vvb_feedback: dict[str, Any] | None = None
 
 
 class ReportOut(ReportBase, ORMBase):
@@ -345,25 +345,25 @@ class HumanReviewQueueBase(BaseModel):
     item_id: uuid.UUID
     reason: str
     priority: int = Field(..., ge=1, le=5)
-    status: Optional[str] = "pending"
-    resolution_notes: Optional[str] = None
+    status: str | None = "pending"
+    resolution_notes: str | None = None
 
 
 class HumanReviewQueueCreate(HumanReviewQueueBase):
-    assigned_to: Optional[uuid.UUID] = None
+    assigned_to: uuid.UUID | None = None
 
 
 class HumanReviewQueueUpdate(BaseModel):
-    assigned_to: Optional[uuid.UUID] = None
-    status: Optional[str] = None
-    resolution_notes: Optional[str] = None
+    assigned_to: uuid.UUID | None = None
+    status: str | None = None
+    resolution_notes: str | None = None
 
 
 class HumanReviewQueueOut(HumanReviewQueueBase, ORMBase):
     id: uuid.UUID
-    assigned_to: Optional[uuid.UUID] = None
+    assigned_to: uuid.UUID | None = None
     created_at: datetime
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
 
 
 # ─── IoT Webhook ──────────────────────────────────────────────────────────────
@@ -371,34 +371,34 @@ class HumanReviewQueueOut(HumanReviewQueueBase, ORMBase):
 class IoTWebhookPayload(BaseModel):
     device_id: str
     timestamp: datetime
-    stove_id: Optional[str] = None
-    cooking_events: Optional[int] = None
-    total_cooking_minutes: Optional[float] = None
-    temperature_avg: Optional[float] = None
-    usage_status: Optional[str] = None
-    raw_payload: Dict[str, Any] = {}
+    stove_id: str | None = None
+    cooking_events: int | None = None
+    total_cooking_minutes: float | None = None
+    temperature_avg: float | None = None
+    usage_status: str | None = None
+    raw_payload: dict[str, Any] = {}
 
 
 class IoTWebhookResponse(BaseModel):
     received: bool
-    data_source_id: Optional[uuid.UUID] = None
+    data_source_id: uuid.UUID | None = None
     validation_status: str
-    confidence_score: Optional[float] = None
-    errors: Optional[List[str]] = None
+    confidence_score: float | None = None
+    errors: list[str] | None = None
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 class Token(BaseModel):
     access_token: str
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
     token_type: str = "bearer"
-    session_id: Optional[str] = None
+    session_id: str | None = None
 
 
 class TokenPayload(BaseModel):
-    sub: Optional[str] = None
-    type: Optional[str] = None
+    sub: str | None = None
+    type: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -413,11 +413,11 @@ class MFAVerifyRequest(BaseModel):
 
 class MFAConfirmResponse(BaseModel):
     id: str
-    email: Optional[str] = None
-    name: Optional[str] = None
-    role: Optional[str] = None
+    email: str | None = None
+    name: str | None = None
+    role: str | None = None
     mfa_enabled: bool = False
-    backup_codes: List[str] = []
+    backup_codes: list[str] = []
 
 
 class RefreshRequest(BaseModel):
@@ -457,8 +457,8 @@ class ResetPasswordRequest(BaseModel):
 
 class ApiKeyCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    scopes: List[str] = []
-    expires_in_days: Optional[int] = Field(None, ge=1, le=365)
+    scopes: list[str] = []
+    expires_in_days: int | None = Field(None, ge=1, le=365)
 
 
 class ApiKeyOut(BaseModel):
@@ -468,8 +468,8 @@ class ApiKeyOut(BaseModel):
     key_prefix: str
     scopes: list
     created_by: uuid.UUID
-    last_used_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
     is_active: bool
     created_at: datetime
 
@@ -491,7 +491,7 @@ class HealthCheck(BaseModel):
 
 class DashboardStats(BaseModel):
     total_projects: int
-    projects_by_status: Dict[str, int]
+    projects_by_status: dict[str, int]
     pending_reviews: int
     recent_calculations: int
     total_emissions_reduced: float
@@ -513,10 +513,10 @@ class EnumeratorOut(ORMBase):
     phone_number: str
     language_preference: str
     active: bool
-    data_quality_score: Optional[float]
+    data_quality_score: float | None
     submissions_count: int
     rejections_count: int
-    last_sync_at: Optional[datetime]
+    last_sync_at: datetime | None
     created_at: datetime
 
 
@@ -524,15 +524,15 @@ class SurveyResponseOut(ORMBase):
     id: uuid.UUID
     project_id: uuid.UUID
     conversation_id: uuid.UUID
-    enumerator_id: Optional[uuid.UUID]
-    household_id: Optional[str]
-    stove_id: Optional[str]
-    village_name: Optional[str]
-    responses: Dict[str, Any]
-    gps_latitude: Optional[float]
-    gps_longitude: Optional[float]
+    enumerator_id: uuid.UUID | None
+    household_id: str | None
+    stove_id: str | None
+    village_name: str | None
+    responses: dict[str, Any]
+    gps_latitude: float | None
+    gps_longitude: float | None
     validation_status: str
-    confidence_score: Optional[float]
+    confidence_score: float | None
     submitted_via: str
     created_at: datetime
 
@@ -544,9 +544,9 @@ class SupportTicketOut(ORMBase):
     issue_type: str
     description: str
     status: str
-    assigned_to: Optional[uuid.UUID]
+    assigned_to: uuid.UUID | None
     created_at: datetime
-    resolved_at: Optional[datetime]
+    resolved_at: datetime | None
 
 
 class WhatsAppMessageIn(BaseModel):
@@ -563,11 +563,11 @@ class BrokerageListingCreate(BaseModel):
     price_per_credit_usd: float = Field(..., gt=0)
     vintage_year: int
     methodology: str
-    co_benefits: List[str] = []
+    co_benefits: list[str] = []
     delivery_timeline_days: int = 30
-    location: Optional[str] = None
+    location: str | None = None
     minimum_purchase: float = 1.0
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
 
 
 class BrokerageListingOut(ORMBase):
@@ -578,9 +578,9 @@ class BrokerageListingOut(ORMBase):
     price_per_credit_usd: float
     vintage_year: int
     methodology: str
-    co_benefits: List[str]
+    co_benefits: list[str]
     delivery_timeline_days: int
-    location: Optional[str]
+    location: str | None
     status: str
     minimum_purchase: float
     created_at: datetime
@@ -588,11 +588,11 @@ class BrokerageListingOut(ORMBase):
 
 class BuyerProfileCreate(BaseModel):
     buyer_type: str
-    company_name: Optional[str] = None
-    preferred_methodologies: List[str] = []
-    price_range_min_usd: Optional[float] = None
-    price_range_max_usd: Optional[float] = None
-    preferred_locations: List[str] = []
+    company_name: str | None = None
+    preferred_methodologies: list[str] = []
+    price_range_min_usd: float | None = None
+    price_range_max_usd: float | None = None
+    preferred_locations: list[str] = []
     delivery_timeline_preference_days: int = 90
     auto_match_enabled: bool = True
 
@@ -601,11 +601,11 @@ class BuyerProfileOut(ORMBase):
     id: uuid.UUID
     user_id: uuid.UUID
     buyer_type: str
-    company_name: Optional[str]
-    preferred_methodologies: List[str]
-    price_range_min_usd: Optional[float]
-    price_range_max_usd: Optional[float]
-    preferred_locations: List[str]
+    company_name: str | None
+    preferred_methodologies: list[str]
+    price_range_min_usd: float | None
+    price_range_max_usd: float | None
+    preferred_locations: list[str]
     auto_match_enabled: bool
     created_at: datetime
 
@@ -627,7 +627,7 @@ class TransactionCreate(BaseModel):
     listing_id: uuid.UUID
     credits_amount: float = Field(..., gt=0)
     trade_type: str
-    delivery_date: Optional[date] = None
+    delivery_date: date | None = None
 
 
 class TransactionOut(ORMBase):
@@ -642,7 +642,7 @@ class TransactionOut(ORMBase):
     commission_rate: float
     commission_usd: float
     status: str
-    delivery_date: Optional[date]
+    delivery_date: date | None
     created_at: datetime
 
 
@@ -674,8 +674,8 @@ class TokenMintRequest(BaseModel):
     vintage_year: int
     methodology: str
     vvb_registry: str
-    vvb_certificate_id: Optional[str] = None
-    metadata: Dict[str, Any] = {}
+    vvb_certificate_id: str | None = None
+    metadata: dict[str, Any] = {}
 
 
 class CarbonCreditTokenOut(ORMBase):
@@ -686,11 +686,11 @@ class CarbonCreditTokenOut(ORMBase):
     vintage_year: int
     methodology: str
     vvb_registry: str
-    vvb_certificate_id: Optional[str]
-    radix_token_address: Optional[str]
+    vvb_certificate_id: str | None
+    radix_token_address: str | None
     status: str
     is_fractional: bool
-    parent_token_id: Optional[uuid.UUID]
+    parent_token_id: uuid.UUID | None
     created_at: datetime
 
 
@@ -713,9 +713,9 @@ class TokenListingOut(ORMBase):
 class TokenRetireRequest(BaseModel):
     token_id: uuid.UUID
     tonnes_retired: float = Field(..., gt=0)
-    purpose: Optional[str] = None
-    beneficiary_name: Optional[str] = None
-    beneficiary_location: Optional[str] = None
+    purpose: str | None = None
+    beneficiary_name: str | None = None
+    beneficiary_location: str | None = None
 
 
 class TokenRetirementOut(ORMBase):
@@ -723,11 +723,11 @@ class TokenRetirementOut(ORMBase):
     token_id: uuid.UUID
     retired_by: uuid.UUID
     tonnes_retired: float
-    purpose: Optional[str]
-    beneficiary_name: Optional[str]
-    beneficiary_location: Optional[str]
-    radix_burn_tx_ref: Optional[str]
-    retirement_certificate_url: Optional[str]
+    purpose: str | None
+    beneficiary_name: str | None
+    beneficiary_location: str | None
+    radix_burn_tx_ref: str | None
+    retirement_certificate_url: str | None
     created_at: datetime
 
 
@@ -739,7 +739,7 @@ class CorporatePortfolioOut(ORMBase):
     total_credits_held: float
     total_credits_retired: float
     portfolio_value_usd: float
-    esg_report_config: Dict[str, Any]
+    esg_report_config: dict[str, Any]
     updated_at: datetime
 
 
@@ -758,7 +758,7 @@ class ESGReportConfig(BaseModel):
     reporting_period_start: date
     reporting_period_end: date
     scope: str = "Scope 3"
-    sdgs: List[str] = []
+    sdgs: list[str] = []
 
 
 class ESGReportOut(BaseModel):
@@ -766,10 +766,10 @@ class ESGReportOut(BaseModel):
     reporting_period: str
     total_offsets_tco2e: float
     total_retired_tco2e: float
-    vintage_distribution: Dict[int, float]
-    methodology_breakdown: Dict[str, float]
-    sdg_impact_summary: Dict[str, Any]
-    project_contributions: List[Dict[str, Any]]
+    vintage_distribution: dict[int, float]
+    methodology_breakdown: dict[str, float]
+    sdg_impact_summary: dict[str, Any]
+    project_contributions: list[dict[str, Any]]
     generated_at: datetime
 
 
@@ -779,26 +779,26 @@ class LeadBase(BaseModel):
     registry_source: str
     external_id: str
     project_name: str
-    project_developer: Optional[str] = None
-    developer_contact: Optional[str] = None
-    developer_email: Optional[str] = None
-    country: Optional[str] = None
-    region: Optional[str] = None
-    location_coords: Optional[str] = None
-    methodology: Optional[str] = None
-    sector: Optional[str] = None
-    status: Optional[str] = "unknown"
-    crediting_period_start: Optional[date] = None
-    crediting_period_end: Optional[date] = None
-    last_verification_date: Optional[date] = None
-    last_monitoring_period_end: Optional[date] = None
-    estimated_credits_per_year: Optional[float] = None
-    registry_url: Optional[str] = None
-    days_in_status: Optional[int] = None
+    project_developer: str | None = None
+    developer_contact: str | None = None
+    developer_email: str | None = None
+    country: str | None = None
+    region: str | None = None
+    location_coords: str | None = None
+    methodology: str | None = None
+    sector: str | None = None
+    status: str | None = "unknown"
+    crediting_period_start: date | None = None
+    crediting_period_end: date | None = None
+    last_verification_date: date | None = None
+    last_monitoring_period_end: date | None = None
+    estimated_credits_per_year: float | None = None
+    registry_url: str | None = None
+    days_in_status: int | None = None
     stuck_score: float = 0.0
-    priority: Optional[str] = "low"
-    lead_status: Optional[str] = "new"
-    notes: Optional[str] = None
+    priority: str | None = "low"
+    lead_status: str | None = "new"
+    notes: str | None = None
 
 
 class LeadCreate(LeadBase):
@@ -806,39 +806,39 @@ class LeadCreate(LeadBase):
 
 
 class LeadUpdate(BaseModel):
-    project_name: Optional[str] = None
-    project_developer: Optional[str] = None
-    developer_contact: Optional[str] = None
-    developer_email: Optional[str] = None
-    country: Optional[str] = None
-    region: Optional[str] = None
-    methodology: Optional[str] = None
-    sector: Optional[str] = None
-    status: Optional[str] = None
-    crediting_period_start: Optional[date] = None
-    crediting_period_end: Optional[date] = None
-    estimated_credits_per_year: Optional[float] = None
-    registry_url: Optional[str] = None
-    stuck_score: Optional[float] = None
-    priority: Optional[str] = None
-    lead_status: Optional[str] = None
-    notes: Optional[str] = None
-    assigned_to: Optional[uuid.UUID] = None
+    project_name: str | None = None
+    project_developer: str | None = None
+    developer_contact: str | None = None
+    developer_email: str | None = None
+    country: str | None = None
+    region: str | None = None
+    methodology: str | None = None
+    sector: str | None = None
+    status: str | None = None
+    crediting_period_start: date | None = None
+    crediting_period_end: date | None = None
+    estimated_credits_per_year: float | None = None
+    registry_url: str | None = None
+    stuck_score: float | None = None
+    priority: str | None = None
+    lead_status: str | None = None
+    notes: str | None = None
+    assigned_to: uuid.UUID | None = None
 
 
 class LeadOut(LeadBase, ORMBase):
     id: uuid.UUID
     scraped_at: datetime
     updated_at: datetime
-    last_scored_at: Optional[datetime] = None
-    assigned_to: Optional[uuid.UUID] = None
+    last_scored_at: datetime | None = None
+    assigned_to: uuid.UUID | None = None
 
 
 class LeadDocumentBase(BaseModel):
     document_type: str
     source_url: str
-    title: Optional[str] = None
-    status: Optional[str] = "discovered"
+    title: str | None = None
+    status: str | None = "discovered"
 
 
 class LeadDocumentCreate(LeadDocumentBase):
@@ -848,24 +848,24 @@ class LeadDocumentCreate(LeadDocumentBase):
 class LeadDocumentOut(LeadDocumentBase, ORMBase):
     id: uuid.UUID
     lead_id: uuid.UUID
-    file_hash_sha256: Optional[str] = None
-    s3_key: Optional[str] = None
-    s3_bucket: Optional[str] = None
-    file_size_bytes: Optional[int] = None
-    mime_type: Optional[str] = None
-    error_message: Optional[str] = None
-    fetched_at: Optional[datetime] = None
+    file_hash_sha256: str | None = None
+    s3_key: str | None = None
+    s3_bucket: str | None = None
+    file_size_bytes: int | None = None
+    mime_type: str | None = None
+    error_message: str | None = None
+    fetched_at: datetime | None = None
     created_at: datetime
 
 
 class ProjectPreAuditOut(ORMBase):
     id: uuid.UUID
     project_id: uuid.UUID
-    lead_id: Optional[uuid.UUID] = None
-    validation_run_id: Optional[uuid.UUID] = None
+    lead_id: uuid.UUID | None = None
+    validation_run_id: uuid.UUID | None = None
     readiness_score: float
     status: str
-    gap_summary: Dict[str, Any] = {}
+    gap_summary: dict[str, Any] = {}
     created_at: datetime
 
 
@@ -874,20 +874,20 @@ class LeadScoreRequest(BaseModel):
 
 
 class LeadScrapeRequest(BaseModel):
-    registry_source: Optional[str] = None
-    country: Optional[str] = "Kenya"
+    registry_source: str | None = None
+    country: str | None = "Kenya"
 
 
 class LeadBulkImportItem(BaseModel):
     external_id: str
-    project_name: Optional[str] = None
-    registry_url: Optional[str] = None
-    status: Optional[str] = None
+    project_name: str | None = None
+    registry_url: str | None = None
+    status: str | None = None
 
 
 class LeadBulkImportRequest(BaseModel):
     registry_source: str
-    items: List[LeadBulkImportItem]
+    items: list[LeadBulkImportItem]
 
 
 class LeadBulkImportResponse(BaseModel):
@@ -896,7 +896,7 @@ class LeadBulkImportResponse(BaseModel):
     updated: int
     queued: int
     errors: int
-    leads: List[uuid.UUID]
+    leads: list[uuid.UUID]
 
 
 class LeadOpportunityOut(LeadBase):
@@ -905,17 +905,17 @@ class LeadOpportunityOut(LeadBase):
     updated_at: datetime
     document_count: int
     fetched_document_count: int
-    converted_project_id: Optional[uuid.UUID] = None
-    readiness_score: Optional[float] = None
-    pre_audit_status: Optional[str] = None
+    converted_project_id: uuid.UUID | None = None
+    readiness_score: float | None = None
+    pre_audit_status: str | None = None
 
 
 class LeadStats(BaseModel):
     total_leads: int
-    by_registry: Dict[str, int]
-    by_priority: Dict[str, int]
-    by_country: Dict[str, int]
-    by_lead_status: Dict[str, int]
+    by_registry: dict[str, int]
+    by_priority: dict[str, int]
+    by_country: dict[str, int]
+    by_lead_status: dict[str, int]
     avg_stuck_score: float
     high_priority_count: int
     critical_count: int
@@ -925,13 +925,13 @@ class LeadStats(BaseModel):
 
 class ApplicationBase(BaseModel):
     applicant_email_hash: str
-    applicant_email_encrypted: Optional[str] = None
-    organization_name: Optional[str] = None
+    applicant_email_encrypted: str | None = None
+    organization_name: str | None = None
     project_title: str
-    country: Optional[str] = None
-    region: Optional[str] = None
-    sector: Optional[str] = None
-    proposed_methodology: Optional[str] = None
+    country: str | None = None
+    region: str | None = None
+    sector: str | None = None
+    proposed_methodology: str | None = None
     status: str = "intake"
     confidence_score: float = 0.0
 
@@ -941,25 +941,25 @@ class ApplicationCreate(ApplicationBase):
 
 
 class ApplicationUpdate(BaseModel):
-    organization_name: Optional[str] = None
-    project_title: Optional[str] = None
-    country: Optional[str] = None
-    region: Optional[str] = None
-    sector: Optional[str] = None
-    proposed_methodology: Optional[str] = None
-    status: Optional[str] = None
-    confidence_score: Optional[float] = None
-    converted_project_id: Optional[uuid.UUID] = None
-    validation_run_id: Optional[uuid.UUID] = None
+    organization_name: str | None = None
+    project_title: str | None = None
+    country: str | None = None
+    region: str | None = None
+    sector: str | None = None
+    proposed_methodology: str | None = None
+    status: str | None = None
+    confidence_score: float | None = None
+    converted_project_id: uuid.UUID | None = None
+    validation_run_id: uuid.UUID | None = None
 
 
 class ApplicationOut(ApplicationBase, ORMBase):
     id: uuid.UUID
-    converted_project_id: Optional[uuid.UUID] = None
-    validation_run_id: Optional[uuid.UUID] = None
+    converted_project_id: uuid.UUID | None = None
+    validation_run_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
-    applicant_token: Optional[str] = None
+    applicant_token: str | None = None
     gap_findings: dict = Field(default_factory=dict)
 
 
@@ -967,18 +967,18 @@ class ApplicationDocumentOut(BaseModel):
     id: uuid.UUID
     application_id: uuid.UUID
     source_type: str
-    source_url: Optional[str] = None
-    s3_key: Optional[str] = None
-    original_filename: Optional[str] = None
-    mime_type: Optional[str] = None
-    file_size_bytes: Optional[int] = None
-    file_hash_sha256: Optional[str] = None
-    document_type: Optional[str] = None
+    source_url: str | None = None
+    s3_key: str | None = None
+    original_filename: str | None = None
+    mime_type: str | None = None
+    file_size_bytes: int | None = None
+    file_hash_sha256: str | None = None
+    document_type: str | None = None
     status: str
-    extracted_text: Optional[str] = None
+    extracted_text: str | None = None
     extracted_entities: dict = Field(default_factory=dict)
     gap_findings: dict = Field(default_factory=dict)
-    error_message: Optional[str] = None
+    error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -987,11 +987,11 @@ class ApplicationDocumentOut(BaseModel):
 
 class ApplicationIntakeRequest(BaseModel):
     applicant_email: EmailStr
-    organization_name: Optional[str] = None
+    organization_name: str | None = None
     project_title: str
-    country: Optional[str] = None
-    sector: Optional[str] = None
-    proposed_methodology: Optional[str] = None
+    country: str | None = None
+    sector: str | None = None
+    proposed_methodology: str | None = None
 
 
 # ─── Admin ────────────────────────────────────────────────────────────────────
@@ -1001,7 +1001,7 @@ class AdminStats(BaseModel):
     active_users: int
     inactive_users: int
     locked_users: int
-    users_by_role: Dict[str, int]
+    users_by_role: dict[str, int]
     new_users_today: int
     new_users_this_week: int
     total_sessions: int
@@ -1023,8 +1023,8 @@ class SessionOut(BaseModel):
     user_email: str
     device: str
     ip: str
-    last_active: Optional[str] = None
-    created_at: Optional[str] = None
+    last_active: str | None = None
+    created_at: str | None = None
     current: bool = False
 
 
@@ -1047,13 +1047,13 @@ class GeneratedMethodologyOut(GeneratedMethodologyBase):
 
     id: uuid.UUID
     project_id: uuid.UUID
-    gap_analysis: Optional[dict] = None
-    methodology: Optional[dict] = None
-    quantification_scaffold: Optional[dict] = None
+    gap_analysis: dict | None = None
+    methodology: dict | None = None
+    quantification_scaffold: dict | None = None
     status: str
-    rejection_reason: Optional[str] = None
-    reviewed_by: Optional[uuid.UUID] = None
-    reviewed_at: Optional[datetime] = None
+    rejection_reason: str | None = None
+    reviewed_by: uuid.UUID | None = None
+    reviewed_at: datetime | None = None
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -1065,8 +1065,8 @@ class MethodologyTemplateOut(ORMBase):
     sector: str
     is_active: bool
     defaults_json: dict
-    description: Optional[str] = None
-    created_by: Optional[uuid.UUID] = None
+    description: str | None = None
+    created_by: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -1075,7 +1075,7 @@ class GeneratedMethodologyStatusUpdate(BaseModel):
     status: Literal[
         "draft", "under_review", "approved", "rejected", "revision_requested"
     ]
-    rejection_reason: Optional[str] = Field(None, max_length=2000)
+    rejection_reason: str | None = Field(None, max_length=2000)
 
 
 # ─── Agent Decision Audit Trail ────────────────────────────────────────────────
@@ -1083,28 +1083,28 @@ class GeneratedMethodologyStatusUpdate(BaseModel):
 class AgentDecisionOut(ORMBase):
     id: uuid.UUID
     decision_id: uuid.UUID
-    project_id: Optional[uuid.UUID] = None
+    project_id: uuid.UUID | None = None
     agent_type: str
     action: str
-    confidence_score: Optional[float] = None
+    confidence_score: float | None = None
     reasoning: str
-    input_summary: Optional[dict] = None
-    context_package: Optional[dict] = None
-    prev_hash: Optional[str] = None
+    input_summary: dict | None = None
+    context_package: dict | None = None
+    prev_hash: str | None = None
     record_hash: str
     created_at: datetime
     actor: str
-    review_queue_item_id: Optional[uuid.UUID] = None
+    review_queue_item_id: uuid.UUID | None = None
 
 
 class AgentDecisionListResponse(BaseModel):
     total: int
     limit: int
     offset: int
-    decisions: List[AgentDecisionOut]
+    decisions: list[AgentDecisionOut]
 
 
 class VerifyChainResponse(BaseModel):
     valid: bool
     checked: int
-    first_broken_id: Optional[uuid.UUID] = None
+    first_broken_id: uuid.UUID | None = None

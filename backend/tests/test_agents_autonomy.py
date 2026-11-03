@@ -1,7 +1,7 @@
 """Tests for agent autonomy: real-data reasoning, LLM fallback, explainability."""
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -16,8 +16,10 @@ from app.agents import (
     ValidationAgent,
     VVBLiaisonAgent,
 )
-from app.agents.base import AgentResult, BaseAgent, BLEND_FORMULA
+from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
+from app.core.encryption import compute_searchable_hash
 from app.models import (
+    AgentDecision,
     CalculationRun,
     CalculationStatusEnum,
     DataSource,
@@ -38,10 +40,7 @@ from app.models import (
     UserRoleEnum,
     ValidationStatusEnum,
     WhatsAppConversation,
-    AgentDecision,
 )
-from app.core.encryption import compute_searchable_hash
-
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -321,7 +320,7 @@ class TestQualityControlAgentAutonomy:
 
     @pytest.mark.asyncio
     async def test_iqr_outlier_detected(self, db_session, seeded_project):
-        base = datetime.now(timezone.utc) - timedelta(days=1)
+        base = datetime.now(UTC) - timedelta(days=1)
         for i, emissions in enumerate([100.0, 101.0, 99.0, 100.5, 9000.0]):
             db_session.add(CalculationRun(
                 id=uuid.uuid4(),
@@ -441,9 +440,10 @@ class TestClientSuccessAgentAutonomy:
 class TestDecisionReasoningWiring:
     @pytest.mark.asyncio
     async def test_decision_uses_agent_reasoning(self, db_session, seeded_project, monkeypatch):
+        from sqlalchemy import select as sa_select
+
         import app.orchestrator.orchestrator as orchestrator_module
         from app.orchestrator.orchestrator import KimiClawOrchestrator
-        from sqlalchemy import select as sa_select
 
         agent_reasoning = "Duplicate upload detected in baseline data — review required."
 

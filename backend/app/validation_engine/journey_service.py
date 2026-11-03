@@ -10,8 +10,8 @@ journeys are hermetic: no network, no external storage.
 """
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,13 +27,13 @@ SERVICE_NAME = "validation_journeys"
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SyntheticJourneyService:
     """Named async service functions exercised by synthetic journey steps."""
 
-    async def assert_true(self, value: Any, label: str = "assertion") -> Dict[str, Any]:
+    async def assert_true(self, value: Any, label: str = "assertion") -> dict[str, Any]:
         """Raise (failing the step and run) unless ``value`` is truthy.
 
         Chained after decision-gate steps: the gate evaluates the condition
@@ -46,7 +46,7 @@ class SyntheticJourneyService:
 
     # ─── developer journey ────────────────────────────────────────────────────
 
-    async def register_developer(self, marker: str) -> Dict[str, Any]:
+    async def register_developer(self, marker: str) -> dict[str, Any]:
         """Register a synthetic developer (User + Developer profile)."""
         from app.database import get_db_context
         from app.models import Developer, User, UserRoleEnum
@@ -77,7 +77,7 @@ class SyntheticJourneyService:
                 "marker": marker,
             }
 
-    async def create_project(self, developer_id: str, project_name: str) -> Dict[str, Any]:
+    async def create_project(self, developer_id: str, project_name: str) -> dict[str, Any]:
         """Create a project in onboarding state owned by the synthetic developer."""
         from app.database import get_db_context
         from app.models import MethodologyEnum, Project, ProjectStatusEnum
@@ -100,7 +100,7 @@ class SyntheticJourneyService:
                 "status": project.status.value,
             }
 
-    async def create_fixture_data(self, project_id: str, marker: str) -> Dict[str, Any]:
+    async def create_fixture_data(self, project_id: str, marker: str) -> dict[str, Any]:
         """Upload a small in-DB data fixture (one mobile-survey DataSource)."""
         from app.database import get_db_context
         from app.models import DataSource, SourceTypeEnum, ValidationStatusEnum
@@ -131,7 +131,7 @@ class SyntheticJourneyService:
                 "fixture_rows": 5,
             }
 
-    async def run_calculation(self, project_id: str) -> Dict[str, Any]:
+    async def run_calculation(self, project_id: str) -> dict[str, Any]:
         """Run a synthetic calculation and walk the project to review state."""
         from app.database import get_db_context
         from app.models import (
@@ -180,7 +180,7 @@ class SyntheticJourneyService:
 
     async def generate_report_draft(
         self, project_id: str, calculation_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a synthetic report draft for the calculation run."""
         from app.database import get_db_context
         from app.models import Report, ReportStatusEnum, ReportTemplateTypeEnum
@@ -206,7 +206,7 @@ class SyntheticJourneyService:
 
     # ─── enumerator journey ───────────────────────────────────────────────────
 
-    async def create_offline_batch(self, marker: str, project_name: str) -> Dict[str, Any]:
+    async def create_offline_batch(self, marker: str, project_name: str) -> dict[str, Any]:
         """Create an enumerator with an offline survey batch (6 rows, 1 duplicate)."""
         from app.database import get_db_context
         from app.models import (
@@ -300,7 +300,7 @@ class SyntheticJourneyService:
             await db.flush()
         return developer.id
 
-    async def sync_offline_batch(self, project_id: str, marker: str) -> Dict[str, Any]:
+    async def sync_offline_batch(self, project_id: str, marker: str) -> dict[str, Any]:
         """Sync the offline batch: deduplicate households, stamp provenance.
 
         The newest row for a duplicated household wins; older duplicates are
@@ -318,11 +318,11 @@ class SyntheticJourneyService:
                 )
                 .order_by(SurveyResponse.created_at.asc())
             )
-            rows: List[SurveyResponse] = list(result.scalars().all())
+            rows: list[SurveyResponse] = list(result.scalars().all())
             if not rows:
                 raise RuntimeError(f"No offline survey rows found for project {project_id}")
 
-            seen: Dict[str, SurveyResponse] = {}
+            seen: dict[str, SurveyResponse] = {}
             conflicts_resolved = 0
             synced = 0
             for row in rows:
@@ -370,7 +370,7 @@ class SyntheticJourneyService:
 
     async def inject_and_remediate_anomaly(
         self, marker: str, target_name: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Inject a calculation anomaly and prove the auto-remediation path.
 
         A shared-engine remediation round is run with an injected attempt
@@ -416,7 +416,7 @@ class SyntheticJourneyService:
                 "after_state_hash": outcome.after_hash,
             }
 
-    async def count_escalations_for_target(self, target_id: str) -> Dict[str, Any]:
+    async def count_escalations_for_target(self, target_id: str) -> dict[str, Any]:
         """Count human escalations tied to a remediation target (must be 0)."""
         from app.database import get_db_context
         from app.escalations.models import EscalationEvent, EscalationStatus

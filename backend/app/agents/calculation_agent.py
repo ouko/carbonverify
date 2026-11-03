@@ -1,17 +1,17 @@
 """CalculationAgent: runs the full carbon calculation pipeline."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sqlalchemy import select
 
 from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
-from app.models import CalculationRun, DataSource, Project
-from app.calculations.fnrb_calculator import calculate_fnrb
 from app.calculations.emissions_quantifier import quantify_emissions
+from app.calculations.fnrb_calculator import calculate_fnrb
 from app.calculations.leakage_detector import assess_leakage
 from app.calculations.methodology_validator import validate_methodology
 from app.calculations.uncertainty_engine import run_full_uncertainty_analysis
 from app.core.logging import get_logger
+from app.models import CalculationRun, DataSource, Project
 
 logger = get_logger(__name__)
 
@@ -33,7 +33,7 @@ class CalculationAgent(BaseAgent):
 
     agent_type = "calculation"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Execute fNRB → emissions → leakage → methodology → uncertainty."""
         project_id = self.project_id
 
@@ -203,7 +203,7 @@ class CalculationAgent(BaseAgent):
             },
             response_schema=PLAUSIBILITY_SCHEMA,
         )
-        llm_plausibility: Optional[float] = None
+        llm_plausibility: float | None = None
         llm_rationale = ""
         if not llm_review.get("_fallback"):
             raw = llm_review.get("plausibility")

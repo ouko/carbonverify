@@ -1,0 +1,5 @@
+# Ruff configuration — CarbonVerify backend.
+# Pins the rule set CI enforces. The historical codebase predates ruff's
+# expanded default rule set (I/B/UP/RUF/BLE/...); those are tackled
+# incrementally, not gated. Keep CI green: only unambiguous error classes.
+select = ["E4", "E7", "E9", "F"]

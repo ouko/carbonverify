@@ -18,8 +18,8 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +62,7 @@ def default_sleeper() -> Sleeper:
     return _asyncio_sleeper
 
 
-def hash_state(state: Dict[str, Any]) -> str:
+def hash_state(state: dict[str, Any]) -> str:
     """SHA-256 of the canonical (sorted-key) JSON serialization of a state."""
     canonical = json.dumps(state, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -74,10 +74,10 @@ class RemediationOutcome:
 
     status: str  # resolved | failed | escalated
     attempts_used: int
-    detail: Dict[str, Any] = field(default_factory=dict)
+    detail: dict[str, Any] = field(default_factory=dict)
     before_hash: str = ""
-    after_hash: Optional[str] = None
-    rule_key: Optional[str] = None
+    after_hash: str | None = None
+    rule_key: str | None = None
 
 
 class RemediationEngine:
@@ -87,9 +87,9 @@ class RemediationEngine:
         self,
         db: AsyncSession,
         *,
-        sleeper: Optional[Sleeper] = None,
-        attempt_fn: Optional[AttemptFn] = None,
-        draft_fn: Optional[DraftFn] = None,
+        sleeper: Sleeper | None = None,
+        attempt_fn: AttemptFn | None = None,
+        draft_fn: DraftFn | None = None,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     ):
         self.db = db
@@ -100,7 +100,7 @@ class RemediationEngine:
 
     # ─── rule lookup ──────────────────────────────────────────────────────────
 
-    async def _find_rule(self, category: str) -> Optional[RemediationRule]:
+    async def _find_rule(self, category: str) -> RemediationRule | None:
         result = await self.db.execute(
             select(RemediationRule)
             .where(RemediationRule.enabled.is_(True))
@@ -132,14 +132,14 @@ class RemediationEngine:
         rule_key: str,
         target_type: str,
         target_id: str,
-        project_id: Optional[uuid.UUID],
+        project_id: uuid.UUID | None,
         attempt_number: int,
         before_hash: str,
-        after_hash: Optional[str],
+        after_hash: str | None,
         status: str,
-        detail: Dict[str, Any],
-        error: Optional[str],
-        failing_state: Dict[str, Any],
+        detail: dict[str, Any],
+        error: str | None,
+        failing_state: dict[str, Any],
     ) -> RemediationAttempt:
         row = RemediationAttempt(
             rule_key=rule_key,
@@ -160,7 +160,7 @@ class RemediationEngine:
 
     async def _failure_chain(
         self, rule_key: str, target_type: str, target_id: str
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         result = await self.db.execute(
             select(RemediationAttempt)
             .where(
@@ -195,11 +195,11 @@ class RemediationEngine:
     async def _escalate(
         self,
         *,
-        rule: Optional[RemediationRule],
+        rule: RemediationRule | None,
         category: str,
         target_type: str,
         target_id: str,
-        project_id: Optional[uuid.UUID],
+        project_id: uuid.UUID | None,
         before_hash: str,
         reason: str,
     ) -> RemediationOutcome:
@@ -212,7 +212,7 @@ class RemediationEngine:
             reason=f"Remediation exhausted for '{rule_key}' on {target_type}:{target_id}. {reason}",
             priority=ESCALATION_PRIORITY,
             status=QueueStatusEnum.pending,
-            sla_deadline=datetime.now(timezone.utc) + timedelta(hours=4),
+            sla_deadline=datetime.now(UTC) + timedelta(hours=4),
             context_json={
                 "project_id": str(project_id) if project_id else None,
                 "target_type": target_type,
@@ -278,8 +278,8 @@ class RemediationEngine:
         category: str,
         target_type: str,
         target_id: str,
-        failing_state: Dict[str, Any],
-        project_id: Optional[uuid.UUID] = None,
+        failing_state: dict[str, Any],
+        project_id: uuid.UUID | None = None,
         attempts_so_far: int = 0,
     ) -> RemediationOutcome:
         """Run one remediation round for a failing target.
@@ -310,9 +310,9 @@ class RemediationEngine:
 
         budget = max(1, self.max_attempts - max(0, attempts_so_far))
         attempts_used = 0
-        last_detail: Dict[str, Any] = {}
-        last_error: Optional[str] = None
-        after_hash: Optional[str] = None
+        last_detail: dict[str, Any] = {}
+        last_error: str | None = None
+        after_hash: str | None = None
 
         for _ in range(budget):
             attempt_number = await self._next_attempt_number(
@@ -332,7 +332,7 @@ class RemediationEngine:
             )
             try:
                 verdict = await strategy(ctx)
-            except Exception as exc:  # noqa: BLE001 — strategies must never break dispatch
+            except Exception as exc:
                 logger.exception("remediation_strategy_error", rule_key=rule.rule_key)
                 verdict = AttemptVerdict(success=False, error=str(exc))
 
@@ -397,7 +397,7 @@ class RemediationEngine:
 
     # ─── stats (API support) ──────────────────────────────────────────────────
 
-    async def stats(self) -> Dict[str, Any]:
+    async def stats(self) -> dict[str, Any]:
         result = await self.db.execute(
             select(RemediationAttempt.status, func.count())
             .group_by(RemediationAttempt.status)

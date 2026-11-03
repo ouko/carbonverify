@@ -10,8 +10,8 @@ fields plus the previous record's hash, forming a tamper-evident chain that
 import hashlib
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,8 +31,8 @@ def _serialize(value: Any) -> Any:
     """
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc).isoformat()
+            value = value.replace(tzinfo=UTC)
+        return value.astimezone(UTC).isoformat()
     if isinstance(value, uuid.UUID):
         return str(value)
     if isinstance(value, dict):
@@ -42,7 +42,7 @@ def _serialize(value: Any) -> Any:
     return value
 
 
-def compute_record_hash(fields: Dict[str, Any]) -> str:
+def compute_record_hash(fields: dict[str, Any]) -> str:
     """SHA-256 of the canonical (sorted-key) serialization of the field set."""
     canonical = json.dumps(
         {k: _serialize(v) for k, v in sorted(fields.items())},
@@ -52,7 +52,7 @@ def compute_record_hash(fields: Dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def hash_fields_for(decision: AgentDecision) -> Dict[str, Any]:
+def hash_fields_for(decision: AgentDecision) -> dict[str, Any]:
     """The exact field set covered by ``record_hash``."""
     return {
         "decision_id": decision.decision_id,
@@ -77,12 +77,12 @@ async def record_decision(
     action: str,
     reasoning: str,
     actor: str,
-    project_id: Optional[uuid.UUID] = None,
-    decision_id: Optional[uuid.UUID] = None,
-    confidence_score: Optional[float] = None,
-    input_summary: Optional[Dict[str, Any]] = None,
-    context_package: Optional[Dict[str, Any]] = None,
-    review_queue_item_id: Optional[uuid.UUID] = None,
+    project_id: uuid.UUID | None = None,
+    decision_id: uuid.UUID | None = None,
+    confidence_score: float | None = None,
+    input_summary: dict[str, Any] | None = None,
+    context_package: dict[str, Any] | None = None,
+    review_queue_item_id: uuid.UUID | None = None,
 ) -> AgentDecision:
     """Append a decision to the chain and return the persisted record.
 
@@ -90,18 +90,24 @@ async def record_decision(
     new record's hash covers it plus every stored field, so any later edit to
     any row (or to chain order) is detectable via :func:`verify_chain`.
     """
+    # ``with_for_update`` serializes concurrent appends: a second writer
+    # blocks on the chain tip until the first commits, then re-reads the new
+    # tip, so two simultaneous ``record_decision`` calls cannot fork the chain
+    # (both pointing at the same prev_hash), which ``verify_chain`` would
+    # otherwise report as tampering. SQLite/test dialects ignore the clause.
     result = await db.execute(
         select(AgentDecision.record_hash, AgentDecision.created_at)
         .order_by(AgentDecision.created_at.desc(), AgentDecision.id.desc())
         .limit(1)
+        .with_for_update()
     )
     latest = result.first()
     prev_hash = latest.record_hash if latest else None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     latest_created = latest.created_at if latest else None
     if latest_created and latest_created.tzinfo is None:
-        latest_created = latest_created.replace(tzinfo=timezone.utc)
+        latest_created = latest_created.replace(tzinfo=UTC)
     if latest_created and now <= latest_created:
         # Keep created_at strictly monotonic so chain ordering is unambiguous
         # even when many decisions are recorded within the same microsecond.
@@ -135,7 +141,7 @@ async def record_decision(
     return decision
 
 
-async def verify_chain(db: AsyncSession) -> Dict[str, Any]:
+async def verify_chain(db: AsyncSession) -> dict[str, Any]:
     """Walk every row in chain order, recomputing hashes.
 
     Returns ``{"valid": bool, "checked": int, "first_broken_id": uuid|None}``
@@ -148,9 +154,9 @@ async def verify_chain(db: AsyncSession) -> Dict[str, Any]:
     )
     rows = result.scalars().all()
 
-    expected_prev: Optional[str] = None
+    expected_prev: str | None = None
     checked = 0
-    first_broken_id: Optional[uuid.UUID] = None
+    first_broken_id: uuid.UUID | None = None
     chain_intact = True
 
     for row in rows:

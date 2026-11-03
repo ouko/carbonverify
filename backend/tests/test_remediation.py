@@ -5,7 +5,7 @@ deterministic local response when no API key is configured).
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -165,7 +165,7 @@ async def test_backoff_retry_no_signal_queues_for_retry(db_session, seeded_rules
 
 
 async def test_backoff_retry_attempt_fn_injection(db_session, seeded_rules, sleeper_spy):
-    sleeper, calls = sleeper_spy
+    sleeper, _calls = sleeper_spy
     attempts = []
 
     async def flaky_executor(ctx):
@@ -461,7 +461,7 @@ async def test_remediation_sweep_reruns_old_failures(
     db_session.add(stale)
     await db_session.commit()
 
-    old = datetime.now(timezone.utc) - timedelta(hours=2)
+    old = datetime.now(UTC) - timedelta(hours=2)
     await db_session.execute(
         update(RemediationAttempt)
         .where(RemediationAttempt.id == stale.id)

@@ -1,13 +1,20 @@
 """ReportingAgent: generates monitoring reports and submission packages."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sqlalchemy import select
 
 from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
-from app.models import CalculationRun, DataSource, Project, Report, ReportTemplateTypeEnum, ReportStatusEnum
-from app.reports.generator import generate_report
 from app.core.logging import get_logger
+from app.models import (
+    CalculationRun,
+    DataSource,
+    Project,
+    Report,
+    ReportStatusEnum,
+    ReportTemplateTypeEnum,
+)
+from app.reports.generator import generate_report
 
 logger = get_logger(__name__)
 
@@ -29,7 +36,7 @@ class ReportingAgent(BaseAgent):
 
     agent_type = "reporting"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Generate report from calculation run and data sources."""
         project_id = self.project_id
         calc_run_id = context.get("calculation_run_id")
@@ -180,7 +187,7 @@ class ReportingAgent(BaseAgent):
             },
             response_schema=COMPLETENESS_SCHEMA,
         )
-        llm_completeness: Optional[float] = None
+        llm_completeness: float | None = None
         llm_gaps = []
         if not llm_review.get("_fallback"):
             raw = llm_review.get("completeness")

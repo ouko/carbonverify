@@ -8,8 +8,8 @@ project, to compute per-agent override statistics and suggest calibrated
 auto-advance thresholds.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,16 +33,16 @@ BUCKET_REVIEW = "0.85-0.95"
 BUCKET_AUTO = ">=0.95"
 
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+def _aware(dt: datetime | None) -> datetime | None:
     """Normalize a possibly-naive datetime (SQLite round-trip) to UTC."""
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt
 
 
-def _confidence_bucket(confidence: Optional[float]) -> Optional[str]:
+def _confidence_bucket(confidence: float | None) -> str | None:
     if confidence is None:
         return None
     if confidence >= 0.95:
@@ -52,22 +52,22 @@ def _confidence_bucket(confidence: Optional[float]) -> Optional[str]:
     return None
 
 
-async def _decisions_since(db: AsyncSession, days: int) -> List[AgentDecision]:
+async def _decisions_since(db: AsyncSession, days: int) -> list[AgentDecision]:
     """Load decisions from the last ``days`` days (filtered in Python because
     SQLite returns naive datetimes that do not string-compare cleanly against
     tz-aware cutoffs)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     result = await db.execute(select(AgentDecision).order_by(AgentDecision.created_at.asc()))
     rows = result.scalars().all()
     return [r for r in rows if (_aware(r.created_at) or cutoff) >= cutoff]
 
 
 def _pair_review_decisions(
-    rows: List[AgentDecision],
-) -> List[Tuple[AgentDecision, AgentDecision]]:
+    rows: list[AgentDecision],
+) -> list[tuple[AgentDecision, AgentDecision]]:
     """Pair each queue item's earliest agent routing decision with its earliest
     subsequent human decision."""
-    by_queue: Dict[Any, Dict[str, Any]] = {}
+    by_queue: dict[Any, dict[str, Any]] = {}
     for row in rows:
         if row.review_queue_item_id is None:
             continue
@@ -77,15 +77,15 @@ def _pair_review_decisions(
         elif row.action in HUMAN_ACTIONS:
             entry["human"].append(row)
 
-    pairs: List[Tuple[AgentDecision, AgentDecision]] = []
+    pairs: list[tuple[AgentDecision, AgentDecision]] = []
     for entry in by_queue.values():
         if not entry["agent"] or not entry["human"]:
             continue
         agent_first = min(entry["agent"], key=lambda r: (_aware(r.created_at), r.id))
         human_after = [
             h for h in entry["human"]
-            if (_aware(h.created_at) or datetime.min.replace(tzinfo=timezone.utc))
-            > (_aware(agent_first.created_at) or datetime.min.replace(tzinfo=timezone.utc))
+            if (_aware(h.created_at) or datetime.min.replace(tzinfo=UTC))
+            > (_aware(agent_first.created_at) or datetime.min.replace(tzinfo=UTC))
         ]
         if human_after:
             human_first = min(human_after, key=lambda r: (_aware(r.created_at), r.id))
@@ -101,7 +101,7 @@ class LearningLoopService:
 
     # ─── Learning feedback consumer ───────────────────────────────────────
 
-    async def record_override(self, queue_item: HumanReviewQueue) -> Dict[str, Any]:
+    async def record_override(self, queue_item: HumanReviewQueue) -> dict[str, Any]:
         """Learning-feedback consumer hook for resolved review items.
 
         Human feedback is stored on the queue item as ``learning_feedback`` by
@@ -112,7 +112,7 @@ class LearningLoopService:
         if queue_item.learning_feedback:
             return queue_item.learning_feedback
 
-        feedback: Dict[str, Any] = {
+        feedback: dict[str, Any] = {
             "human_decision": queue_item.human_decision,
             "confidence_gap": queue_item.confidence_gap,
             "agent_type": (
@@ -126,14 +126,14 @@ class LearningLoopService:
 
     # ─── Calibration ──────────────────────────────────────────────────────
 
-    async def compute_calibration(self, days: int = 30) -> Dict[str, Any]:
+    async def compute_calibration(self, days: int = 30) -> dict[str, Any]:
         """Per-agent override statistics over the trailing ``days`` window."""
         rows = await _decisions_since(self.db, days)
         pairs = _pair_review_decisions(rows)
 
-        stats: Dict[str, Dict[str, Any]] = {}
+        stats: dict[str, dict[str, Any]] = {}
 
-        def _entry(agent_type: str) -> Dict[str, Any]:
+        def _entry(agent_type: str) -> dict[str, Any]:
             return stats.setdefault(
                 agent_type,
                 {
@@ -154,7 +154,7 @@ class LearningLoopService:
             if row.action in ROUTING_ACTIONS or row.action in HUMAN_ACTIONS:
                 _entry(row.agent_type)["n_decisions"] += 1
 
-        override_confidences: Dict[str, List[float]] = {}
+        override_confidences: dict[str, list[float]] = {}
         for agent_decision, human_decision in pairs:
             agent_type = agent_decision.agent_type
             entry = _entry(agent_type)
@@ -194,7 +194,7 @@ class LearningLoopService:
             ),
         }
 
-    async def suggested_threshold(self, agent_type: str) -> Optional[float]:
+    async def suggested_threshold(self, agent_type: str) -> float | None:
         """Lowest confidence among the agent's overridden auto-advances, clamped.
 
         An auto-advance is "overridden" when a later ``human_rejected`` or
@@ -223,14 +223,14 @@ class LearningLoopService:
         if not rejections:
             return None
 
-        lowest: Optional[float] = None
+        lowest: float | None = None
         for advance in auto_advances:
-            advance_at = _aware(advance.created_at) or datetime.min.replace(tzinfo=timezone.utc)
+            advance_at = _aware(advance.created_at) or datetime.min.replace(tzinfo=UTC)
             if advance.project_id is None:
                 continue
             reversed_by_human = any(
                 rejection.project_id == advance.project_id
-                and (_aware(rejection.created_at) or datetime.min.replace(tzinfo=timezone.utc))
+                and (_aware(rejection.created_at) or datetime.min.replace(tzinfo=UTC))
                 > advance_at
                 for rejection in rejections
             )
@@ -241,7 +241,7 @@ class LearningLoopService:
             return None
         return round(min(THRESHOLD_MAX, max(THRESHOLD_MIN, lowest)), 4)
 
-    async def recent_overrides(self, limit: int = 50) -> List[Dict[str, Any]]:
+    async def recent_overrides(self, limit: int = 50) -> list[dict[str, Any]]:
         """Recent human overrides paired with the agent decision they reversed."""
         result = await self.db.execute(
             select(AgentDecision)
@@ -251,9 +251,9 @@ class LearningLoopService:
         )
         human_decisions = result.scalars().all()
 
-        paired: List[Dict[str, Any]] = []
+        paired: list[dict[str, Any]] = []
         for human in human_decisions:
-            agent_pair: Optional[AgentDecision] = None
+            agent_pair: AgentDecision | None = None
             if human.review_queue_item_id is not None:
                 pair_result = await self.db.execute(
                     select(AgentDecision)
@@ -279,13 +279,13 @@ class LearningLoopService:
 
     # ─── Weekly report ────────────────────────────────────────────────────
 
-    async def weekly_retraining_report(self, persist: bool = False) -> Dict[str, Any]:
+    async def weekly_retraining_report(self, persist: bool = False) -> dict[str, Any]:
         """Structured weekly brief: override-ranked agents, threshold and
         retraining suggestions, top override reasons, and a markdown brief."""
         calibration = await self.compute_calibration(days=7)
 
-        suggested_adjustments: List[str] = []
-        ranked_agents: List[Dict[str, Any]] = []
+        suggested_adjustments: list[str] = []
+        ranked_agents: list[dict[str, Any]] = []
         for entry in calibration["agents"]:
             agent_type = entry["agent_type"]
             threshold = await self.suggested_threshold(agent_type)
@@ -306,8 +306,8 @@ class LearningLoopService:
 
         reason_counts = await self._top_override_reasons(limit=5)
 
-        report: Dict[str, Any] = {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+        report: dict[str, Any] = {
+            "generated_at": datetime.now(UTC).isoformat(),
             "period_days": 7,
             "agents": ranked_agents,
             "suggested_adjustments": suggested_adjustments,
@@ -320,11 +320,11 @@ class LearningLoopService:
             await self.db.commit()
         return report
 
-    async def _top_override_reasons(self, limit: int = 5) -> List[Dict[str, Any]]:
+    async def _top_override_reasons(self, limit: int = 5) -> list[dict[str, Any]]:
         """Most common override justifications from review-queue learning feedback."""
         result = await self.db.execute(select(HumanReviewQueue))
         items = result.scalars().all()
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for item in items:
             feedback = item.learning_feedback or {}
             if feedback.get("human_decision") not in OVERRIDE_ACTIONS:
@@ -337,9 +337,9 @@ class LearningLoopService:
 
     @staticmethod
     def _format_markdown(
-        agents: List[Dict[str, Any]],
-        adjustments: List[str],
-        reasons: List[Dict[str, Any]],
+        agents: list[dict[str, Any]],
+        adjustments: list[str],
+        reasons: list[dict[str, Any]],
     ) -> str:
         lines = ["# Weekly Agent Retraining Brief", ""]
         lines.append("## Override ranking")

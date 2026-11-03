@@ -1,8 +1,8 @@
 """REST API for the human escalation & notification service (Command Center)."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -22,7 +22,7 @@ REMEDIATION_WINDOW = timedelta(days=7)
 VALIDATION_WINDOW = timedelta(days=7)
 
 
-def _event_to_dict(event: EscalationEvent) -> Dict[str, Any]:
+def _event_to_dict(event: EscalationEvent) -> dict[str, Any]:
     return {
         "id": str(event.id),
         "project_id": str(event.project_id) if event.project_id else None,
@@ -45,14 +45,14 @@ def _event_to_dict(event: EscalationEvent) -> Dict[str, Any]:
 
 @router.get("/")
 async def list_escalations(
-    status_filter: Optional[str] = Query(None, alias="status"),
-    priority: Optional[int] = Query(None, ge=0, le=2),
-    project_id: Optional[uuid.UUID] = None,
+    status_filter: str | None = Query(None, alias="status"),
+    priority: int | None = Query(None, ge=0, le=2),
+    project_id: uuid.UUID | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     stmt = select(EscalationEvent)
     count_stmt = select(func.count(EscalationEvent.id))
     if status_filter:
@@ -81,23 +81,23 @@ async def list_escalations(
 async def escalation_stats(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     result = await db.execute(select(EscalationEvent))
     events = result.scalars().all()
 
-    by_status: Dict[str, int] = {s.value: 0 for s in EscalationStatus}
-    by_priority: Dict[str, int] = {"0": 0, "1": 0, "2": 0}
-    ack_seconds: List[float] = []
+    by_status: dict[str, int] = {s.value: 0 for s in EscalationStatus}
+    by_priority: dict[str, int] = {"0": 0, "1": 0, "2": 0}
+    ack_seconds: list[float] = []
     for event in events:
         by_status[event.status.value] += 1
         by_priority[str(event.priority)] = by_priority.get(str(event.priority), 0) + 1
         if event.acknowledged_at and event.created_at:
             created = event.created_at
             if created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
+                created = created.replace(tzinfo=UTC)
             acknowledged = event.acknowledged_at
             if acknowledged.tzinfo is None:
-                acknowledged = acknowledged.replace(tzinfo=timezone.utc)
+                acknowledged = acknowledged.replace(tzinfo=UTC)
             ack_seconds.append((acknowledged - created).total_seconds())
 
     return {
@@ -113,10 +113,10 @@ async def escalation_stats(
 async def health_score(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Composite 0-100 system health score with per-component breakdown."""
-    now = datetime.now(timezone.utc)
-    components: Dict[str, Any] = {}
+    now = datetime.now(UTC)
+    components: dict[str, Any] = {}
 
     # 1. Agent confidence (last 24h of orchestration decisions).
     cutoff = now - CONFIDENCE_WINDOW
@@ -226,7 +226,7 @@ async def health_score(
     else:
         score = 100.0
 
-    return {"score": int(round(max(0.0, min(100.0, score)))), "components": components}
+    return {"score": round(max(0.0, min(100.0, score))), "components": components}
 
 
 @router.get("/{event_id}")
@@ -234,7 +234,7 @@ async def get_escalation(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     event = await EscalationService(db).get_event(event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Escalation not found")
@@ -246,7 +246,7 @@ async def acknowledge_escalation(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     try:
         event = await EscalationService(db).acknowledge(event_id, current_user.id)
     except ValueError as exc:
@@ -264,7 +264,7 @@ async def resolve_escalation(
     payload: ResolvePayload,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     try:
         event = await EscalationService(db).resolve(event_id, current_user.id, payload.notes)
     except ValueError as exc:

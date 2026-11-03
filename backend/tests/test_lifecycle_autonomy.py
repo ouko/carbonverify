@@ -1,7 +1,7 @@
 """Tests for autonomous lifecycle orchestration (advance_project, SLA sweep, scan)."""
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -291,7 +291,7 @@ async def test_sla_sweep_auto_approves_stale_item(db_session, seeded_project, pa
             "agent_run_id": str(uuid.uuid4()),
         },
         confidence_gap=0.05,
-        created_at=datetime.now(timezone.utc) - timedelta(hours=25),
+        created_at=datetime.now(UTC) - timedelta(hours=25),
     )
     fresh_item = HumanReviewQueue(
         item_type=QueueItemTypeEnum.agent_review,
@@ -300,7 +300,7 @@ async def test_sla_sweep_auto_approves_stale_item(db_session, seeded_project, pa
         priority=3,
         status=QueueStatusEnum.pending,
         context_json={"project_id": str(seeded_project.id), "agent_type": "ingestion"},
-        created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        created_at=datetime.now(UTC) - timedelta(hours=1),
     )
     urgent_item = HumanReviewQueue(
         item_type=QueueItemTypeEnum.agent_review,
@@ -309,7 +309,7 @@ async def test_sla_sweep_auto_approves_stale_item(db_session, seeded_project, pa
         priority=5,
         status=QueueStatusEnum.pending,
         context_json={"project_id": str(seeded_project.id), "agent_type": "ingestion"},
-        created_at=datetime.now(timezone.utc) - timedelta(hours=48),
+        created_at=datetime.now(UTC) - timedelta(hours=48),
     )
     db_session.add_all([stale_item, fresh_item, urgent_item])
     await db_session.commit()

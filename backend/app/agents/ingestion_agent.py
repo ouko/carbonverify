@@ -1,13 +1,13 @@
 """IngestionAgent: assesses project data ingestion status and data quality."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 
 from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
-from app.models import DataSource, FileUpload
 from app.core.logging import get_logger
+from app.models import DataSource, FileUpload
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class IngestionAgent(BaseAgent):
 
     agent_type = "ingestion"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Assess ingestion state for the project."""
         project_id = self.project_id
 
@@ -71,11 +71,11 @@ class IngestionAgent(BaseAgent):
                 evidence={"uploads": 0, "data_sources": 0},
             )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         processed_count = 0
         queued_count = 0
         failed_count = 0
-        anomalies: List[Dict[str, Any]] = []
+        anomalies: list[dict[str, Any]] = []
 
         # 1. Per-upload pipeline-appropriate validation on DB state.
         for upload in uploads:
@@ -117,7 +117,7 @@ class IngestionAgent(BaseAgent):
             created_at = upload.created_at
             if status in ("uploaded", "processing") and created_at:
                 if created_at.tzinfo is None:
-                    created_at = created_at.replace(tzinfo=timezone.utc)
+                    created_at = created_at.replace(tzinfo=UTC)
                 age_days = (now - created_at).days
                 if age_days >= STALE_UPLOAD_DAYS:
                     anomalies.append({
@@ -135,7 +135,7 @@ class IngestionAgent(BaseAgent):
             created_at = ds.created_at
             if validation_status == "pending" and created_at:
                 if created_at.tzinfo is None:
-                    created_at = created_at.replace(tzinfo=timezone.utc)
+                    created_at = created_at.replace(tzinfo=UTC)
                 age_days = (now - created_at).days
                 if age_days >= STALE_UPLOAD_DAYS:
                     anomalies.append({
@@ -238,9 +238,9 @@ class IngestionAgent(BaseAgent):
 
     # ─── Validation helpers ───────────────────────────────────────────────
 
-    def _validate_upload(self, upload: FileUpload, now: datetime) -> List[Dict[str, Any]]:
+    def _validate_upload(self, upload: FileUpload, now: datetime) -> list[dict[str, Any]]:
         """Pipeline-appropriate structural validation of a single upload record."""
-        anomalies: List[Dict[str, Any]] = []
+        anomalies: list[dict[str, Any]] = []
         detected = (
             upload.detected_type.value if hasattr(upload.detected_type, "value") else str(upload.detected_type)
         )
@@ -265,10 +265,10 @@ class IngestionAgent(BaseAgent):
             })
         return anomalies
 
-    def _detect_duplicate_uploads(self, uploads: List[FileUpload]) -> List[Dict[str, Any]]:
+    def _detect_duplicate_uploads(self, uploads: list[FileUpload]) -> list[dict[str, Any]]:
         """Flag uploads sharing an identical SHA-256 hash (re-submissions)."""
-        seen: Dict[str, str] = {}
-        anomalies: List[Dict[str, Any]] = []
+        seen: dict[str, str] = {}
+        anomalies: list[dict[str, Any]] = []
         for upload in uploads:
             file_hash = upload.file_hash_sha256
             if not file_hash:
@@ -286,9 +286,9 @@ class IngestionAgent(BaseAgent):
                 seen[file_hash] = upload.original_filename
         return anomalies
 
-    def _detect_out_of_range(self, ds: DataSource) -> List[Dict[str, Any]]:
+    def _detect_out_of_range(self, ds: DataSource) -> list[dict[str, Any]]:
         """Flag implausible numeric values in a source's processed data."""
-        anomalies: List[Dict[str, Any]] = []
+        anomalies: list[dict[str, Any]] = []
         processed = ds.processed_data or {}
         for key, value in processed.items():
             if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -301,7 +301,7 @@ class IngestionAgent(BaseAgent):
         return anomalies
 
     @staticmethod
-    def _extract_llm_score(llm_review: Dict[str, Any]) -> "Optional[float]":
+    def _extract_llm_score(llm_review: dict[str, Any]) -> "float | None":
         """Pull a numeric anomaly_severity out of an LLM review, or None if unusable."""
         if llm_review.get("_fallback"):
             return None

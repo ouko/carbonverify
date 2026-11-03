@@ -21,7 +21,8 @@ Two implementations behind a common ``Embedder`` protocol:
 import hashlib
 import math
 import re
-from typing import Dict, List, Optional, Protocol, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Protocol
 
 import httpx
 
@@ -36,7 +37,7 @@ _TOKEN_RE = re.compile(r"[a-z0-9]+")
 class Embedder(Protocol):
     """Async text→vector provider."""
 
-    async def embed(self, texts: Sequence[str]) -> List[List[float]]:
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         """Embed a batch of texts into equal-length float vectors."""
         ...
 
@@ -47,7 +48,7 @@ class LocalHashEmbedder:
     def __init__(self, dim: int = 256):
         self.dim = dim
 
-    def _bucketize(self, text: str) -> List[float]:
+    def _bucketize(self, text: str) -> list[float]:
         vec = [0.0] * self.dim
         tokens = _TOKEN_RE.findall(text.lower())
         features = list(tokens)
@@ -60,7 +61,7 @@ class LocalHashEmbedder:
             vec = [v / norm for v in vec]
         return vec
 
-    async def embed(self, texts: Sequence[str]) -> List[List[float]]:
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         return [self._bucketize(t) for t in texts]
 
 
@@ -69,9 +70,9 @@ class OpenAICompatibleEmbedder:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
         timeout: float = 60.0,
     ):
         settings = get_settings()
@@ -82,7 +83,7 @@ class OpenAICompatibleEmbedder:
             raise ValueError("OpenAICompatibleEmbedder requires a base URL")
         self._client = httpx.AsyncClient(timeout=timeout)
 
-    async def embed(self, texts: Sequence[str]) -> List[List[float]]:
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         if not self.api_key:
             raise RuntimeError("KNOWLEDGE_EMBEDDER_API_KEY is not configured")
         response = await self._client.post(
@@ -95,7 +96,7 @@ class OpenAICompatibleEmbedder:
         )
         response.raise_for_status()
         data = response.json()
-        ordered: Dict[int, List[float]] = {}
+        ordered: dict[int, list[float]] = {}
         for item in data.get("data", []):
             ordered[int(item["index"])] = [float(v) for v in item["embedding"]]
         return [ordered[i] for i in sorted(ordered)]
@@ -127,7 +128,7 @@ def top_k(
     query_vec: Sequence[float],
     candidates: Sequence[Sequence[float]],
     k: int,
-) -> List[Tuple[int, float]]:
+) -> list[tuple[int, float]]:
     """Rank candidate vectors against ``query_vec`` by cosine similarity.
 
     Returns up to ``k`` ``(index, score)`` pairs, best first. Pure python so

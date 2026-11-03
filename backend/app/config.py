@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -83,8 +83,8 @@ class Settings(BaseSettings):
     IOT_WEBHOOK_SECRET: str = ""
 
     # SIEM streaming
-    SIEM_ENDPOINT: Optional[str] = None
-    SIEM_TOKEN: Optional[str] = None
+    SIEM_ENDPOINT: str | None = None
+    SIEM_TOKEN: str | None = None
     SIEM_SOURCE: str = "carbonverify"
     SIEM_INDEX: str = "main"
     WHATSAPP_VERIFY_TOKEN: str = ""
@@ -137,6 +137,6 @@ class Settings(BaseSettings):
     OAUTH_OKTA_DOMAIN: str = ""  # e.g. https://your-org.okta.com
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

@@ -2,8 +2,8 @@
 
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,7 +87,7 @@ STEADY_STATES = (
 )
 
 
-def trigger_for_next_state(next_state: str) -> Optional[str]:
+def trigger_for_next_state(next_state: str) -> str | None:
     """Reverse-map a next-state name to its lifecycle trigger."""
     for trigger, state in TRIGGER_STATES.items():
         if state.value == next_state:
@@ -102,7 +102,7 @@ class KimiClawOrchestrator:
         self.db = db
         self.event_logger = EventLogger(db)
 
-    async def process_project(self, project_id: uuid.UUID, trigger: str, context: Optional[Dict[str, Any]] = None):
+    async def process_project(self, project_id: uuid.UUID, trigger: str, context: dict[str, Any] | None = None):
         """Main entry point: process a project state transition."""
         context = context or {}
 
@@ -149,7 +149,7 @@ class KimiClawOrchestrator:
         agents_to_run = STATE_TRANSITIONS.get(target_state, {})
         # Find which agent keys map to the next logical state
         next_state_key = None
-        for key, agents in agents_to_run.items():
+        for key in agents_to_run:
             # key is the next state name (as string)
             next_state_key = key
             break
@@ -175,8 +175,8 @@ class KimiClawOrchestrator:
         self,
         project_id: uuid.UUID,
         max_steps: int = 3,
-        _visited: Optional[set] = None,
-    ) -> Dict[str, Any]:
+        _visited: set | None = None,
+    ) -> dict[str, Any]:
         """Autonomously advance a project through lifecycle states.
 
         Runs the current state's required agents via :meth:`dispatch_agent`.
@@ -289,7 +289,7 @@ class KimiClawOrchestrator:
         project_id: uuid.UUID,
         agent_type: str,
         trigger_event: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> AgentResult:
         """Dispatch a single agent and handle its result."""
 
@@ -334,7 +334,7 @@ class KimiClawOrchestrator:
         agent_run.confidence_score = result.confidence_score
         agent_run.execution_time_ms = result.execution_time_ms
         agent_run.error_message = result.errors[0] if result.errors else None
-        agent_run.completed_at = datetime.now(timezone.utc)
+        agent_run.completed_at = datetime.now(UTC)
         await self.db.commit()
 
         await self.event_logger.log_agent_complete(
@@ -363,7 +363,7 @@ class KimiClawOrchestrator:
         agent_type: str,
         agent_run_id: uuid.UUID,
         result: AgentResult,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ):
         """Route based on confidence score: auto-advance, human review, or escalate."""
         score = result.confidence_score
@@ -535,7 +535,7 @@ class KimiClawOrchestrator:
             if not (has_errors or low_confidence):
                 return
 
-            category: Optional[str] = None
+            category: str | None = None
             error_text = " ".join(str(e) for e in result.errors).lower()
             if "timeout" in error_text or "rate limit" in error_text or "429" in error_text:
                 category = "api_timeout_rate_limit"
@@ -549,7 +549,7 @@ class KimiClawOrchestrator:
             from app.remediation.engine import RemediationEngine
 
             engine = RemediationEngine(self.db)
-            failing_state: Dict[str, Any] = {
+            failing_state: dict[str, Any] = {
                 "agent_type": agent_type,
                 "agent_run_id": str(agent_run_id),
                 "errors": list(result.errors),
@@ -593,7 +593,7 @@ class KimiClawOrchestrator:
         agent_run_id: uuid.UUID,
         result: AgentResult,
         tier: str,
-        next_trigger: Optional[str] = None,
+        next_trigger: str | None = None,
     ) -> str:
         """Compose human-readable, explainable reasoning for a routing decision.
 
@@ -603,8 +603,10 @@ class KimiClawOrchestrator:
         if result.reasoning:
             parts = [
                 f"{agent_type} agent run {agent_run_id}: {result.reasoning}",
-                f"Confidence {result.confidence_score:.2f} maps to tier '{tier}'"
-                f" (auto-advance >= 0.95, human review >= 0.85, escalate below 0.85).",
+                (
+                    f"Confidence {result.confidence_score:.2f} maps to tier '{tier}'"
+                    f" (auto-advance >= 0.95, human review >= 0.85, escalate below 0.85)."
+                ),
             ]
             if result.evidence:
                 evidence_summary = json.dumps(result.evidence, sort_keys=True, default=str)
@@ -622,8 +624,10 @@ class KimiClawOrchestrator:
             summary = summary[:400] + "..."
         parts = [
             f"{agent_type} agent run {agent_run_id} finished with status '{result.status}'.",
-            f"Confidence {result.confidence_score:.2f} maps to tier '{tier}'"
-            f" (auto-advance >= 0.95, human review >= 0.85, escalate below 0.85).",
+            (
+                f"Confidence {result.confidence_score:.2f} maps to tier '{tier}'"
+                f" (auto-advance >= 0.95, human review >= 0.85, escalate below 0.85)."
+            ),
             f"Output summary: {summary}",
         ]
         if result.errors:
@@ -660,7 +664,7 @@ class KimiClawOrchestrator:
 
         # SLA deadline: priority 5 = 4 hours, priority 3 = 24 hours, priority 1 = 72 hours
         sla_hours = {5: 4, 4: 8, 3: 24, 2: 48, 1: 72}.get(priority, 24)
-        sla_deadline = datetime.now(timezone.utc) + timedelta(hours=sla_hours)
+        sla_deadline = datetime.now(UTC) + timedelta(hours=sla_hours)
 
         queue_item = HumanReviewQueue(
             item_type=QueueItemTypeEnum.agent_review,
@@ -685,7 +689,7 @@ class KimiClawOrchestrator:
         await self.db.refresh(queue_item)
         return queue_item
 
-    def _get_next_trigger(self, agent_type: str) -> Optional[str]:
+    def _get_next_trigger(self, agent_type: str) -> str | None:
         """Map agent completion to the next logical trigger."""
         mapping = {
             "ingestion": "data_complete",
@@ -704,7 +708,7 @@ class KimiClawOrchestrator:
             return f"Investigate low confidence ({result.confidence_score:.2f}) in {agent_type} output. Check data quality."
         return f"Review {agent_type} output for accuracy. Approve if acceptable."
 
-    async def _publish_project_update(self, project_id: uuid.UUID, update: Dict[str, Any]):
+    async def _publish_project_update(self, project_id: uuid.UUID, update: dict[str, Any]):
         """Publish update via Redis pub/sub for WebSocket forwarding."""
         try:
             await agent_pubsub.publish_project_update(str(project_id), update)
@@ -717,7 +721,7 @@ class KimiClawOrchestrator:
         decision: str,  # "approve" | "reject" | "escalate"
         resolution_notes: str,
         now: datetime,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Apply a resolution to a queue item: mutate, persist, log, notify.
 
         Shared by human resolution (resolve_human_review) and the SLA
@@ -731,7 +735,7 @@ class KimiClawOrchestrator:
         # Calculate time metrics (created_at may come back tz-naive from SQLite)
         created_at = item.created_at
         if created_at and created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = created_at.replace(tzinfo=UTC)
         if created_at:
             item.time_in_queue_seconds = int((now - created_at).total_seconds())
         # response_time would be from assignment to resolution
@@ -782,8 +786,8 @@ class KimiClawOrchestrator:
         decision: str,  # "approve" | "reject" | "escalate"
         resolution_notes: str,
         user_id: uuid.UUID,
-        actor: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        actor: str | None = None,
+    ) -> dict[str, Any]:
         """Resolve a human review queue item and trigger follow-up actions."""
         result = await self.db.execute(
             select(HumanReviewQueue).where(HumanReviewQueue.id == queue_item_id)
@@ -792,7 +796,7 @@ class KimiClawOrchestrator:
         if not item:
             return {"error": "Queue item not found"}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         resolution = await self._apply_human_review_resolution(item, decision, resolution_notes, now)
 
         actor_label = actor or str(user_id)
@@ -829,10 +833,10 @@ class KimiClawOrchestrator:
     async def sla_auto_approve(
         self,
         queue_item_id: uuid.UUID,
-        max_age: Optional[timedelta] = None,
+        max_age: timedelta | None = None,
         actor: str = "system:sla_sweep",
         resolution_notes: str = "Auto-approved by 24h SLA sweep",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Auto-approve a stale pending review item. Used by the SLA sweep."""
         result = await self.db.execute(
             select(HumanReviewQueue).where(HumanReviewQueue.id == queue_item_id)
@@ -843,10 +847,10 @@ class KimiClawOrchestrator:
         if item.status != QueueStatusEnum.pending:
             return {"error": f"Queue item is not pending (status={item.status.value})", "skipped": True}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         created_at = item.created_at
         if created_at and created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
+            created_at = created_at.replace(tzinfo=UTC)
         age = now - created_at if created_at else timedelta(0)
         if max_age is not None and age < max_age:
             return {"error": "Queue item is younger than the SLA age", "skipped": True}
@@ -881,7 +885,7 @@ class KimiClawOrchestrator:
 
         return resolution
 
-    async def get_project_state(self, project_id: uuid.UUID) -> Dict[str, Any]:
+    async def get_project_state(self, project_id: uuid.UUID) -> dict[str, Any]:
         """Get full orchestrator state for a project."""
         result = await self.db.execute(select(Project).where(Project.id == project_id))
         project = result.scalar_one_or_none()

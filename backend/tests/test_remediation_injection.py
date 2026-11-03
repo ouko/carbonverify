@@ -26,14 +26,16 @@ back to deterministic local content without an API key).
 import hashlib
 import json
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
 
+from app.core.encryption import compute_searchable_hash
 from app.models import (
     AgentDecision,
     Developer,
@@ -45,7 +47,6 @@ from app.models import (
     User,
     UserRoleEnum,
 )
-from app.core.encryption import compute_searchable_hash
 from app.remediation.engine import RemediationEngine
 from app.remediation.rules import seed_default_rules
 
@@ -60,13 +61,13 @@ class FaultCase:
     category: str
     target_type: str
     target_id: str
-    failing_state: Dict[str, Any]
+    failing_state: dict[str, Any]
     resolvable: bool
-    attempt_fn: Optional[Callable] = None
-    draft_fn: Optional[Callable] = None
+    attempt_fn: Callable | None = None
+    draft_fn: Callable | None = None
     project_backed: bool = False
-    snapshots: List[Dict[str, Any]] = field(default_factory=list)
-    outcome_status: Optional[str] = None
+    snapshots: list[dict[str, Any]] = field(default_factory=list)
+    outcome_status: str | None = None
 
 
 # ─── case factories ───────────────────────────────────────────────────────────
@@ -99,11 +100,11 @@ def _vvb_draft_fn(text: str) -> Callable:
     return draft_fn
 
 
-def build_fault_cases(project_id: uuid.UUID) -> List[FaultCase]:
+def build_fault_cases(project_id: uuid.UUID) -> list[FaultCase]:
     """23 injected faults across the 6 rule categories (20 resolvable,
     3 unresolvable)."""
     p = str(project_id)
-    cases: List[FaultCase] = []
+    cases: list[FaultCase] = []
 
     # ── a. form_validation_error → auto_correct ───────────────────────────
     for i, (bad_field, default) in enumerate(
@@ -345,10 +346,10 @@ def _canonical(value: Any) -> str:
     ).hexdigest()
 
 
-async def _compute_data_loss(db, cases: List[FaultCase]) -> Dict[str, Any]:
+async def _compute_data_loss(db, cases: list[FaultCase]) -> dict[str, Any]:
     from app.remediation.models import RemediationAttempt
 
-    details: List[str] = []
+    details: list[str] = []
     lost = 0
 
     for case in cases:
@@ -382,7 +383,7 @@ async def _compute_data_loss(db, cases: List[FaultCase]) -> Dict[str, Any]:
     return {"lost_records": lost, "details": details}
 
 
-def compute_resolution_rate(db, cases: List[FaultCase]) -> float:
+def compute_resolution_rate(db, cases: list[FaultCase]) -> float:
     """Resolved-case rate across the injected fault matrix."""
     total = len(cases)
     resolved = sum(1 for c in cases if c.outcome_status == "resolved")
@@ -432,7 +433,7 @@ async def target_project(db_session):
 
 @pytest.fixture
 def sleeper_spy():
-    calls: List[float] = []
+    calls: list[float] = []
 
     async def spy(seconds: float) -> None:
         calls.append(seconds)

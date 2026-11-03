@@ -1,7 +1,7 @@
 """Tests for the Phase 3 human escalation & notification service."""
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -423,7 +423,7 @@ class TestEscalationJobs:
     async def test_p0_skipped_after_recent_success(self, db_session, patch_db_context):
         from app.tasks.escalation_jobs import dispatch_p0_escalations
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         event = EscalationEvent(
             source="agent:test",
             title="p0",
@@ -471,7 +471,7 @@ class TestEscalationJobs:
         await service.raise_escalation("agent:b", "p2 two", "d", priority=PRIORITY_P2)
         await service.raise_escalation("agent:c", "p0", "d", priority=PRIORITY_P0)
 
-        old = datetime.now(timezone.utc) - timedelta(days=2)
+        old = datetime.now(UTC) - timedelta(days=2)
         stale = EscalationEvent(
             source="agent:old",
             title="stale p0",

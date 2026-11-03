@@ -6,8 +6,8 @@ The Alembic migration is the source of truth for PostgreSQL DDL.
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import JSON, DateTime, Index, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
@@ -20,7 +20,7 @@ PortableJSONB = JSON().with_variant(JSONB(astext_type=Text()), "postgresql")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class LearningReport(Base):
@@ -36,7 +36,7 @@ class LearningReport(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     # e.g. "weekly_retraining"
     report_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    report: Mapped[Dict[str, Any]] = mapped_column(PortableJSONB, default=dict, nullable=False)
+    report: Mapped[dict[str, Any]] = mapped_column(PortableJSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )

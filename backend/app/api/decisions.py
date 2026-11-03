@@ -9,7 +9,6 @@ are declared BEFORE the parameterized ``/{decision_id}`` route.
 """
 
 import uuid
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -28,9 +27,9 @@ router = APIRouter(prefix="/api/v1/audit", tags=["audit-decisions"])
 
 @router.get("/decisions", response_model=AgentDecisionListResponse)
 async def list_agent_decisions(
-    project_id: Optional[uuid.UUID] = None,
-    agent_type: Optional[str] = None,
-    action: Optional[str] = None,
+    project_id: uuid.UUID | None = None,
+    agent_type: str | None = None,
+    action: str | None = None,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_viewer),

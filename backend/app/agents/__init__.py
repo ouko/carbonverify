@@ -1,13 +1,13 @@
 """Kimi Claw multi-agent orchestration agents."""
 
 from app.agents.base import AgentResult, BaseAgent
-from app.agents.ingestion_agent import IngestionAgent
-from app.agents.validation_agent import ValidationAgent
 from app.agents.calculation_agent import CalculationAgent
-from app.agents.reporting_agent import ReportingAgent
-from app.agents.vvb_liaison_agent import VVBLiaisonAgent
-from app.agents.quality_control_agent import QualityControlAgent
 from app.agents.client_success_agent import ClientSuccessAgent
+from app.agents.ingestion_agent import IngestionAgent
+from app.agents.quality_control_agent import QualityControlAgent
+from app.agents.reporting_agent import ReportingAgent
+from app.agents.validation_agent import ValidationAgent
+from app.agents.vvb_liaison_agent import VVBLiaisonAgent
 
 AGENT_REGISTRY = {
     "ingestion": IngestionAgent,
@@ -20,14 +20,14 @@ AGENT_REGISTRY = {
 }
 
 __all__ = [
+    "AGENT_REGISTRY",
     "AgentResult",
     "BaseAgent",
-    "IngestionAgent",
-    "ValidationAgent",
     "CalculationAgent",
+    "ClientSuccessAgent",
+    "IngestionAgent",
+    "QualityControlAgent",
     "ReportingAgent",
     "VVBLiaisonAgent",
-    "QualityControlAgent",
-    "ClientSuccessAgent",
-    "AGENT_REGISTRY",
+    "ValidationAgent",
 ]

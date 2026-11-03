@@ -12,7 +12,7 @@ time) so tests can route sessions via the ``patch_db_context`` fixture.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -47,7 +47,7 @@ def _latest_success(event: EscalationEvent) -> datetime | None:
         except ValueError:
             continue
         if sent_at.tzinfo is None:
-            sent_at = sent_at.replace(tzinfo=timezone.utc)
+            sent_at = sent_at.replace(tzinfo=UTC)
         if latest is None or sent_at > latest:
             latest = sent_at
     return latest

@@ -5,7 +5,7 @@ history and per-journey pass/fail stats for the last 24 hours. The deploy gate
 (``scripts/pre_deploy_check.py``) consumes this endpoint.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/v1/validation", tags=["validation-health"])
 async def get_validation_health(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Latest validation health snapshot, 7-day history, and 24h journey stats."""
     history = await recent_snapshots(db)
     snapshots = [snapshot_to_dict(s) for s in history]

@@ -1,12 +1,12 @@
 """QualityControlAgent: statistical sampling, cross-project anomaly detection, version audit."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import func, select
 
 from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
-from app.models import CalculationRun, DataSource, FileUpload, Project, SurveyResponse
 from app.core.logging import get_logger
+from app.models import CalculationRun, DataSource, FileUpload, Project, SurveyResponse
 
 logger = get_logger(__name__)
 
@@ -26,11 +26,11 @@ class QualityControlAgent(BaseAgent):
 
     agent_type = "quality_control"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Run quality control checks: sampling, anomaly detection, hash verification."""
         check_type = context.get("check_type", "milestone")  # "daily" or "milestone"
 
-        flags: List[Dict[str, Any]] = []
+        flags: list[dict[str, Any]] = []
 
         # 1. Structural sampling of calculation runs.
         calc_flags, calc_samples = await self._sample_calculations()
@@ -83,7 +83,7 @@ class QualityControlAgent(BaseAgent):
                 "required": ["genuine_rate"],
             },
         )
-        llm_genuine: Optional[float] = None
+        llm_genuine: float | None = None
         if not llm_review.get("_fallback"):
             raw = llm_review.get("genuine_rate")
             if isinstance(raw, (int, float)) and not isinstance(raw, bool):
@@ -182,14 +182,14 @@ class QualityControlAgent(BaseAgent):
 
         return flags, len(calcs)
 
-    async def _sample_data_points(self) -> Dict[str, Any]:
+    async def _sample_data_points(self) -> dict[str, Any]:
         """Compute null rate and IQR outliers over the project's numeric data points.
 
         Numeric samples are drawn from calculation runs, data-source processed
         data, and survey confidence scores — the 'transactions' of the MRV
         pipeline.
         """
-        samples: List[float] = []
+        samples: list[float] = []
         nulls = 0
         total_fields = 0
 
@@ -243,7 +243,7 @@ class QualityControlAgent(BaseAgent):
         }
 
     @staticmethod
-    def _iqr_outliers(samples: List[float]) -> List[float]:
+    def _iqr_outliers(samples: list[float]) -> list[float]:
         """Values beyond Q1 - 1.5*IQR / Q3 + 1.5*IQR (empty for small samples)."""
         if len(samples) < 4:
             return []
@@ -256,7 +256,7 @@ class QualityControlAgent(BaseAgent):
         high = q3 + IQR_MULTIPLIER * iqr
         return [s for s in ordered if s < low or s > high]
 
-    def _iqr_outlier_count(self, samples: List[float]) -> int:
+    def _iqr_outlier_count(self, samples: list[float]) -> int:
         return len(self._iqr_outliers(samples))
 
     async def _detect_cross_project_anomalies(self) -> tuple:
@@ -294,7 +294,7 @@ class QualityControlAgent(BaseAgent):
                 })
         return flags, f"ran against {total_projects - 1} peer project(s)"
 
-    async def _verify_data_integrity(self) -> List[Dict[str, Any]]:
+    async def _verify_data_integrity(self) -> list[dict[str, Any]]:
         """Verify SHA-256 hashes of file uploads."""
         result = await self.db.execute(
             select(FileUpload).where(FileUpload.project_id == self.project_id)
@@ -312,7 +312,7 @@ class QualityControlAgent(BaseAgent):
 
         return flags
 
-    def _check_blockchain_anchors(self) -> List[Dict[str, Any]]:
+    def _check_blockchain_anchors(self) -> list[dict[str, Any]]:
         """Placeholder for blockchain anchoring verification."""
         # In production: verify Merkle root on-chain
         return []

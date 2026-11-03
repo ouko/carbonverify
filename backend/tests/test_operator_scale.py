@@ -11,7 +11,7 @@ review items in a single batch call.
 
 import time
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -79,7 +79,7 @@ async def operator_scale_data(db_session):
     db_session.add_all(projects)
     await db_session.flush()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     agent_types = list(AgentTypeEnum)
 
     # ~40 projects with recent agent runs.
@@ -238,7 +238,7 @@ async def test_sla_sweep_processes_stale_items_in_single_batch(
     db_session, patch_db_context, operator_scale_data
 ):
     """The SLA sweep clears every stale pending item in one batch call."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stale_items = [
         HumanReviewQueue(
             id=uuid.uuid4(),

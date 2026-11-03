@@ -11,8 +11,7 @@ to the session fixture via the ``patch_db_context`` conftest fixture.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Dict
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -66,7 +65,7 @@ def lifecycle_scan(self):
         enqueued = 0
         skipped = 0
         async with app_database.get_db_context() as db:
-            cutoff = datetime.now(timezone.utc) - RECENT_PROJECT_WINDOW
+            cutoff = datetime.now(UTC) - RECENT_PROJECT_WINDOW
             result = await db.execute(
                 select(Project).where(
                     Project.status.in_(LIFECYCLE_DRIVE_STATES),
@@ -130,7 +129,7 @@ def human_review_sla_sweep(self):
     async def _sweep():
         auto_approved = 0
         async with app_database.get_db_context() as db:
-            cutoff = datetime.now(timezone.utc) - SLA_MAX_AGE
+            cutoff = datetime.now(UTC) - SLA_MAX_AGE
             result = await db.execute(
                 select(HumanReviewQueue).where(
                     HumanReviewQueue.status == QueueStatusEnum.pending,
@@ -183,7 +182,7 @@ def remediation_sweep(self):
     async def _sweep():
         reruns = 0
         async with app_database.get_db_context() as db:
-            cutoff = datetime.now(timezone.utc) - REMEDIATION_SWEEP_MAX_AGE
+            cutoff = datetime.now(UTC) - REMEDIATION_SWEEP_MAX_AGE
             result = await db.execute(
                 select(RemediationAttempt)
                 .where(
@@ -196,7 +195,7 @@ def remediation_sweep(self):
             rows = result.scalars().all()
 
             # Deduplicate to the most recent failed attempt per target.
-            latest_by_target: Dict[tuple, RemediationAttempt] = {}
+            latest_by_target: dict[tuple, RemediationAttempt] = {}
             for row in rows:
                 key = (row.rule_key, row.target_type, row.target_id)
                 latest_by_target.setdefault(key, row)

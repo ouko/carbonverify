@@ -10,8 +10,8 @@ time) so tests can route sessions via the ``patch_db_context`` fixture.
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +44,7 @@ IN_FLIGHT_STATUSES = (
 
 async def has_inflight_run(db: AsyncSession, workflow_id: Any, journey: str) -> bool:
     """True when a synthetic run for the journey is still in flight."""
-    cutoff = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    cutoff = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
         select(ValidationRun).where(
             ValidationRun.workflow_id == workflow_id,
@@ -58,7 +58,7 @@ async def has_inflight_run(db: AsyncSession, workflow_id: Any, journey: str) -> 
     return False
 
 
-async def run_synthetic_journeys(db: AsyncSession) -> Dict[str, Any]:
+async def run_synthetic_journeys(db: AsyncSession) -> dict[str, Any]:
     """Queue one synthetic run per journey (bounded) and store a health snapshot.
 
     Split from the Celery task wrapper so tests can drive it with an explicit
@@ -76,7 +76,7 @@ async def run_synthetic_journeys(db: AsyncSession) -> Dict[str, Any]:
     actor = await actor_factory.get_or_create_default_actor(db, SyntheticActorType.service)
     marker = (actor.markers or {}).get("synthetic_actor_id", actor.name)
 
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
     for journey_name in templates:
         workflow = workflows[journey_name]
         if await has_inflight_run(db, workflow.id, journey_name):
@@ -128,7 +128,7 @@ def run_synthetic_validation(self):
 
     try:
         return run_async(_work())
-    except Exception as exc:  # noqa: BLE001 — task retries on transient failures
+    except Exception as exc:
         logger.error("run_synthetic_validation_failed", error=str(exc))
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc)

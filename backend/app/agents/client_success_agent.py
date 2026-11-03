@@ -1,11 +1,12 @@
 """ClientSuccessAgent: onboarding, progress updates, retention, upsell."""
 
-from datetime import date, datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 
 from app.agents.base import AgentResult, BaseAgent
+from app.core.logging import get_logger
 from app.models import (
     AgentRun,
     CalculationRun,
@@ -19,7 +20,6 @@ from app.models import (
     SurveyResponse,
     WhatsAppConversation,
 )
-from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -46,7 +46,7 @@ class ClientSuccessAgent(BaseAgent):
 
     agent_type = "client_success"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Generate client success actions based on project state."""
         project_id = self.project_id
         trigger = context.get("trigger", "milestone")  # milestone | schedule | usage_pattern
@@ -85,7 +85,7 @@ class ClientSuccessAgent(BaseAgent):
         )
         engagement_score = 1.0 - churn_risk
 
-        actions: List[Dict[str, Any]] = []
+        actions: list[dict[str, Any]] = []
         actions.extend(await self._check_onboarding(project))
         actions.extend(await self._generate_progress_update(project))
         actions.extend(self._check_retention_risk(project, days_since_activity, churn_risk))
@@ -191,7 +191,7 @@ class ClientSuccessAgent(BaseAgent):
 
     async def _days_since_activity(self, project: Project) -> int:
         """Days since the most recent of: agent run, calculation, or upload."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         latest: datetime | None = None
         for model in (AgentRun, CalculationRun, FileUpload):
             result = await self.db.execute(
@@ -207,7 +207,7 @@ class ClientSuccessAgent(BaseAgent):
             # Fall back to project creation.
             latest = project.created_at
         if latest.tzinfo is None:
-            latest = latest.replace(tzinfo=timezone.utc)
+            latest = latest.replace(tzinfo=UTC)
         return max(0, (now - latest).days)
 
     async def _count_open_tickets(self, project: Project) -> int:
@@ -228,7 +228,7 @@ class ClientSuccessAgent(BaseAgent):
         )
         return result.scalar() or 0
 
-    async def _survey_stats(self, project: Project) -> Dict[str, Any]:
+    async def _survey_stats(self, project: Project) -> dict[str, Any]:
         """Survey response rate: responses over completed conversations."""
         conv_result = await self.db.execute(
             select(func.count(WhatsAppConversation.id)).where(
@@ -256,7 +256,7 @@ class ClientSuccessAgent(BaseAgent):
         owner_present: bool,
         days_since_activity: int,
         open_tickets: int,
-        survey_stats: Dict[str, Any],
+        survey_stats: dict[str, Any],
     ) -> float:
         """Weighted churn-risk score in [0, 1]."""
         risk = 0.1
@@ -282,16 +282,16 @@ class ClientSuccessAgent(BaseAgent):
             return True
         return (end - today).days <= MONITORING_PERIOD_APPROACHING_DAYS
 
-    async def _check_onboarding(self, project: Project) -> List[Dict[str, Any]]:
+    async def _check_onboarding(self, project: Project) -> list[dict[str, Any]]:
         """Check if onboarding tasks are complete."""
-        actions: List[Dict[str, Any]] = []
+        actions: list[dict[str, Any]] = []
         if project.status != ProjectStatusEnum.onboarding:
             return actions
 
         created_at = project.created_at
         if created_at and created_at.tzinfo is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        days_since_creation = (datetime.now(timezone.utc) - created_at).days if created_at else 0
+            created_at = created_at.replace(tzinfo=UTC)
+        days_since_creation = (datetime.now(UTC) - created_at).days if created_at else 0
 
         if days_since_creation <= 1:
             actions.append({
@@ -314,7 +314,7 @@ class ClientSuccessAgent(BaseAgent):
 
         return actions
 
-    async def _generate_progress_update(self, project: Project) -> List[Dict[str, Any]]:
+    async def _generate_progress_update(self, project: Project) -> list[dict[str, Any]]:
         """Generate progress update for the client."""
         calc_result = await self.db.execute(
             select(func.count(CalculationRun.id)).where(CalculationRun.project_id == project.id)
@@ -348,7 +348,7 @@ class ClientSuccessAgent(BaseAgent):
         project: Project,
         days_since_activity: int,
         churn_risk: float,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Identify retention risks and propose interventions."""
         actions = []
 
@@ -368,7 +368,7 @@ class ClientSuccessAgent(BaseAgent):
 
         return actions
 
-    def _generate_upsell_recommendations(self, project: Project) -> List[Dict[str, Any]]:
+    def _generate_upsell_recommendations(self, project: Project) -> list[dict[str, Any]]:
         """Generate upsell recommendations based on project maturity."""
         actions = []
 

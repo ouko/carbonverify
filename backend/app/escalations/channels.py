@@ -8,8 +8,8 @@ failing channel must never break dispatch of the others.
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Protocol
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -26,9 +26,9 @@ class ChannelResult:
     success: bool
     configured: bool
     detail: str = ""
-    sent_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    sent_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_record(self) -> Dict[str, Any]:
+    def to_record(self) -> dict[str, Any]:
         return {
             "sent_at": self.sent_at.isoformat(),
             "success": self.success,
@@ -194,10 +194,10 @@ class InAppChannel:
             return ChannelResult(channel=self.name, success=False, configured=True, detail=str(exc))
 
 
-_adapters: Optional[Dict[str, ChannelAdapter]] = None
+_adapters: dict[str, ChannelAdapter] | None = None
 
 
-def get_channel_adapters() -> Dict[str, ChannelAdapter]:
+def get_channel_adapters() -> dict[str, ChannelAdapter]:
     """Lazy registry of channel adapters (single instance per process)."""
     global _adapters
     if _adapters is None:

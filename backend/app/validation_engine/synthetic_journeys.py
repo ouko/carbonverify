@@ -20,7 +20,7 @@ anywhere the engine runs. Runs are tagged with a synthetic actor marker via
 
 import hashlib
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,10 +37,10 @@ def _service_step(
     step_id: str,
     name: str,
     method_name: str,
-    args: List[Any],
-    next_on_success: List[str],
-    next_on_failure: List[str] | None = None,
-) -> Dict[str, Any]:
+    args: list[Any],
+    next_on_success: list[str],
+    next_on_failure: list[str] | None = None,
+) -> dict[str, Any]:
     return {
         "id": step_id,
         "name": name,
@@ -55,7 +55,7 @@ def _service_step(
     }
 
 
-def _developer_journey() -> Dict[str, Any]:
+def _developer_journey() -> dict[str, Any]:
     return {
         "version": "1.0",
         "description": (
@@ -144,7 +144,7 @@ def _developer_journey() -> Dict[str, Any]:
     }
 
 
-def _enumerator_journey() -> Dict[str, Any]:
+def _enumerator_journey() -> dict[str, Any]:
     return {
         "version": "1.0",
         "description": (
@@ -211,7 +211,7 @@ def _enumerator_journey() -> Dict[str, Any]:
     }
 
 
-def _anomaly_recovery_journey() -> Dict[str, Any]:
+def _anomaly_recovery_journey() -> dict[str, Any]:
     return {
         "version": "1.0",
         "description": (
@@ -271,34 +271,34 @@ _JOURNEY_BUILDERS = {
 }
 
 
-def get_journey_templates() -> Dict[str, Dict[str, Any]]:
+def get_journey_templates() -> dict[str, dict[str, Any]]:
     """Return the three journey graph dicts, each validated by WorkflowGraph."""
     templates = {name: builder() for name, builder in _JOURNEY_BUILDERS.items()}
-    for name, graph in templates.items():
+    for graph in templates.values():
         WorkflowGraph.model_validate(graph)
     return templates
 
 
-def get_journey_names() -> List[str]:
+def get_journey_names() -> list[str]:
     return list(_JOURNEY_BUILDERS.keys())
 
 
-def compute_graph_hash(graph: Dict[str, Any]) -> str:
+def compute_graph_hash(graph: dict[str, Any]) -> str:
     canonical = json.dumps(graph, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 async def ensure_journey_workflows(
     db: AsyncSession,
-    templates: Dict[str, Dict[str, Any]] | None = None,
-) -> Dict[str, ValidationWorkflow]:
+    templates: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, ValidationWorkflow]:
     """Upsert one ValidationWorkflow row per journey template (by name+version).
 
     Returns a mapping of journey name to workflow. Existing rows are returned
     untouched so operator edits are never clobbered.
     """
     templates = templates or get_journey_templates()
-    workflows: Dict[str, ValidationWorkflow] = {}
+    workflows: dict[str, ValidationWorkflow] = {}
 
     existing_result = await db.execute(
         select(ValidationWorkflow).where(

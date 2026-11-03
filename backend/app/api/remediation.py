@@ -5,7 +5,7 @@ are declared BEFORE the parameterized ``/attempts/{attempt_id}/retry`` route.
 """
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/remediation", tags=["remediation"])
 
 
-def _rule_out(rule: RemediationRule) -> Dict[str, Any]:
+def _rule_out(rule: RemediationRule) -> dict[str, Any]:
     return {
         "id": str(rule.id),
         "rule_key": rule.rule_key,
@@ -35,7 +35,7 @@ def _rule_out(rule: RemediationRule) -> Dict[str, Any]:
     }
 
 
-def _attempt_out(row: RemediationAttempt) -> Dict[str, Any]:
+def _attempt_out(row: RemediationAttempt) -> dict[str, Any]:
     return {
         "id": str(row.id),
         "rule_key": row.rule_key,
@@ -54,10 +54,10 @@ def _attempt_out(row: RemediationAttempt) -> Dict[str, Any]:
 
 @router.get("/rules")
 async def list_rules(
-    enabled: Optional[bool] = None,
+    enabled: bool | None = None,
     current_user: User = Depends(require_viewer),
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List remediation rules (optionally filtered by enabled flag)."""
     stmt = select(RemediationRule).order_by(RemediationRule.rule_key)
     if enabled is not None:
@@ -68,15 +68,15 @@ async def list_rules(
 
 @router.get("/attempts")
 async def list_attempts(
-    rule_key: Optional[str] = None,
-    target_type: Optional[str] = None,
-    status: Optional[str] = None,
-    project_id: Optional[uuid.UUID] = None,
+    rule_key: str | None = None,
+    target_type: str | None = None,
+    status: str | None = None,
+    project_id: uuid.UUID | None = None,
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(require_viewer),
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """List remediation attempts with filters (newest first, paginated)."""
     filters = []
     if rule_key:
@@ -112,7 +112,7 @@ async def list_attempts(
 async def remediation_stats(
     current_user: User = Depends(require_viewer),
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Aggregate remediation statistics, including resolution rate."""
     engine = RemediationEngine(db)
     return await engine.stats()
@@ -123,7 +123,7 @@ async def retry_attempt(
     attempt_id: uuid.UUID,
     current_user: User = Depends(require_operator),
     db: AsyncSession = Depends(get_db),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Manually re-run a previous remediation attempt with a fresh budget."""
     result = await db.execute(
         select(RemediationAttempt).where(RemediationAttempt.id == attempt_id)

@@ -2,7 +2,8 @@
 
 import asyncio
 import json
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any, Optional
 
 import redis.asyncio as redis
 
@@ -27,8 +28,8 @@ class AgentPubSub:
     def __init__(self):
         if self._initialized:
             return
-        self._redis: Optional[redis.Redis] = None
-        self._pubsub: Optional[redis.client.PubSub] = None
+        self._redis: redis.Redis | None = None
+        self._pubsub: redis.client.PubSub | None = None
         self._listeners: list = []
         self._initialized = True
 
@@ -91,14 +92,14 @@ class AgentPubSub:
         except Exception as exc:
             logger.error("pubsub_listen_loop_error", error=str(exc))
 
-    def add_listener(self, callback: Callable[[str, Dict[str, Any]], None]):
+    def add_listener(self, callback: Callable[[str, dict[str, Any]], None]):
         self._listeners.append(callback)
 
-    def remove_listener(self, callback: Callable[[str, Dict[str, Any]], None]):
+    def remove_listener(self, callback: Callable[[str, dict[str, Any]], None]):
         if callback in self._listeners:
             self._listeners.remove(callback)
 
-    async def publish_event(self, event_type: str, payload: Dict[str, Any]):
+    async def publish_event(self, event_type: str, payload: dict[str, Any]):
         """Publish an orchestrator event to all subscribers."""
         if self._redis is None:
             await self.connect()
@@ -106,7 +107,7 @@ class AgentPubSub:
         await self._redis.publish("orchestrator:events", message)
         logger.debug("pubsub_event_published", event_type=event_type)
 
-    async def publish_agent_result(self, agent_type: str, project_id: str, result: Dict[str, Any]):
+    async def publish_agent_result(self, agent_type: str, project_id: str, result: dict[str, Any]):
         """Publish an agent execution result."""
         if self._redis is None:
             await self.connect()
@@ -121,7 +122,7 @@ class AgentPubSub:
         await self._redis.publish("agent:results", message)
         logger.debug("pubsub_agent_result_published", agent_type=agent_type, project_id=project_id)
 
-    async def publish_project_update(self, project_id: str, update: Dict[str, Any]):
+    async def publish_project_update(self, project_id: str, update: dict[str, Any]):
         """Publish a project-specific update for WebSocket clients."""
         if self._redis is None:
             await self.connect()

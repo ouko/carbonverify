@@ -1,13 +1,13 @@
 """Event logging and audit trail for the orchestrator."""
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import OrchestratorEvent, OrchestratorEventTypeEnum
 from app.core.logging import get_logger
+from app.models import OrchestratorEvent, OrchestratorEventTypeEnum
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ class EventLogger:
         project_id: uuid.UUID,
         from_state: str,
         to_state: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> OrchestratorEvent:
         event = OrchestratorEvent(
             project_id=project_id,
@@ -47,7 +47,7 @@ class EventLogger:
         project_id: uuid.UUID,
         agent_type: str,
         trigger_event: str,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> OrchestratorEvent:
         event = OrchestratorEvent(
             project_id=project_id,
@@ -69,7 +69,7 @@ class EventLogger:
         project_id: uuid.UUID,
         agent_run_id: uuid.UUID,
         confidence_score: float,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> OrchestratorEvent:
         event = OrchestratorEvent(
             project_id=project_id,
@@ -94,7 +94,7 @@ class EventLogger:
         agent_type: str,
         confidence_score: float,
         decision: str,  # auto_advance | human_review | escalate
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ) -> OrchestratorEvent:
         event = OrchestratorEvent(
             project_id=project_id,

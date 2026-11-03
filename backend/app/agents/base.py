@@ -3,7 +3,7 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.logging import get_logger
 
@@ -29,11 +29,11 @@ class AgentResult:
         self,
         status: str,  # "completed" | "failed" | "queued_for_review"
         confidence_score: float,
-        output_data: Dict[str, Any],
-        errors: Optional[list] = None,
-        execution_time_ms: Optional[int] = None,
-        reasoning: Optional[str] = None,
-        evidence: Optional[Dict[str, Any]] = None,
+        output_data: dict[str, Any],
+        errors: list | None = None,
+        execution_time_ms: int | None = None,
+        reasoning: str | None = None,
+        evidence: dict[str, Any] | None = None,
     ):
         self.status = status
         self.confidence_score = max(0.0, min(1.0, confidence_score))
@@ -43,7 +43,7 @@ class AgentResult:
         self.reasoning = reasoning
         self.evidence = evidence or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "status": self.status,
             "confidence_score": self.confidence_score,
@@ -66,7 +66,7 @@ class BaseAgent(ABC):
         self.logger = get_logger(f"agent.{self.agent_type}")
 
     @abstractmethod
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Execute the agent's core logic.
 
         Args:
@@ -93,10 +93,10 @@ class BaseAgent(ABC):
     async def reason_with_llm(
         self,
         task_prompt: str,
-        context: Dict[str, Any],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        response_schema: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any],
+        tools: list[dict[str, Any]] | None = None,
+        response_schema: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Run a structured LLM reasoning task, always returning a dict.
 
         Falls back to ``{"_fallback": True, ...}`` when the Kimi API is
@@ -117,7 +117,7 @@ class BaseAgent(ABC):
             )
             return {"_fallback": True, "error": str(exc)}
 
-    def blend_confidence(self, heuristic: float, llm: Optional[float] = None) -> float:
+    def blend_confidence(self, heuristic: float, llm: float | None = None) -> float:
         """Blend heuristic engine confidence with an LLM review score.
 
         Weighting: heuristic * 0.4 + llm * 0.6 when an LLM score is present,
@@ -133,13 +133,13 @@ class BaseAgent(ABC):
     @staticmethod
     def build_output(
         reasoning: str,
-        evidence: Dict[str, Any],
+        evidence: dict[str, Any],
         **data: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Build output_data with mandatory audit-trail fields."""
         return {**data, "reasoning": reasoning, "evidence": evidence}
 
-    def _no_data_result(self, reasoning: str, evidence: Optional[Dict[str, Any]] = None) -> AgentResult:
+    def _no_data_result(self, reasoning: str, evidence: dict[str, Any] | None = None) -> AgentResult:
         """Standard graceful result for projects with no data yet (0.5-0.7 confidence)."""
         return AgentResult(
             status="completed",
@@ -149,7 +149,7 @@ class BaseAgent(ABC):
             evidence=evidence or {},
         )
 
-    async def execute(self, trigger_event: str, context: Dict[str, Any]) -> AgentResult:
+    async def execute(self, trigger_event: str, context: dict[str, Any]) -> AgentResult:
         """Wrapper that records timing and logs execution."""
         start = time.perf_counter()
         self.logger.info(

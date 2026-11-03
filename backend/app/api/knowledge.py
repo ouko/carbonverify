@@ -8,7 +8,7 @@ before the parameterized ``/documents/{document_id}`` route.
 """
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -25,15 +25,18 @@ class DocumentIngestRequest(BaseModel):
     registry: str = Field(..., pattern="^(gold_standard|verra|ipcc|other)$")
     methodology_id: str = Field(..., min_length=1, max_length=100)
     title: str = Field(..., min_length=1, max_length=500)
-    content: str = Field(..., min_length=1)
+    # Cap document size to bound chunking/embedding work per ingest request
+    # (CWE-400): an unbounded body would let a single request exhaust memory
+    # and CPU in ``chunk_text``/``embed`` and bloat the chunks table.
+    content: str = Field(..., min_length=1, max_length=500_000)
     version: str = Field(..., min_length=1, max_length=50)
-    source_url: Optional[str] = Field(default=None, max_length=1000)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    source_url: str | None = Field(default=None, max_length=1000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class KnowledgeQueryRequest(BaseModel):
     question: str = Field(..., min_length=1)
-    registry: Optional[str] = None
+    registry: str | None = None
 
 
 def _service(db: AsyncSession) -> KnowledgeBaseService:
@@ -63,7 +66,7 @@ async def ingest_document(
 
 @router.get("/documents")
 async def list_documents(
-    registry: Optional[str] = None,
+    registry: str | None = None,
     current_user=Depends(require_viewer),
     db: AsyncSession = Depends(get_db),
 ):
@@ -86,7 +89,7 @@ async def query_knowledge(
 @router.get("/search")
 async def search_knowledge(
     q: str = Query(..., min_length=1),
-    registry: Optional[str] = None,
+    registry: str | None = None,
     k: int = Query(5, ge=1, le=50),
     current_user=Depends(require_viewer),
     db: AsyncSession = Depends(get_db),
@@ -120,4 +123,4 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
 
-__all__: List[str] = ["router"]
+__all__: list[str] = ["router"]

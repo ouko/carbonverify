@@ -35,8 +35,8 @@ from app.api.methodology_templates import router as methodology_templates_router
 from app.api.oauth import router as oauth_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.projects import router as projects_router
-from app.api.reports import router as reports_router
 from app.api.remediation import router as remediation_router
+from app.api.reports import router as reports_router
 from app.api.review_queue import router as review_queue_router
 from app.api.tokenization import router as tokenization_router
 from app.api.uploads import router as uploads_router

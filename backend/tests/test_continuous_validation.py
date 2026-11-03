@@ -18,13 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.escalations.models import EscalationEvent, EscalationStatus
 from app.remediation.models import RemediationAttempt
+from app.tasks.validation_jobs import has_inflight_run, run_synthetic_journeys
 from app.validation_engine.health import (
+    compute_and_store_snapshot,
     compute_health_score,
     compute_journey_stats,
     escalation_backlog_percent,
     journey_success_percent,
     next_streak,
-    compute_and_store_snapshot,
 )
 from app.validation_engine.journey_service import (
     ensure_journey_service_registered,
@@ -44,7 +45,6 @@ from app.validation_engine.synthetic_journeys import (
     get_journey_names,
     get_journey_templates,
 )
-from app.tasks.validation_jobs import has_inflight_run, run_synthetic_journeys
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
@@ -458,6 +458,7 @@ class TestDeployGate:
             text=True,
             cwd=str(BACKEND_ROOT),
             timeout=60,
+            check=False,
         )
         assert result.returncode == 0
         assert "all gate cases passed" in result.stdout

@@ -1,6 +1,6 @@
 """KnowledgeBaseService: ingest, chunk, embed, search, and RAG-query methodology texts."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 CHUNK_SIZE_TOKENS = 500
 CHUNK_OVERLAP_TOKENS = 50
 
-RAG_ANSWER_SCHEMA: Dict[str, Any] = {
+RAG_ANSWER_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "answer": {
@@ -31,7 +31,7 @@ RAG_ANSWER_SCHEMA: Dict[str, Any] = {
 }
 
 
-def chunk_text(content: str, size: int = CHUNK_SIZE_TOKENS, overlap: int = CHUNK_OVERLAP_TOKENS) -> List[str]:
+def chunk_text(content: str, size: int = CHUNK_SIZE_TOKENS, overlap: int = CHUNK_OVERLAP_TOKENS) -> list[str]:
     """Split text into token windows with overlap using a whitespace splitter."""
     tokens = content.split()
     if not tokens:
@@ -50,7 +50,7 @@ def chunk_text(content: str, size: int = CHUNK_SIZE_TOKENS, overlap: int = CHUNK
     return chunks
 
 
-def _document_to_dict(doc: MethodologyDocument) -> Dict[str, Any]:
+def _document_to_dict(doc: MethodologyDocument) -> dict[str, Any]:
     return {
         "id": str(doc.id),
         "registry": doc.registry,
@@ -64,7 +64,7 @@ def _document_to_dict(doc: MethodologyDocument) -> Dict[str, Any]:
     }
 
 
-def _chunk_to_dict(chunk: KnowledgeChunk) -> Dict[str, Any]:
+def _chunk_to_dict(chunk: KnowledgeChunk) -> dict[str, Any]:
     return {
         "id": str(chunk.id),
         "document_id": str(chunk.document_id),
@@ -77,7 +77,7 @@ def _chunk_to_dict(chunk: KnowledgeChunk) -> Dict[str, Any]:
 class KnowledgeBaseService:
     """Ingest and retrieve methodology knowledge with vector search + RAG."""
 
-    def __init__(self, db: AsyncSession, embedder: Optional[Embedder] = None):
+    def __init__(self, db: AsyncSession, embedder: Embedder | None = None):
         self.db = db
         self.embedder = embedder or get_embedder()
 
@@ -88,8 +88,8 @@ class KnowledgeBaseService:
         title: str,
         content: str,
         version: str,
-        source_url: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        source_url: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MethodologyDocument:
         """Ingest a methodology document, chunking + embedding it for search.
 
@@ -149,9 +149,9 @@ class KnowledgeBaseService:
     async def search(
         self,
         query: str,
-        registry: Optional[str] = None,
+        registry: str | None = None,
         k: int = 5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Vector-search chunks; returns ``[{chunk, document, score}]`` best-first."""
         stmt = select(KnowledgeChunk, MethodologyDocument).join(
             MethodologyDocument, KnowledgeChunk.document_id == MethodologyDocument.id
@@ -177,9 +177,9 @@ class KnowledgeBaseService:
     async def query_knowledge_base(
         self,
         question: str,
-        registry: Optional[str] = None,
+        registry: str | None = None,
         k: int = 4,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """RAG answer over retrieved methodology passages.
 
         Retrieves the top-k chunks, asks the Kimi LLM to synthesize a cited
@@ -200,7 +200,7 @@ class KnowledgeBaseService:
             }
             for r in results
         ]
-        base: Dict[str, Any] = {
+        base: dict[str, Any] = {
             "question": question,
             "registry": registry,
             "passages": passages,
@@ -253,7 +253,7 @@ class KnowledgeBaseService:
         await self.db.commit()
         return True
 
-    async def list_documents(self, registry: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_documents(self, registry: str | None = None) -> list[dict[str, Any]]:
         """List ingested documents (newest first) with their chunk counts."""
         stmt = (
             select(MethodologyDocument, KnowledgeChunk.id)
@@ -263,8 +263,8 @@ class KnowledgeBaseService:
         if registry:
             stmt = stmt.where(MethodologyDocument.registry == registry)
         result = await self.db.execute(stmt)
-        counts: Dict[Any, int] = {}
-        ordered: List[MethodologyDocument] = []
+        counts: dict[Any, int] = {}
+        ordered: list[MethodologyDocument] = []
         seen = set()
         for doc, chunk_id in result.all():
             if doc.id not in seen:
@@ -275,7 +275,7 @@ class KnowledgeBaseService:
                 counts[doc.id] += 1
         return [{**_document_to_dict(doc), "chunk_count": counts[doc.id]} for doc in ordered]
 
-    async def get_document(self, document_id: Any) -> Optional[Dict[str, Any]]:
+    async def get_document(self, document_id: Any) -> dict[str, Any] | None:
         """Fetch a single document with its chunks."""
         from uuid import UUID
 

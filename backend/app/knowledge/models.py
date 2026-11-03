@@ -12,8 +12,8 @@ metadata JSONB column is exposed as ``metadata_`` (column name ``metadata``).
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -35,7 +35,7 @@ PortableJSONB = JSON().with_variant(JSONB(astext_type=Text()), "postgresql")
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class MethodologyDocument(Base):
@@ -58,9 +58,9 @@ class MethodologyDocument(Base):
     methodology_id: Mapped[str] = mapped_column(String(100), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     version: Mapped[str] = mapped_column(String(50), nullable=False)
-    source_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata_: Mapped[Dict[str, Any]] = mapped_column(
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", PortableJSONB, default=dict, nullable=False
     )
     ingested_at: Mapped[datetime] = mapped_column(
@@ -70,7 +70,7 @@ class MethodologyDocument(Base):
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
 
-    chunks: Mapped[List["KnowledgeChunk"]] = relationship(
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(
         "KnowledgeChunk",
         back_populates="document",
         cascade="all, delete-orphan",
@@ -93,7 +93,7 @@ class KnowledgeChunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[List[float]] = mapped_column(PortableJSONB, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(PortableJSONB, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False

@@ -1,15 +1,15 @@
 """VVBLiaisonAgent: tracks registry submissions and drafts VVB responses."""
 
-from datetime import timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC
+from typing import Any
 
 from sqlalchemy import select
 
 from app.agents.base import AgentResult, BaseAgent
-from app.models import CalculationRun, Project, Report, ReportStatusEnum
-from app.vvb_liaison.polling import RegistryPoller
-from app.vvb_liaison.auto_responder import draft_clarification_response
 from app.core.logging import get_logger
+from app.models import CalculationRun, Project, Report, ReportStatusEnum
+from app.vvb_liaison.auto_responder import draft_clarification_response
+from app.vvb_liaison.polling import RegistryPoller
 
 logger = get_logger(__name__)
 
@@ -27,7 +27,7 @@ class VVBLiaisonAgent(BaseAgent):
 
     agent_type = "vvb_liaison"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Check submission status and draft responses to VVB queries."""
         project_id = self.project_id
         report_id = context.get("report_id")
@@ -45,7 +45,7 @@ class VVBLiaisonAgent(BaseAgent):
             )
 
         # Get the report: explicit id, else latest submitted, else latest approved.
-        report: Optional[Report] = None
+        report: Report | None = None
         if report_id:
             report_result = await self.db.execute(select(Report).where(Report.id == report_id))
             report = report_result.scalar_one_or_none()
@@ -81,7 +81,7 @@ class VVBLiaisonAgent(BaseAgent):
             submitted_at = report.created_at
             if submitted_at is not None:
                 if submitted_at.tzinfo is None:
-                    submitted_at = submitted_at.replace(tzinfo=timezone.utc)
+                    submitted_at = submitted_at.replace(tzinfo=UTC)
                 follow_up = poller.check_follow_up_needed(
                     submission_date=submitted_at,
                     current_status=report_status,
@@ -92,7 +92,7 @@ class VVBLiaisonAgent(BaseAgent):
         # 2. Draft responses to any outstanding VVB queries.
         queries = self._extract_queries(report.vvb_feedback)
         calc_data = await self._calculation_context(report)
-        responses: List[Dict[str, Any]] = []
+        responses: list[dict[str, Any]] = []
         answered = 0
         for query in queries:
             drafted = draft_clarification_response(
@@ -188,8 +188,8 @@ class VVBLiaisonAgent(BaseAgent):
         )
 
     async def _knowledge_passages(
-        self, question: str, registry: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, question: str, registry: str | None = None
+    ) -> list[dict[str, Any]]:
         """Best-effort knowledge-base enrichment; never breaks the agent.
 
         Silently returns [] when the knowledge base is not importable, errors,
@@ -211,7 +211,7 @@ class VVBLiaisonAgent(BaseAgent):
         return "verra"
 
     @staticmethod
-    def _status_freshness(report_status: str, follow_up: Dict[str, Any]) -> float:
+    def _status_freshness(report_status: str, follow_up: dict[str, Any]) -> float:
         """Map registry/VVB status to a freshness score in [0, 1]."""
         if report_status in FINAL_STATUSES:
             return 1.0
@@ -222,7 +222,7 @@ class VVBLiaisonAgent(BaseAgent):
         return {"wait": 0.9, "follow_up": 0.7, "escalate": 0.5}.get(str(action), 0.8)
 
     @staticmethod
-    def _extract_queries(vvb_feedback: Optional[Dict[str, Any]]) -> List[str]:
+    def _extract_queries(vvb_feedback: dict[str, Any] | None) -> list[str]:
         """Pull outstanding VVB query strings out of the free-form feedback blob."""
         if not isinstance(vvb_feedback, dict):
             return []
@@ -241,7 +241,7 @@ class VVBLiaisonAgent(BaseAgent):
                     queries.append(str(text))
         return queries
 
-    async def _calculation_context(self, report: Report) -> Dict[str, Any]:
+    async def _calculation_context(self, report: Report) -> dict[str, Any]:
         """Best-effort calculation figures for the auto-responder templates."""
         result = await self.db.execute(
             select(CalculationRun).where(CalculationRun.id == report.calculation_run_id)

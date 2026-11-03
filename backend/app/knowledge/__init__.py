@@ -7,7 +7,7 @@ string. Both are fully defensive: any failure logs and returns ``None`` /
 ``[]`` rather than raising, so callers never break on knowledge-base errors.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.logging import get_logger
 from app.knowledge.embeddings import (
@@ -39,9 +39,9 @@ __all__ = [
 
 async def search_knowledge(
     query: str,
-    registry: Optional[str] = None,
+    registry: str | None = None,
     k: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Module-level vector search using a standalone DB session."""
     try:
         from app.database import get_db_context
@@ -56,9 +56,9 @@ async def search_knowledge(
 
 async def query_knowledge_base(
     question: str,
-    registry: Optional[str] = None,
+    registry: str | None = None,
     k: int = 4,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Module-level RAG query using a standalone DB session."""
     try:
         from app.database import get_db_context

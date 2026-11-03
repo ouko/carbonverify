@@ -11,8 +11,8 @@ Channel failures are recorded on ``channels_sent`` and never raised.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,7 @@ P1_SLA = timedelta(hours=2)
 P0_REDELIVER_WINDOW = timedelta(seconds=60)
 
 # Channels attempted per priority on dispatch.
-PRIORITY_CHANNELS: Dict[int, List[str]] = {
+PRIORITY_CHANNELS: dict[int, list[str]] = {
     PRIORITY_P0: ["whatsapp", "sms", "email", "in_app"],
     PRIORITY_P1: ["email", "in_app"],
     PRIORITY_P2: [],
@@ -53,7 +53,7 @@ def derive_priority(severity_score: float) -> int:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class EscalationService:
@@ -62,12 +62,12 @@ class EscalationService:
     def __init__(
         self,
         db: AsyncSession,
-        adapters: Optional[Dict[str, ChannelAdapter]] = None,
+        adapters: dict[str, ChannelAdapter] | None = None,
     ):
         self.db = db
         self._adapters = adapters
 
-    def _get_adapters(self) -> Dict[str, ChannelAdapter]:
+    def _get_adapters(self) -> dict[str, ChannelAdapter]:
         if self._adapters is None:
             self._adapters = get_channel_adapters()
         return self._adapters
@@ -77,10 +77,10 @@ class EscalationService:
         source: str,
         title: str,
         detail: str,
-        context_package: Optional[Dict[str, Any]] = None,
-        priority: Optional[int] = None,
-        project_id: Optional[uuid.UUID] = None,
-        severity_score: Optional[float] = None,
+        context_package: dict[str, Any] | None = None,
+        priority: int | None = None,
+        project_id: uuid.UUID | None = None,
+        severity_score: float | None = None,
     ) -> EscalationEvent:
         """Create an escalation event and dispatch it according to priority."""
         if severity_score is None:
@@ -124,12 +124,12 @@ class EscalationService:
     async def dispatch(
         self,
         event: EscalationEvent,
-        channels: Optional[List[str]] = None,
+        channels: list[str] | None = None,
     ) -> EscalationEvent:
         """Attempt each configured channel, recording every attempt."""
         channel_names = channels if channels is not None else PRIORITY_CHANNELS.get(event.priority, [])
         adapters = self._get_adapters()
-        sent: Dict[str, Any] = dict(event.channels_sent or {})
+        sent: dict[str, Any] = dict(event.channels_sent or {})
         for name in channel_names:
             adapter = adapters.get(name)
             if adapter is None:
@@ -182,7 +182,7 @@ class EscalationService:
         except Exception as exc:  # noqa: BLE001 — scheduling is best-effort
             logger.warning("escalation_p1_sla_schedule_failed", escalation_id=event_id, error=str(exc))
 
-    async def get_event(self, event_id: uuid.UUID) -> Optional[EscalationEvent]:
+    async def get_event(self, event_id: uuid.UUID) -> EscalationEvent | None:
         result = await self.db.execute(select(EscalationEvent).where(EscalationEvent.id == event_id))
         return result.scalar_one_or_none()
 

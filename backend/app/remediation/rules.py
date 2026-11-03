@@ -11,8 +11,9 @@ import inspect
 import random
 import statistics
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,12 +48,12 @@ class RuleContext:
     rule: RemediationRule
     target_type: str
     target_id: str
-    project_id: Optional[uuid.UUID]
-    failing_state: Dict[str, Any]
+    project_id: uuid.UUID | None
+    failing_state: dict[str, Any]
     attempt_number: int
     sleeper: Sleeper
-    attempt_fn: Optional[AttemptFn] = None
-    draft_fn: Optional[DraftFn] = None
+    attempt_fn: AttemptFn | None = None
+    draft_fn: DraftFn | None = None
 
 
 @dataclass
@@ -60,9 +61,9 @@ class AttemptVerdict:
     """Result of one strategy attempt."""
 
     success: bool
-    state: Optional[Dict[str, Any]] = None  # replacement state; None = unchanged
-    detail: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+    state: dict[str, Any] | None = None  # replacement state; None = unchanged
+    detail: dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
     # True when the attempt should stop the round without counting as a
     # failure (e.g. circuit breaker open → queue-for-retry).
     deferred: bool = False
@@ -81,7 +82,7 @@ def _target_uuid(target_id: str) -> uuid.UUID:
         return uuid.uuid5(uuid.NAMESPACE_URL, f"carbonverify:remediation:{target_id}")
 
 
-async def _retry_success(ctx: RuleContext) -> Optional[bool]:
+async def _retry_success(ctx: RuleContext) -> bool | None:
     """Resolve whether a retry attempt succeeds.
 
     Priority: injected ``attempt_fn`` > explicit ``retry_outcome`` signal in
@@ -118,14 +119,14 @@ async def strategy_auto_correct(ctx: RuleContext) -> AttemptVerdict:
     else:
         error_fields = []
 
-    defaults: Dict[str, Any] = {}
+    defaults: dict[str, Any] = {}
     if isinstance(ctx.rule.config.get("defaults"), dict):
         defaults.update(ctx.rule.config["defaults"])
     if isinstance(ctx.failing_state.get("defaults"), dict):
         defaults.update(ctx.failing_state["defaults"])
 
     corrected = dict(form)
-    corrections: Dict[str, Dict[str, Any]] = {}
+    corrections: dict[str, dict[str, Any]] = {}
     for field_name in error_fields:
         if field_name in defaults and field_name in corrected:
             corrections[field_name] = {
@@ -266,8 +267,8 @@ async def strategy_conservative_fallback(ctx: RuleContext) -> AttemptVerdict:
 
 # ─── e. missing_data_gap → interpolate_or_exclude ─────────────────────────────
 
-def _missing_runs(series: List[Any]) -> List[List[int]]:
-    runs: List[List[int]] = []
+def _missing_runs(series: list[Any]) -> list[list[int]]:
+    runs: list[list[int]] = []
     for idx, value in enumerate(series):
         if value is None:
             if runs and runs[-1][-1] == idx - 1:
@@ -323,7 +324,7 @@ async def strategy_interpolate_or_exclude(ctx: RuleContext) -> AttemptVerdict:
         )
     else:
         filled = list(series)
-        interpolated: List[int] = []
+        interpolated: list[int] = []
         for run in runs:
             left = filled[run[0] - 1]
             right = filled[run[-1] + 1]
@@ -375,10 +376,10 @@ async def strategy_kb_draft_response(ctx: RuleContext) -> AttemptVerdict:
     if not query_text.strip():
         return AttemptVerdict(False, error="failing_state has no 'query_text'")
     project_data = ctx.failing_state.get("project_data") or {}
-    methodology_kb: Optional[str] = ctx.failing_state.get("methodology_kb")
+    methodology_kb: str | None = ctx.failing_state.get("methodology_kb")
 
-    draft: Optional[str] = None
-    kb_used: Optional[str] = None
+    draft: str | None = None
+    kb_used: str | None = None
 
     if ctx.draft_fn is not None:
         try:
@@ -397,7 +398,7 @@ async def strategy_kb_draft_response(ctx: RuleContext) -> AttemptVerdict:
                     query_fn = candidate
                     break
             if query_fn is None and hasattr(kb_module, "service"):
-                service = getattr(kb_module, "service")
+                service = kb_module.service
                 for attr in ("query", "search", "query_knowledge_base"):
                     candidate = getattr(service, attr, None)
                     if callable(candidate):
@@ -438,7 +439,7 @@ async def strategy_kb_draft_response(ctx: RuleContext) -> AttemptVerdict:
     )
 
 
-STRATEGIES: Dict[str, Callable[[RuleContext], Awaitable[AttemptVerdict]]] = {
+STRATEGIES: dict[str, Callable[[RuleContext], Awaitable[AttemptVerdict]]] = {
     STRATEGY_AUTO_CORRECT: strategy_auto_correct,
     STRATEGY_BACKOFF_RETRY: strategy_backoff_retry,
     STRATEGY_JITTER_RETRY: strategy_jitter_retry,
@@ -447,7 +448,7 @@ STRATEGIES: Dict[str, Callable[[RuleContext], Awaitable[AttemptVerdict]]] = {
     STRATEGY_KB_DRAFT_RESPONSE: strategy_kb_draft_response,
 }
 
-DEFAULT_RULES: List[Dict[str, Any]] = [
+DEFAULT_RULES: list[dict[str, Any]] = [
     {
         "rule_key": "form_validation_error",
         "category": "form_validation_error",
@@ -493,7 +494,7 @@ DEFAULT_RULES: List[Dict[str, Any]] = [
 ]
 
 
-async def seed_default_rules(db: AsyncSession) -> List[RemediationRule]:
+async def seed_default_rules(db: AsyncSession) -> list[RemediationRule]:
     """Insert the default rule set, skipping rule_keys that already exist.
 
     Existing rows are left untouched so operator edits (config, enabled) are

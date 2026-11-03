@@ -1,13 +1,13 @@
 """ValidationAgent: data validation, additionality screening, and risk flags."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 
 from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
-from app.models import CalculationRun, DataSource, Project
 from app.core.logging import get_logger
+from app.models import CalculationRun, DataSource, Project
 
 logger = get_logger(__name__)
 
@@ -43,7 +43,7 @@ class ValidationAgent(BaseAgent):
 
     agent_type = "validation"
 
-    async def run(self, context: Dict[str, Any]) -> AgentResult:
+    async def run(self, context: dict[str, Any]) -> AgentResult:
         """Run comprehensive validation plus risk screening for the project."""
         project_id = self.project_id
 
@@ -92,7 +92,7 @@ class ValidationAgent(BaseAgent):
         # enriched with methodology knowledge-base passages (Phase 5). The
         # enrichment is best-effort and silently skipped when the knowledge
         # base is unavailable or empty.
-        llm_context: Dict[str, Any] = {
+        llm_context: dict[str, Any] = {
             "project": {
                 "name": project.name,
                 "methodology": project.methodology.value,
@@ -129,7 +129,7 @@ class ValidationAgent(BaseAgent):
             response_schema=RED_FLAG_REVIEW_SCHEMA,
         )
         confirmed_flags = red_flags
-        false_positive_ids: List[str] = []
+        false_positive_ids: list[str] = []
         if not llm_review.get("_fallback"):
             raw = llm_review.get("false_positives")
             if isinstance(raw, list):
@@ -143,7 +143,7 @@ class ValidationAgent(BaseAgent):
         heuristic = (outlier_confidence * 0.4) + (gap_confidence * 0.3) + (additionality["score"] * 0.3)
         heuristic = max(0.0, min(1.0, heuristic))
 
-        llm_score: Optional[float] = None
+        llm_score: float | None = None
         if not llm_review.get("_fallback"):
             confirmed = llm_review.get("confirmed_flags")
             if isinstance(confirmed, list) and red_flags:
@@ -223,8 +223,8 @@ class ValidationAgent(BaseAgent):
         return "verra"
 
     async def _knowledge_passages(
-        self, question: str, registry: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, question: str, registry: str | None = None
+    ) -> list[dict[str, Any]]:
         """Best-effort knowledge-base enrichment; never breaks the agent.
 
         Silently returns [] when the knowledge base is not importable, errors,
@@ -240,7 +240,7 @@ class ValidationAgent(BaseAgent):
             logger.debug("knowledge_enrichment_unavailable", agent_type=self.agent_type, error=str(exc))
             return []
 
-    def _validate_source(self, ds: DataSource) -> Dict[str, Any]:
+    def _validate_source(self, ds: DataSource) -> dict[str, Any]:
         """Validate a single data source from its real processed data."""
         processed = ds.processed_data or {}
         records = processed.get("records_extracted", 0) or 0
@@ -274,10 +274,10 @@ class ValidationAgent(BaseAgent):
         }
 
     @staticmethod
-    def _screen_additionality(project: Project) -> Dict[str, Any]:
+    def _screen_additionality(project: Project) -> dict[str, Any]:
         """Screen additionality from project metadata (conservative pass/fail signals)."""
         checks = []
-        now = datetime.now(timezone.utc).date()
+        now = datetime.now(UTC).date()
 
         start = project.crediting_period_start
         end = project.crediting_period_end
@@ -317,10 +317,10 @@ class ValidationAgent(BaseAgent):
     async def _collect_red_flags(
         self,
         project: Project,
-        data_sources: List[DataSource],
-    ) -> List[Dict[str, Any]]:
+        data_sources: list[DataSource],
+    ) -> list[dict[str, Any]]:
         """Collect conservative red flags over project data."""
-        flags: List[Dict[str, Any]] = []
+        flags: list[dict[str, Any]] = []
 
         # Activity data implausibly smooth: identical record counts across sources.
         record_counts = [
