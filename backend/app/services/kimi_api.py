@@ -1,6 +1,8 @@
 """Kimi API integration for NLP tasks in CarbonVerify."""
 
+import json
 import os
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -13,6 +15,32 @@ logger = get_logger(__name__)
 settings = get_settings()
 
 DEFAULT_MODEL = "moonshot-v1-8k"
+
+AGENT_SYSTEM_PROMPT = (
+    "You are a CarbonVerify MRV (Monitoring, Reporting, Verification) agent. "
+    "Be conservative: only assert what the evidence supports, cite the specific "
+    "facts you rely on, and acknowledge uncertainty rather than guessing. "
+    "When a structured result is requested, output strict JSON matching the "
+    "requested schema exactly."
+)
+
+
+@dataclass
+class ToolCall:
+    """A single tool call requested by the model."""
+
+    name: str
+    arguments: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ToolCallResult:
+    """Parsed result of a chat completion that may include tool calls."""
+
+    content: Optional[str]
+    tool_calls: List[ToolCall] = field(default_factory=list)
+    finish_reason: str = "stop"
+    raw: Dict[str, Any] = field(default_factory=dict)
 
 
 class KimiAPIClient:
@@ -60,6 +88,165 @@ class KimiAPIClient:
         except Exception as exc:
             logger.error("kimi_api_error", error=str(exc))
             return self._fallback_response(messages)
+
+    @with_circuit_breaker("kimi_api")
+    async def chat_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: List[Dict[str, Any]],
+        model: Optional[str] = None,
+        temperature: float = 0.2,
+        max_tokens: int = 2048,
+        tool_choice: Any = "auto",
+    ) -> ToolCallResult:
+        """Send a chat completion request with tool-calling support.
+
+        Uses the OpenAI-compatible ``tools`` / ``tool_choice`` parameters and
+        parses any requested tool calls from the response. Falls back to an
+        empty result when no API key is configured or the request fails.
+        """
+        if not self.api_key:
+            logger.warning("kimi_api_key_missing")
+            return ToolCallResult(content=None, finish_reason="fallback")
+
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model or self.model,
+                    "messages": messages,
+                    "tools": tools,
+                    "tool_choice": tool_choice,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            choice = data["choices"][0]
+            message = choice.get("message", {}) or {}
+            tool_calls = []
+            for tc in message.get("tool_calls") or []:
+                function = tc.get("function", {}) or {}
+                arguments: Dict[str, Any] = {}
+                raw_args = function.get("arguments")
+                if isinstance(raw_args, dict):
+                    arguments = raw_args
+                elif isinstance(raw_args, str) and raw_args.strip():
+                    try:
+                        parsed = json.loads(raw_args)
+                        arguments = parsed if isinstance(parsed, dict) else {"value": parsed}
+                    except (ValueError, TypeError):
+                        logger.warning("kimi_tool_arguments_parse_failed", raw=raw_args[:200])
+                        arguments = {}
+                tool_calls.append(ToolCall(name=function.get("name", ""), arguments=arguments))
+
+            return ToolCallResult(
+                content=message.get("content"),
+                tool_calls=tool_calls,
+                finish_reason=choice.get("finish_reason", "stop"),
+                raw=data,
+            )
+        except Exception as exc:
+            logger.error("kimi_api_tool_error", error=str(exc))
+            return ToolCallResult(content=None, finish_reason="error", raw={"error": str(exc)})
+
+    async def reason(
+        self,
+        prompt: str,
+        context: Dict[str, Any],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        response_schema: Optional[Dict[str, Any]] = None,
+        model: Optional[str] = None,
+        max_tokens: int = 2048,
+    ) -> Dict[str, Any]:
+        """Agent-facing structured reasoning helper.
+
+        Builds a conservative MRV-agent conversation from ``prompt`` +
+        ``context``. When ``response_schema`` is given, the model is forced to
+        call a ``submit_result`` tool whose parameters are the schema, and the
+        parsed arguments are returned as a dict. When no API key is configured
+        (or the call fails), returns a deterministic local heuristic result
+        flagged ``{"_fallback": True}`` so callers never block on the network.
+        """
+        user_content = prompt
+        if context:
+            user_content += "\n\nContext (JSON):\n" + json.dumps(context, default=str, indent=2)
+
+        all_tools = list(tools or [])
+        if response_schema is not None:
+            all_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "submit_result",
+                        "description": "Submit the structured analysis result.",
+                        "parameters": response_schema,
+                    },
+                }
+            )
+
+        if not self.api_key:
+            return self._fallback_reasoning(prompt, context, response_schema)
+
+        result = await self.chat_with_tools(
+            messages=[
+                {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            tools=all_tools,
+            model=model,
+            max_tokens=max_tokens,
+            tool_choice=(
+                {"type": "function", "function": {"name": "submit_result"}}
+                if response_schema is not None
+                else "auto"
+            ),
+        )
+
+        for tool_call in result.tool_calls:
+            if tool_call.name == "submit_result" and tool_call.arguments:
+                return dict(tool_call.arguments)
+
+        if result.content:
+            try:
+                parsed = json.loads(result.content)
+                if isinstance(parsed, dict):
+                    return parsed
+            except ValueError:
+                pass
+            return {"_fallback": True, "summary": result.content[:500]}
+
+        return self._fallback_reasoning(prompt, context, response_schema)
+
+    def _fallback_reasoning(
+        self,
+        prompt: str,
+        context: Dict[str, Any],
+        response_schema: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Deterministic local heuristic used when the Kimi API is unavailable."""
+        fallback: Dict[str, Any] = {
+            "_fallback": True,
+            "reason": "Kimi API unavailable — deterministic heuristic result",
+            "task": prompt[:200],
+            "context_keys": sorted(context.keys()) if isinstance(context, dict) else [],
+        }
+        if response_schema is not None:
+            properties = response_schema.get("properties", {}) if isinstance(response_schema, dict) else {}
+            for key in properties:
+                if isinstance(properties[key], dict) and properties[key].get("type") == "number":
+                    fallback[key] = 0.5
+                elif isinstance(properties[key], dict) and properties[key].get("type") == "array":
+                    fallback[key] = []
+                else:
+                    fallback[key] = ""
+        return fallback
 
     def _fallback_response(self, messages: List[Dict[str, str]]) -> Dict[str, Any]:
         """Generate a fallback response when API is unavailable."""

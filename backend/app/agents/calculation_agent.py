@@ -1,11 +1,11 @@
 """CalculationAgent: runs the full carbon calculation pipeline."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from sqlalchemy import select
 
-from app.agents.base import AgentResult, BaseAgent
-from app.models import CalculationRun, Project
+from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
+from app.models import CalculationRun, DataSource, Project
 from app.calculations.fnrb_calculator import calculate_fnrb
 from app.calculations.emissions_quantifier import quantify_emissions
 from app.calculations.leakage_detector import assess_leakage
@@ -14,6 +14,18 @@ from app.calculations.uncertainty_engine import run_full_uncertainty_analysis
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+PLAUSIBILITY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "plausibility": {
+            "type": "number",
+            "description": "0-1 score: does the tCO2e magnitude plausibly follow from the activity data?",
+        },
+        "rationale": {"type": "string"},
+    },
+    "required": ["plausibility", "rationale"],
+}
 
 
 class CalculationAgent(BaseAgent):
@@ -33,7 +45,24 @@ class CalculationAgent(BaseAgent):
                 confidence_score=0.0,
                 output_data={},
                 errors=["Project not found"],
+                reasoning="Calculation aborted: project record not found.",
+                evidence={},
             )
+
+        # Data coverage: fraction of project data sources that passed validation.
+        ds_result = await self.db.execute(
+            select(DataSource).where(DataSource.project_id == project_id)
+        )
+        data_sources = ds_result.scalars().all()
+        if data_sources:
+            valid_sources = sum(
+                1 for ds in data_sources
+                if (ds.validation_status.value if hasattr(ds.validation_status, "value") else str(ds.validation_status)) == "valid"
+            )
+            data_coverage = valid_sources / len(data_sources)
+        else:
+            valid_sources = 0
+            data_coverage = 0.0
 
         # Pull parameters from context or use defaults
         params = context.get("calculation_params", {})
@@ -130,11 +159,11 @@ class CalculationAgent(BaseAgent):
         await self.db.commit()
         await self.db.refresh(calc_run)
 
-        # Calculate agent confidence
+        # Calculate agent confidence (heuristic, uncertainty-aware):
         # 30% uncertainty magnitude (lower CI width = higher confidence)
         # 30% methodology compliance
         # 20% fNRB confidence
-        # 20% cross-validation with historical
+        # 20% data coverage from validated sources
         uncertainty_width = emissions_result.get("uncertainty_95ci", 0)
         baseline_emissions = emissions_result["baseline_emissions"]["total_tco2e_per_year"]
         uncertainty_ratio = uncertainty_width / baseline_emissions if baseline_emissions > 0 else 0
@@ -142,24 +171,94 @@ class CalculationAgent(BaseAgent):
 
         methodology_confidence = methodology_result["compliance_score"] / 100.0
         fnrb_confidence = fnrb_result.get("confidence_score", 0.8)
-        historical_cv = 0.90  # Placeholder for cross-validation with historical data
 
-        confidence = (
+        heuristic = (
             uncertainty_confidence * 0.30
             + methodology_confidence * 0.30
             + fnrb_confidence * 0.20
-            + historical_cv * 0.20
+            + data_coverage * 0.20
         )
-        confidence = max(0.0, min(1.0, confidence))
+        heuristic = max(0.0, min(1.0, heuristic))
 
-        output = {
-            "calculation_run_id": str(calc_run.id),
-            "fnrb": fnrb_result,
-            "emissions": emissions_result,
-            "leakage": leakage_result,
-            "methodology_validation": methodology_result,
-            "uncertainty": uncertainty_result,
+        # LLM sanity check: does the tCO2e magnitude follow from the inputs?
+        gross_reductions = emissions_result["net_reductions"]["gross_reduction_tco2e"]
+        llm_review = await self.reason_with_llm(
+            task_prompt=(
+                "Sanity-check this emissions calculation. Given the activity data "
+                "(households, fuel consumption, efficiencies), does the resulting "
+                "tCO2e magnitude plausibly follow? Score plausibility 0-1."
+            ),
+            context={
+                "household_count": household_count,
+                "fuel_consumption_kg_per_day": fuel_consumption,
+                "thermal_efficiency": thermal_efficiency,
+                "baseline_efficiency": baseline_efficiency,
+                "fnrb": fnrb_result["fnrb_value"],
+                "baseline_emissions_tco2e_per_year": baseline_emissions,
+                "gross_reduction_tco2e": gross_reductions,
+                "net_reduction_tco2e": emissions_result["net_reductions"]["net_reduction_tco2e"],
+                "uncertainty_95ci": uncertainty_width,
+                "methodology_compliance_pct": methodology_result["compliance_score"],
+                "data_coverage": data_coverage,
+            },
+            response_schema=PLAUSIBILITY_SCHEMA,
+        )
+        llm_plausibility: Optional[float] = None
+        llm_rationale = ""
+        if not llm_review.get("_fallback"):
+            raw = llm_review.get("plausibility")
+            if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+                llm_plausibility = max(0.0, min(1.0, float(raw)))
+            llm_rationale = str(llm_review.get("rationale", ""))
+
+        confidence = self.blend_confidence(heuristic, llm_plausibility)
+        blend_note = (
+            f"Blended heuristic ({heuristic:.2f}) with LLM plausibility ({llm_plausibility:.2f}) "
+            f"via {BLEND_FORMULA}."
+            if llm_plausibility is not None
+            else f"LLM sanity check unavailable; heuristic score stands alone (blending {BLEND_FORMULA} not applied)."
+        )
+
+        reasoning = (
+            f"Ran engines for {household_count} households, {fuel_consumption} kg/day fuel: "
+            f"fNRB {fnrb_result['fnrb_value']:.3f} (confidence {fnrb_confidence:.2f}); "
+            f"baseline {baseline_emissions:.1f} tCO2e/yr, gross reductions {gross_reductions:.1f} tCO2e/yr, "
+            f"leakage {leakage_result['total_leakage_tco2e']:.1f} tCO2e; "
+            f"uncertainty 95CI ±{uncertainty_width:.1f} ({uncertainty_ratio:.1%} of baseline); "
+            f"methodology compliance {methodology_result['compliance_score']:.0f}%; "
+            f"data coverage {data_coverage:.0%} ({valid_sources}/{len(data_sources)} sources valid). "
+            f"{blend_note}"
+            + (f" LLM rationale: {llm_rationale}" if llm_rationale else "")
+        )
+
+        evidence = {
+            "fnrb_value": fnrb_result["fnrb_value"],
+            "fnrb_confidence": fnrb_confidence,
+            "baseline_emissions_tco2e_per_year": baseline_emissions,
+            "gross_reduction_tco2e": gross_reductions,
+            "leakage_tco2e": leakage_result["total_leakage_tco2e"],
+            "uncertainty_95ci": uncertainty_width,
+            "uncertainty_ratio": round(uncertainty_ratio, 4),
+            "methodology_compliance_pct": methodology_result["compliance_score"],
+            "data_coverage": round(data_coverage, 3),
+            "valid_sources": valid_sources,
+            "total_sources": len(data_sources),
+            "conservative_issuance_tco2e": uncertainty_result.get("conservative_issuance_tco2e"),
+            "llm_plausibility": llm_plausibility,
         }
+
+        output = self.build_output(
+            reasoning,
+            evidence,
+            calculation_run_id=str(calc_run.id),
+            fnrb=fnrb_result,
+            emissions=emissions_result,
+            leakage=leakage_result,
+            methodology_validation=methodology_result,
+            uncertainty=uncertainty_result,
+            heuristic_confidence=round(heuristic, 3),
+            llm_plausibility=llm_plausibility,
+        )
 
         status = "completed" if confidence >= 0.85 else "queued_for_review"
 
@@ -167,4 +266,6 @@ class CalculationAgent(BaseAgent):
             status=status,
             confidence_score=confidence,
             output_data=output,
+            reasoning=reasoning,
+            evidence=evidence,
         )

@@ -112,8 +112,11 @@ class TestIngestionAgent:
         agent = IngestionAgent(project_id=uuid.uuid4(), db_session=MockSession())
         result = _run_async(agent.run({}))
         assert result.status == "completed"
-        assert result.confidence_score == 1.0
+        # No data yet: graceful low-confidence result, not an exception.
+        assert 0.5 <= result.confidence_score <= 0.7
         assert result.output_data["processed_count"] == 0
+        assert result.output_data["reasoning"]
+        assert isinstance(result.output_data["evidence"], dict)
 
 
 class TestValidationAgent:
@@ -121,8 +124,9 @@ class TestValidationAgent:
         agent = ValidationAgent(project_id=uuid.uuid4(), db_session=MockSession())
         result = _run_async(agent.run({}))
         assert result.status == "completed"
-        assert result.confidence_score == 0.0
-        assert "No data sources" in result.errors[0]
+        # No data yet: graceful low-confidence result, not an exception.
+        assert 0.5 <= result.confidence_score <= 0.7
+        assert "No data sources" in result.output_data["reasoning"]
 
 
 class TestCalculationAgent:

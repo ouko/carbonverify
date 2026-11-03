@@ -1,116 +1,316 @@
-"""ValidationAgent: comprehensive data quality and anomaly detection."""
+"""ValidationAgent: data validation, additionality screening, and risk flags."""
 
-from typing import Any, Dict
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 
-from app.agents.base import AgentResult, BaseAgent
-from app.models import DataSource
+from app.agents.base import BLEND_FORMULA, AgentResult, BaseAgent
+from app.models import CalculationRun, DataSource, Project
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+RED_FLAG_REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "false_positives": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Ids of flags that appear to be false positives, with a short justification",
+        },
+        "confirmed_flags": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "assessment": {"type": "string"},
+    },
+    "required": ["false_positives", "confirmed_flags"],
+}
+
+# Confidence is capped when red flags survive review (conservative bias).
+RED_FLAG_CONFIDENCE_CAP = 0.9
+
 
 class ValidationAgent(BaseAgent):
-    """Agent that performs statistical validation, anomaly detection, and consistency checks."""
+    """Agent that validates data sources and screens project additionality/risk.
+
+    Combines per-source statistical validation with additionality screening
+    from project metadata and a red-flag list (implausibly smooth activity
+    data, negative leakage, missing baseline). An LLM reviews the red-flag
+    list for false positives; surviving flags cap confidence at 0.9.
+    """
 
     agent_type = "validation"
 
     async def run(self, context: Dict[str, Any]) -> AgentResult:
-        """Run comprehensive validation on all project data sources."""
+        """Run comprehensive validation plus risk screening for the project."""
         project_id = self.project_id
+
+        project_result = await self.db.execute(select(Project).where(Project.id == project_id))
+        project = project_result.scalar_one_or_none()
 
         result = await self.db.execute(
             select(DataSource).where(DataSource.project_id == project_id)
         )
         data_sources = result.scalars().all()
 
-        if not data_sources:
-            return AgentResult(
-                status="completed",
-                confidence_score=0.0,
-                output_data={"message": "No data sources to validate"},
-                errors=["No data sources found for validation"],
+        if not project or not data_sources:
+            return self._no_data_result(
+                reasoning=(
+                    f"No data sources to validate for this project "
+                    f"(project found: {project is not None}). Confidence set to 0.6 "
+                    "pending data delivery."
+                ),
+                evidence={"project_found": project is not None, "data_sources": len(data_sources)},
             )
 
-        # Run validation checks
+        # 1. Per-source validation.
         validation_results = []
         outlier_count = 0
         gap_count = 0
-        historical_deviations = []
-
         for ds in data_sources:
             checks = self._validate_source(ds)
             validation_results.append(checks)
             outlier_count += checks["outlier_count"]
             gap_count += checks["gap_count"]
-            if checks.get("historical_deviation"):
-                historical_deviations.append(checks["historical_deviation"])
 
-        # Calculate metrics
         total_records = sum(r.get("record_count", 0) for r in validation_results)
         outlier_rate = outlier_count / total_records if total_records > 0 else 0
         gap_percentage = (gap_count / len(data_sources) * 100) if data_sources else 0
 
-        # Historical accuracy (compare to previous projects if available)
-        historical_accuracy = 1.0 - (sum(historical_deviations) / len(historical_deviations)) if historical_deviations else 0.95
-
-        # Confidence formula:
-        # 40% from outlier rate (lower is better)
-        # 30% from gap percentage (lower is better)
-        # 30% from historical accuracy
-        outlier_confidence = max(0, 1.0 - (outlier_rate * 5))  # Scale: 20% outliers -> 0 confidence
+        outlier_confidence = max(0, 1.0 - (outlier_rate * 5))
         gap_confidence = max(0, 1.0 - (gap_percentage / 100))
 
-        confidence = (outlier_confidence * 0.4) + (gap_confidence * 0.3) + (historical_accuracy * 0.3)
-        confidence = max(0.0, min(1.0, confidence))
+        # 2. Additionality screening from project metadata.
+        additionality = self._screen_additionality(project)
 
-        output = {
+        # 3. Red-flag list.
+        red_flags = await self._collect_red_flags(project, data_sources)
+
+        # 4. LLM false-positive review of the red-flag list.
+        llm_review = await self.reason_with_llm(
+            task_prompt=(
+                "Review this red-flag list for a carbon credit project. Identify "
+                "false positives (flags that are expected or benign for this kind "
+                "of project) and confirm the rest."
+            ),
+            context={
+                "project": {
+                    "name": project.name,
+                    "methodology": project.methodology.value,
+                    "crediting_period_start": str(project.crediting_period_start),
+                    "crediting_period_end": str(project.crediting_period_end),
+                    "complexity_score": project.complexity_score,
+                },
+                "red_flags": red_flags,
+            },
+            response_schema=RED_FLAG_REVIEW_SCHEMA,
+        )
+        confirmed_flags = red_flags
+        false_positive_ids: List[str] = []
+        if not llm_review.get("_fallback"):
+            raw = llm_review.get("false_positives")
+            if isinstance(raw, list):
+                for item in raw:
+                    false_positive_ids.append(str(item))
+                confirmed_flags = [
+                    f for f in red_flags
+                    if f["id"] not in false_positive_ids and f["detail"] not in false_positive_ids
+                ]
+
+        heuristic = (outlier_confidence * 0.4) + (gap_confidence * 0.3) + (additionality["score"] * 0.3)
+        heuristic = max(0.0, min(1.0, heuristic))
+
+        llm_score: Optional[float] = None
+        if not llm_review.get("_fallback"):
+            confirmed = llm_review.get("confirmed_flags")
+            if isinstance(confirmed, list) and red_flags:
+                llm_score = max(0.0, min(1.0, 1.0 - (len(confirmed) / max(1, len(red_flags))) * 0.5))
+            else:
+                llm_score = 1.0
+
+        confidence = self.blend_confidence(heuristic, llm_score)
+
+        # Conservative bias: surviving red flags cap confidence at 0.9.
+        capped = False
+        if confirmed_flags:
+            confidence = min(confidence, RED_FLAG_CONFIDENCE_CAP)
+            capped = True
+
+        blend_note = (
+            f"Blended heuristic ({heuristic:.2f}) with LLM flag review ({llm_score:.2f}) via {BLEND_FORMULA}."
+            if llm_score is not None
+            else f"LLM review unavailable; heuristic score stands alone (blending {BLEND_FORMULA} not applied)."
+        )
+
+        red_flag_summary = "; ".join(f["detail"] for f in confirmed_flags[:5]) if confirmed_flags else "none"
+        reasoning = (
+            f"Validated {len(data_sources)} source(s), {total_records} record(s): "
+            f"outlier rate {outlier_rate:.1%}, gap rate {gap_percentage:.0f}%. "
+            f"Additionality screen: {additionality['summary']} (score {additionality['score']:.2f}). "
+            f"Red flags: {len(red_flags)} raised, {len(false_positive_ids)} dismissed as false "
+            f"positive(s) by LLM review; surviving: {red_flag_summary}. "
+            f"{blend_note}"
+            + (f" Confidence capped at {RED_FLAG_CONFIDENCE_CAP} due to surviving red flags." if capped else "")
+        )
+
+        evidence = {
             "total_sources": len(data_sources),
             "total_records": total_records,
             "outlier_count": outlier_count,
             "outlier_rate": round(outlier_rate, 4),
             "gap_count": gap_count,
             "gap_percentage": round(gap_percentage, 2),
-            "historical_accuracy": round(historical_accuracy, 3),
+            "additionality": additionality,
+            "red_flags_raised": red_flags,
+            "red_flags_confirmed": confirmed_flags,
+            "false_positive_ids": false_positive_ids,
+            "confidence_capped": capped,
             "validation_results": validation_results,
         }
 
-        status = "completed" if outlier_rate < 0.05 and gap_percentage < 10 else "queued_for_review"
+        output = self.build_output(
+            reasoning,
+            evidence,
+            total_sources=len(data_sources),
+            total_records=total_records,
+            outlier_rate=round(outlier_rate, 4),
+            gap_percentage=round(gap_percentage, 2),
+            additionality=additionality,
+            red_flags=confirmed_flags,
+            false_positives_dismissed=len(false_positive_ids),
+        )
+
+        status = "completed" if outlier_rate < 0.05 and gap_percentage < 10 and not confirmed_flags else "queued_for_review"
 
         return AgentResult(
             status=status,
             confidence_score=confidence,
             output_data=output,
+            reasoning=reasoning,
+            evidence=evidence,
         )
 
+    # ─── Screening helpers ────────────────────────────────────────────────
+
     def _validate_source(self, ds: DataSource) -> Dict[str, Any]:
-        """Validate a single data source."""
+        """Validate a single data source from its real processed data."""
         processed = ds.processed_data or {}
-        records = processed.get("records_extracted", 0)
+        records = processed.get("records_extracted", 0) or 0
+        fields_mapped = processed.get("fields_mapped", 0) or 0
 
-        # Simulate statistical checks
-        outliers = max(0, records - 140) if records > 150 else 0  # Simple heuristic
-        gaps = 0 if processed.get("fields_mapped", 12) >= 10 else 1
+        # Outlier heuristic: implausibly high record counts for a single source.
+        outliers = 0
+        if isinstance(records, (int, float)) and records > 100000:
+            outliers = 1
+        # Gap heuristic: sources that mapped almost no fields are incomplete.
+        gaps = 1 if fields_mapped and fields_mapped < 5 else 0
 
-        # GPS boundary check (simulated)
+        # GPS boundary check on stored coordinates, when present.
         gps_valid = True
-        if "gps" in processed:
-            lat = processed["gps"].get("latitude")
-            lon = processed["gps"].get("longitude")
-            if lat is not None and lon is not None:
-                gps_valid = -90 <= lat <= 90 and -180 <= lon <= 180
-
-        # Temporal consistency
-        temporal_valid = True
+        gps = processed.get("gps")
+        if isinstance(gps, dict):
+            lat, lon = gps.get("latitude"), gps.get("longitude")
+            if lat is not None and not (-90 <= lat <= 90):
+                gps_valid = False
+            if lon is not None and not (-180 <= lon <= 180):
+                gps_valid = False
 
         return {
             "source_id": str(ds.id),
             "source_type": ds.source_type.value,
             "record_count": records,
+            "fields_mapped": fields_mapped,
             "outlier_count": outliers,
             "gap_count": gaps,
             "gps_valid": gps_valid,
-            "temporal_valid": temporal_valid,
-            "historical_deviation": 0.05,  # 5% deviation from historical norm
         }
+
+    @staticmethod
+    def _screen_additionality(project: Project) -> Dict[str, Any]:
+        """Screen additionality from project metadata (conservative pass/fail signals)."""
+        checks = []
+        now = datetime.now(timezone.utc).date()
+
+        start = project.crediting_period_start
+        end = project.crediting_period_end
+        period_valid = start is not None and end is not None and start < end
+        checks.append({
+            "check": "crediting_period_order",
+            "passed": period_valid,
+            "detail": f"Crediting period {start} → {end}",
+        })
+        not_future = start is not None and start <= now
+        checks.append({
+            "check": "crediting_period_started",
+            "passed": not_future,
+            "detail": f"Crediting period start {start} is {'in the future' if not not_future else 'in the past'}",
+        })
+        methodology_supported = project.methodology.value in ("TPDDTEC_v4", "VM0050", "VMR0006", "AMS-II.G")
+        checks.append({
+            "check": "methodology_supported",
+            "passed": methodology_supported,
+            "detail": f"Methodology {project.methodology.value}",
+        })
+        has_complexity = project.complexity_score is not None
+        checks.append({
+            "check": "site_characterization_present",
+            "passed": has_complexity,
+            "detail": "complexity_score present" if has_complexity else "complexity_score missing (site characterization incomplete)",
+        })
+
+        passed = sum(1 for c in checks if c["passed"])
+        score = passed / len(checks)
+        return {
+            "score": round(score, 3),
+            "checks": checks,
+            "summary": f"{passed}/{len(checks)} additionality checks passed",
+        }
+
+    async def _collect_red_flags(
+        self,
+        project: Project,
+        data_sources: List[DataSource],
+    ) -> List[Dict[str, Any]]:
+        """Collect conservative red flags over project data."""
+        flags: List[Dict[str, Any]] = []
+
+        # Activity data implausibly smooth: identical record counts across sources.
+        record_counts = [
+            (ds.processed_data or {}).get("records_extracted")
+            for ds in data_sources
+            if (ds.processed_data or {}).get("records_extracted")
+        ]
+        if len(record_counts) >= 3 and len(set(record_counts)) == 1:
+            flags.append({
+                "id": "smooth_activity_data",
+                "detail": (
+                    f"All {len(record_counts)} sources report identical record count "
+                    f"{record_counts[0]} — activity data implausibly smooth"
+                ),
+            })
+
+        calc_result = await self.db.execute(
+            select(CalculationRun)
+            .where(CalculationRun.project_id == self.project_id)
+            .order_by(CalculationRun.created_at.desc())
+            .limit(1)
+        )
+        latest_calc = calc_result.scalar_one_or_none()
+
+        # Missing baseline.
+        if latest_calc is None:
+            flags.append({
+                "id": "missing_baseline",
+                "detail": "No calculation run exists — baseline emissions not established",
+            })
+        else:
+            leakage = (latest_calc.leakage_assessment or {}).get("total_leakage_tco2e", 0) or 0
+            if leakage < 0:
+                flags.append({
+                    "id": "negative_leakage",
+                    "detail": f"Negative leakage {leakage:.2f} tCO2e is physically implausible",
+                })
+
+        return flags

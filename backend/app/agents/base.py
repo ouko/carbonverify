@@ -3,15 +3,27 @@
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Confidence blending weighting: heuristic engines anchor the score, the LLM
+# review moderates it. Documented in every blended reasoning string.
+HEURISTIC_WEIGHT = 0.4
+LLM_WEIGHT = 0.6
+BLEND_FORMULA = f"heuristic*{HEURISTIC_WEIGHT} + llm*{LLM_WEIGHT}"
+
 
 class AgentResult:
-    """Standard result format for all agent executions."""
+    """Standard result format for all agent executions.
+
+    ``reasoning`` is a human-readable explanation of how the result was
+    reached (suitable for the audit trail); ``evidence`` is a dict of the key
+    facts cited. Both flow into orchestrator decision records and review-queue
+    context when present.
+    """
 
     def __init__(
         self,
@@ -20,12 +32,16 @@ class AgentResult:
         output_data: Dict[str, Any],
         errors: Optional[list] = None,
         execution_time_ms: Optional[int] = None,
+        reasoning: Optional[str] = None,
+        evidence: Optional[Dict[str, Any]] = None,
     ):
         self.status = status
         self.confidence_score = max(0.0, min(1.0, confidence_score))
         self.output_data = output_data
         self.errors = errors or []
         self.execution_time_ms = execution_time_ms
+        self.reasoning = reasoning
+        self.evidence = evidence or {}
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -34,6 +50,8 @@ class AgentResult:
             "output_data": self.output_data,
             "errors": self.errors,
             "execution_time_ms": self.execution_time_ms,
+            "reasoning": self.reasoning,
+            "evidence": self.evidence,
         }
 
 
@@ -58,6 +76,78 @@ class BaseAgent(ABC):
             AgentResult with status, confidence score, and output data.
         """
         raise NotImplementedError
+
+    # ─── Shared LLM-reasoning helpers ─────────────────────────────────────
+
+    @property
+    def kimi(self):
+        """Lazily-initialized shared Kimi API client."""
+        client = getattr(self, "_kimi_client", None)
+        if client is None:
+            from app.services.kimi_api import get_kimi_client
+
+            client = get_kimi_client()
+            self._kimi_client = client
+        return client
+
+    async def reason_with_llm(
+        self,
+        task_prompt: str,
+        context: Dict[str, Any],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        response_schema: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Run a structured LLM reasoning task, always returning a dict.
+
+        Falls back to ``{"_fallback": True, ...}`` when the Kimi API is
+        unavailable or errors, so agent logic never blocks on the network.
+        """
+        try:
+            return await self.kimi.reason(
+                prompt=task_prompt,
+                context=context,
+                tools=tools,
+                response_schema=response_schema,
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "llm_reasoning_failed",
+                agent_type=self.agent_type,
+                error=str(exc),
+            )
+            return {"_fallback": True, "error": str(exc)}
+
+    def blend_confidence(self, heuristic: float, llm: Optional[float] = None) -> float:
+        """Blend heuristic engine confidence with an LLM review score.
+
+        Weighting: heuristic * 0.4 + llm * 0.6 when an LLM score is present,
+        otherwise the heuristic stands alone. Callers should document the
+        ``BLEND_FORMULA`` weighting in their reasoning string.
+        """
+        heuristic = max(0.0, min(1.0, heuristic))
+        if llm is None:
+            return heuristic
+        llm = max(0.0, min(1.0, llm))
+        return max(0.0, min(1.0, heuristic * HEURISTIC_WEIGHT + llm * LLM_WEIGHT))
+
+    @staticmethod
+    def build_output(
+        reasoning: str,
+        evidence: Dict[str, Any],
+        **data: Any,
+    ) -> Dict[str, Any]:
+        """Build output_data with mandatory audit-trail fields."""
+        return {**data, "reasoning": reasoning, "evidence": evidence}
+
+    def _no_data_result(self, reasoning: str, evidence: Optional[Dict[str, Any]] = None) -> AgentResult:
+        """Standard graceful result for projects with no data yet (0.5-0.7 confidence)."""
+        return AgentResult(
+            status="completed",
+            confidence_score=0.6,
+            output_data=self.build_output(reasoning, evidence or {}),
+            reasoning=reasoning,
+            evidence=evidence or {},
+        )
 
     async def execute(self, trigger_event: str, context: Dict[str, Any]) -> AgentResult:
         """Wrapper that records timing and logs execution."""

@@ -448,7 +448,28 @@ class KimiClawOrchestrator:
         tier: str,
         next_trigger: Optional[str] = None,
     ) -> str:
-        """Compose human-readable, explainable reasoning for a routing decision."""
+        """Compose human-readable, explainable reasoning for a routing decision.
+
+        Prefers the agent's own structured reasoning (audit-grade explanation)
+        when present, falling back to a composed summary of the raw output.
+        """
+        if result.reasoning:
+            parts = [
+                f"{agent_type} agent run {agent_run_id}: {result.reasoning}",
+                f"Confidence {result.confidence_score:.2f} maps to tier '{tier}'"
+                f" (auto-advance >= 0.95, human review >= 0.85, escalate below 0.85).",
+            ]
+            if result.evidence:
+                evidence_summary = json.dumps(result.evidence, sort_keys=True, default=str)
+                if len(evidence_summary) > 400:
+                    evidence_summary = evidence_summary[:400] + "..."
+                parts.append(f"Evidence: {evidence_summary}")
+            if result.errors:
+                parts.append(f"Errors: {'; '.join(result.errors[:3])}.")
+            if next_trigger:
+                parts.append(f"Next lifecycle trigger: '{next_trigger}'.")
+            return " ".join(parts)
+
         summary = json.dumps(result.output_data, sort_keys=True, default=str)
         if len(summary) > 400:
             summary = summary[:400] + "..."
