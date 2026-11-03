@@ -9,7 +9,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Awaitable, Optional, Dict, Any, cast
 
 import redis.asyncio as redis
 
@@ -135,7 +135,7 @@ class SessionManager:
             session = json.loads(data)
             user_id = session.get("user_id")
             if user_id:
-                await r.srem(cls._user_sessions_key(user_id), session_id)
+                await cast(Awaitable[int], r.srem(cls._user_sessions_key(user_id), session_id))
         await r.delete(cls._session_key(session_id))
         logger.info("session_destroyed", session_id=session_id)
 
@@ -143,7 +143,7 @@ class SessionManager:
     async def destroy_all_user_sessions(cls, user_id: str, except_session: Optional[str] = None) -> int:
         """Destroy all sessions for a user, optionally keeping one."""
         r = _get_redis()
-        session_ids = await r.smembers(cls._user_sessions_key(user_id))
+        session_ids = await cast(Awaitable[set], r.smembers(cls._user_sessions_key(user_id)))
         count = 0
         for sid in session_ids:
             if except_session and sid == except_session:
@@ -163,7 +163,7 @@ class SessionManager:
     async def list_user_sessions(cls, user_id: str) -> list[Dict[str, Any]]:
         """List all active sessions for a user."""
         r = _get_redis()
-        session_ids = await r.smembers(cls._user_sessions_key(user_id))
+        session_ids = await cast(Awaitable[set], r.smembers(cls._user_sessions_key(user_id)))
         sessions = []
         for sid in session_ids:
             data = await r.get(cls._session_key(sid))
@@ -173,7 +173,7 @@ class SessionManager:
                 sessions.append(session)
             else:
                 # Clean up stale reference
-                await r.srem(cls._user_sessions_key(user_id), sid)
+                await cast(Awaitable[int], r.srem(cls._user_sessions_key(user_id), sid))
         return sessions
 
     @classmethod

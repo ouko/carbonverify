@@ -79,7 +79,7 @@ def process_excel_csv(file_bytes: bytes, detected_type: str, filename: str) -> D
     """Process Excel or CSV file and return structured result."""
     logger.info("processing_excel_csv", filename=filename, detected_type=detected_type)
 
-    result = {
+    result: Dict[str, Any] = {
         "filename": filename,
         "detected_type": detected_type,
         "total_rows": 0,
@@ -150,7 +150,7 @@ def process_excel_csv(file_bytes: bytes, detected_type: str, filename: str) -> D
 
         # Store sample data (first 100 rows)
         if idx < 100:
-            record = {}
+            record: Dict[Any, Any] = {}
             for col in df.columns:
                 val = row[col]
                 if pd.isna(val):

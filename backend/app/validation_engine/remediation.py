@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.validation_engine.models import (
     RemediationAction,
+    StepExecutionStatus,
     ValidationRun,
     ValidationStepExecution,
 )
@@ -128,7 +129,7 @@ class RemediationEngine:
         if not step.skippable:
             raise RuntimeError(f"Step '{step.id}' is not marked as skippable")
 
-        step_exec.status = "skipped"
+        step_exec.status = StepExecutionStatus.skipped
         await db.commit()
         return {
             "action": "skip",

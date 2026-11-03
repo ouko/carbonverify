@@ -106,7 +106,7 @@ async def _async_process_erasure(dsr_id: str):
             await _erase_user(db, subject_id)
 
         # Mark as completed
-        dsr.status = DSRStatusEnum.completed
+        dsr.status = DSRStatusEnum.fulfilled
         dsr.completed_at = datetime.now(timezone.utc)
         await db.commit()
 

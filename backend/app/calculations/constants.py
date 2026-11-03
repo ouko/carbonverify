@@ -1,6 +1,6 @@
 """IPCC and methodology constants for cookstove carbon calculations."""
 
-from typing import Dict
+from typing import Any, Dict, Tuple
 
 # ─── IPCC Emission Factors (kg CO2e per kg fuel) ──────────────────────────────
 # Source: IPCC 2006 Guidelines, Vol 2, Ch 2 (Stationary Combustion)
@@ -73,7 +73,7 @@ GWP_100 = {
 
 # ─── fNRB Reference Points ────────────────────────────────────────────────────
 # Known fNRB values from peer-reviewed studies / GS/Verra PD documents
-fNRB_REFERENCE_POINTS = {
+fNRB_REFERENCE_POINTS: Dict[Tuple[float, float], Dict[str, Any]] = {
     # (lat, lon): {"fnrb": value, "uncertainty": value, "source": "...", "year": int}
     (-1.2921, 36.8219): {"fnrb": 0.30, "uncertainty": 0.08, "source": "Kenya NRB Study 2019", "year": 2019, "country": "Kenya"},
     (6.5244, 3.3792): {"fnrb": 0.35, "uncertainty": 0.10, "source": "Nigeria MoFuSS 2020", "year": 2020, "country": "Nigeria"},

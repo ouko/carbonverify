@@ -45,3 +45,7 @@ class BaseRegistryScraper(ABC):
     def close(self) -> None:
         """Clean up any resources (HTTP clients, browsers, etc.)."""
         pass
+
+    def health_check(self) -> Dict[str, Any]:
+        """Return scraper health status. Implemented by concrete scrapers."""
+        raise NotImplementedError

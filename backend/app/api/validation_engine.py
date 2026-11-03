@@ -725,8 +725,8 @@ async def get_quality_metrics(
     total_steps = await db.scalar(select(func.count(ValidationStepExecution.id)))
     failed_steps = await db.scalar(select(func.count(ValidationStepExecution.id)).where(ValidationStepExecution.status == "failed"))
 
-    accuracy = round((approved_runs / total_runs * 100), 1) if total_runs else 94.2
-    rejection_rate = round((rejected_runs / total_runs * 100), 1) if total_runs else 8.4
+    accuracy = round(((approved_runs or 0) / total_runs * 100), 1) if total_runs else 94.2
+    rejection_rate = round(((rejected_runs or 0) / total_runs * 100), 1) if total_runs else 8.4
 
     # Demo chart data (fallback when no real workflow runs exist yet)
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]

@@ -125,7 +125,7 @@ class AuditLogger:
 
     async def log_login(
         self,
-        user_id: uuid.UUID,
+        user_id: Optional[uuid.UUID],
         success: bool,
         request: Optional[Request] = None,
         mfa_used: bool = False,
@@ -246,7 +246,7 @@ class AuditLogger:
 
         stmt = stmt.limit(limit).offset(offset)
         result = await self.db.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def verify_integrity(self, log_id: uuid.UUID) -> Dict[str, Any]:
         """

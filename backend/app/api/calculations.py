@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 import asyncio
 import uuid
 
@@ -57,7 +57,7 @@ def _extract_calc_params(data_sources: List[DataSource]) -> Dict[str, Any]:
 
 @router.get("/", response_model=List[CalculationRunOut])
 async def list_calculations(
-    project_id: uuid.UUID = None,
+    project_id: Optional[uuid.UUID] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -187,7 +187,7 @@ async def run_project_calculation(
     if not validated_sources:
         raise HTTPException(status_code=400, detail="No validated data sources for this project")
 
-    params = _extract_calc_params(validated_sources)
+    params = _extract_calc_params(list(validated_sources))
 
     # Resolve location
     project_location = params.get("project_location") or params.get("gps") or params.get("coordinates")

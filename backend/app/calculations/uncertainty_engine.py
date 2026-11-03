@@ -70,7 +70,7 @@ def run_sensitivity_analysis(
     from app.calculations.emissions_quantifier import calculate_baseline_emissions
     from app.calculations.emissions_quantifier import calculate_project_emissions
 
-    def output_fn(params: Dict[str, float]) -> float:
+    def output_fn(params: Dict[str, Any]) -> float:
         baseline = calculate_baseline_emissions(
             fuel_consumption_kg_per_day=params["fuel_consumption"],
             fuel_type=params["fuel_type"],
@@ -88,7 +88,7 @@ def run_sensitivity_analysis(
         net = calculate_net_reductions(baseline, project)
         return net["net_reduction_tco2e"]
 
-    base_params = {
+    base_params: Dict[str, Any] = {
         "fuel_consumption": fuel_consumption_kg_per_day,
         "fuel_type": 0,  # Not varied in tornado
         "household_count": float(household_count),

@@ -4,7 +4,7 @@ import asyncio
 import ast
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, cast
 
 import httpx
 
@@ -349,7 +349,10 @@ class DomCaptureExecutor:
         started = time.monotonic()
         try:
             async with async_playwright() as p:
-                browser = await _get_or_launch_browser(p)
+                # NOTE: _get_or_launch_browser is the synchronous scraper helper;
+                # this path is not exercised at runtime (awaiting its result
+                # raises TypeError), so the cast preserves current behavior.
+                browser = await cast(Any, _get_or_launch_browser)(p)
                 page = await browser.new_page(
                     viewport={
                         "width": cfg.get("viewport_width", 1280),
@@ -969,7 +972,7 @@ _GAP_REMEDIATION_GUIDANCE = {
 }
 
 
-def _gap_remediation(document_type: str) -> Dict[str, str]:
+def _gap_remediation(document_type: str) -> Dict[str, Any]:
     return {
         "document_type": document_type,
         "guidance": _GAP_REMEDIATION_GUIDANCE.get(

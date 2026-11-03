@@ -80,7 +80,7 @@ class IntentClassifier:
                 scores[intent] = score
 
         if scores:
-            best_intent = max(scores, key=scores.get)
+            best_intent = max(scores, key=lambda i: scores[i])
             best_score = scores[best_intent]
             confidence = min(1.0, best_score * 0.3 + 0.4)
         else:

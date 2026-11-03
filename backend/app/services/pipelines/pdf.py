@@ -78,7 +78,7 @@ def classify_document(text: str) -> DocumentTypeEnum:
         score = sum(1 for p in patterns if re.search(p, text_lower))
         scores[doc_type] = score
 
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda t: scores[t])
     if scores[best] == 0:
         return DocumentTypeEnum.other
     return best
@@ -115,7 +115,7 @@ def process_pdf(file_bytes: bytes, filename: str) -> Dict[str, Any]:
     """Process PDF file and return structured result."""
     logger.info("processing_pdf", filename=filename)
 
-    result = {
+    result: Dict[str, Any] = {
         "filename": filename,
         "detected_type": "pdf",
         "text_length": 0,

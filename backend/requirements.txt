@@ -59,3 +59,11 @@ python-jose[cryptography]==3.5.0
 
 # Rate limiting
 slowapi==0.1.9
+
+
+# Dev tools (lint / typecheck / test) — pinned to match CI (.github/workflows/ci.yml)
+ruff==0.17.3
+mypy==1.17.1
+types-python-dateutil==2.9.0.20261029  # stubs required by mypy for the dateutil import
+pytest
+pytest-asyncio

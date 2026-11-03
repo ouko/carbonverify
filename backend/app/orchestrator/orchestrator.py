@@ -161,8 +161,8 @@ class KimiClawOrchestrator:
 
         results = []
         for agent_type in agent_types:
-            result = await self.dispatch_agent(project_id, agent_type.value, trigger, context)
-            results.append(result)
+            agent_result = await self.dispatch_agent(project_id, agent_type.value, trigger, context)
+            results.append(agent_result)
 
         return {
             "project_id": str(project_id),
@@ -765,7 +765,7 @@ class KimiClawOrchestrator:
             # If approved, trigger next agent
             if decision == "approve":
                 agent_type = item.context_json.get("agent_type") if item.context_json else None
-                next_trigger = self._get_next_trigger(agent_type)
+                next_trigger = self._get_next_trigger(agent_type) if agent_type is not None else None
                 if next_trigger:
                     await self._publish_project_update(project_id, {
                         "type": "human_review_approved",

@@ -167,7 +167,7 @@ def validate_cross_reference(
     reference_data: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     """Cross-reference validation between data sources."""
-    errors = []
+    errors: List[str] = []
     if not reference_data:
         return errors
 

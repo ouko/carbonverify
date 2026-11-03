@@ -1,7 +1,7 @@
 """Lead Intelligence API routes."""
 
 import asyncio
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, cast
 import uuid
 from datetime import datetime, timezone, date as dt_date
 
@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 
 from app.database import get_db
-from app.models import Lead, User, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum, LeadProjectStatusEnum, LeadWorkflowStatusEnum, ProjectPreAudit, ScraperRun, AuditActionEnum
+from app.models import Lead, User, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum, LeadProjectStatusEnum, LeadPriorityEnum, LeadWorkflowStatusEnum, ProjectPreAudit, ScraperRun, AuditActionEnum
 from app.schemas import (
     LeadCreate,
     LeadUpdate,
@@ -254,7 +254,7 @@ async def bulk_import_leads(
                 if item.registry_url is not None:
                     lead.registry_url = item.registry_url
                 if item.status is not None:
-                    lead.status = item.status
+                    lead.status = cast(LeadProjectStatusEnum, item.status)
                 lead.updated_at = datetime.now(timezone.utc)
                 updated += 1
             else:
@@ -317,7 +317,7 @@ async def get_scraper_history(
     """Return the most recent scrape run for each registry source."""
     from sqlalchemy import desc
 
-    results = {}
+    results: Dict[str, Any] = {}
     for source in list_scrapers():
         run_result = await db.execute(
             select(ScraperRun)
@@ -452,7 +452,7 @@ async def score_single_lead(
         last_verification_date=lead.last_verification_date,
         methodology=lead.methodology,
     )
-    lead.priority = priority_from_score(lead.stuck_score)
+    lead.priority = cast(LeadPriorityEnum, priority_from_score(lead.stuck_score))
     lead.last_scored_at = datetime.now(timezone.utc)
     lead.updated_at = datetime.now(timezone.utc)
 
@@ -512,7 +512,7 @@ async def trigger_scrape(
 
         # Batch-load existing leads to avoid N+1 queries per raw lead
         external_ids = [raw["external_id"] for raw in raw_leads if "external_id" in raw]
-        existing_leads = {}
+        existing_leads: Dict[Any, Lead] = {}
         if external_ids:
             existing_result = await db.execute(
                 select(Lead).where(
@@ -520,8 +520,8 @@ async def trigger_scrape(
                     Lead.external_id.in_(external_ids),
                 )
             )
-            for lead in existing_result.scalars().all():
-                existing_leads[lead.external_id] = lead
+            for existing_lead in existing_result.scalars().all():
+                existing_leads[existing_lead.external_id] = existing_lead
 
         for raw in raw_leads:
             meta = raw.pop("_scrape_meta", {})
@@ -553,7 +553,7 @@ async def trigger_scrape(
                     if key in raw and raw[key] is not None:
                         setattr(lead, key, raw[key])
                 lead.stuck_score = stuck
-                lead.priority = priority
+                lead.priority = cast(LeadPriorityEnum, priority)
                 lead.last_scored_at = datetime.now(timezone.utc)
                 lead.updated_at = datetime.now(timezone.utc)
                 total_updated += 1
@@ -653,24 +653,24 @@ async def get_lead_stats(
     priority_result = await db.execute(
         select(Lead.priority, func.count(Lead.id)).group_by(Lead.priority)
     )
-    for row in priority_result.all():
-        by_priority[str(row[0])] = row[1]
+    for prio_row in priority_result.all():
+        by_priority[str(prio_row[0])] = prio_row[1]
 
     # By country
     by_country = {}
     country_result = await db.execute(
         select(Lead.country, func.count(Lead.id)).group_by(Lead.country)
     )
-    for row in country_result.all():
-        by_country[str(row[0]) if row[0] else "Unknown"] = row[1]
+    for country_row in country_result.all():
+        by_country[str(country_row[0]) if country_row[0] else "Unknown"] = country_row[1]
 
     # By lead status
     by_lead_status = {}
     status_result = await db.execute(
         select(Lead.lead_status, func.count(Lead.id)).group_by(Lead.lead_status)
     )
-    for row in status_result.all():
-        by_lead_status[str(row[0])] = row[1]
+    for status_row in status_result.all():
+        by_lead_status[str(status_row[0])] = status_row[1]
 
     # Avg stuck score
     avg_result = await db.execute(select(func.avg(Lead.stuck_score)))

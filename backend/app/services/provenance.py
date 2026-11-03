@@ -91,6 +91,7 @@ def build_full_provenance(
     processing_result: Optional[Dict[str, Any]] = None,
     validation_result: Optional[Dict[str, Any]] = None,
     s3_key: Optional[str] = None,
+    raw_source: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build a complete provenance record from upload through validation."""
     file_hash = None
@@ -98,7 +99,7 @@ def build_full_provenance(
         file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     provenance = create_provenance_record(
-        raw_source=s3_key or original_filename or "unknown",
+        raw_source=raw_source or s3_key or original_filename or "unknown",
         extraction_method=processing_pipeline or "unknown",
         original_filename=original_filename,
         file_hash=file_hash,

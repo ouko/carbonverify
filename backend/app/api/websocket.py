@@ -84,9 +84,9 @@ class ProjectConnectionManager:
             await self.broadcast_global(payload)
         elif channel == "agent:results":
             # Forward agent results to relevant project room
-            project_id = payload.get("project_id")
-            if project_id:
-                await self.broadcast_to_project(project_id, {
+            agent_project_id = payload.get("project_id")
+            if agent_project_id:
+                await self.broadcast_to_project(agent_project_id, {
                     "type": "agent_result",
                     "payload": payload,
                 })

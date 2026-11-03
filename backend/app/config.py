@@ -139,4 +139,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    # Fields without defaults are populated from process env / .env by
+    # pydantic-settings at runtime, which mypy cannot see.
+    return Settings()  # type: ignore[call-arg]

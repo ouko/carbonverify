@@ -232,7 +232,7 @@ class ValidationOrchestrator:
         step_index_map: Dict[str, int] = {s.id: i for i, s in enumerate(steps_in_order)}
 
         try:
-            current_step_id = graph.entry_step
+            current_step_id: Optional[str] = graph.entry_step
             while current_step_id and current_step_id in steps_by_id:
                 if current_step_id in executed_step_ids:
                     break  # Prevent infinite loops

@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import redis
 
@@ -47,7 +47,7 @@ class ConversationStateManager:
         try:
             r = self._get_redis()
             key = self.get_conversation_key(phone_number)
-            data = r.get(key)
+            data = cast(Optional[str], r.get(key))
             if data:
                 return json.loads(data)
         except Exception as exc:
@@ -143,7 +143,7 @@ class ConversationStateManager:
         try:
             r = self._get_redis()
             key = f"{RATE_LIMIT_PREFIX}:{phone_number}"
-            current = r.incr(key)
+            current = cast(int, r.incr(key))
             if current == 1:
                 r.expire(key, window_seconds)
             return current > max_messages
@@ -155,7 +155,7 @@ class ConversationStateManager:
         """Get list of active conversation keys."""
         try:
             r = self._get_redis()
-            keys = r.keys(f"{CONVERSATION_PREFIX}:{pattern}")
+            keys = cast(list, r.keys(f"{CONVERSATION_PREFIX}:{pattern}"))
             return [k.replace(f"{CONVERSATION_PREFIX}:", "") for k in keys]
         except Exception as exc:
             logger.error("redis_scan_error", error=str(exc))

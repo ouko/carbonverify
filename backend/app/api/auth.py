@@ -89,7 +89,7 @@ def _get_device_fingerprint(request: Request) -> str:
     ua = request.headers.get("user-agent", "")
     accept = request.headers.get("accept", "")
     lang = request.headers.get("accept-language", "")
-    return hash((ua, accept, lang))
+    return str(hash((ua, accept, lang)))
 
 
 def _get_client_ip(request: Request) -> str:
@@ -236,7 +236,7 @@ async def login(
         )
         raise HTTPException(
             status_code=403,
-            detail=f"Account locked. Try again after {user.locked_until.isoformat()}",
+            detail=f"Account locked. Try again after {locked_until.isoformat()}",
         )
 
     if not user:

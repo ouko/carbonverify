@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List
+from typing import List, Optional
 import uuid
 
 from app.database import get_db
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/data-sources", tags=["data-sources"])
 
 @router.get("/", response_model=List[DataSourceOut])
 async def list_data_sources(
-    project_id: uuid.UUID = None,
+    project_id: Optional[uuid.UUID] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),

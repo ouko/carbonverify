@@ -91,10 +91,11 @@ class FieldEncryption:
         """Encrypt a string value. Returns None if encryption is disabled."""
         if plaintext is None:
             return None
-        if not self.enabled:
+        fernet = self._fernet
+        if fernet is None:
             return plaintext
         try:
-            token = self._fernet.encrypt(plaintext.encode("utf-8"))
+            token = fernet.encrypt(plaintext.encode("utf-8"))
             return token.decode("utf-8")
         except Exception as exc:
             logger.error("field_encryption_encrypt_failed", error=str(exc))
@@ -104,10 +105,11 @@ class FieldEncryption:
         """Decrypt an encrypted string value."""
         if ciphertext is None:
             return None
-        if not self.enabled:
+        fernet = self._fernet
+        if fernet is None:
             return ciphertext
         try:
-            plaintext = self._fernet.decrypt(ciphertext.encode("utf-8"))
+            plaintext = fernet.decrypt(ciphertext.encode("utf-8"))
             return plaintext.decode("utf-8")
         except Exception as exc:
             logger.error("field_encryption_decrypt_failed", error=str(exc))
@@ -123,10 +125,11 @@ class FieldEncryption:
         """
         if ciphertext is None:
             return None
-        if not self.enabled:
+        fernet = self._fernet
+        if fernet is None:
             return ciphertext
         try:
-            plaintext = self._fernet.decrypt(ciphertext.encode("utf-8"))
+            plaintext = fernet.decrypt(ciphertext.encode("utf-8"))
             return plaintext.decode("utf-8")
         except Exception as exc:
             logger.warning(

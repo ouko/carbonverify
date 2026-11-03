@@ -28,9 +28,9 @@ IMAGE_CATEGORY_PATTERNS = {
 
 def extract_exif(image: Image.Image) -> Dict[str, Any]:
     """Extract EXIF data from image."""
-    exif_data = {}
+    exif_data: Dict[Any, Any] = {}
     try:
-        raw_exif = image._getexif()
+        raw_exif = getattr(image, "_getexif", image.getexif)()
         if raw_exif:
             for tag_id, value in raw_exif.items():
                 tag_name = TAGS.get(tag_id, tag_id)
@@ -101,7 +101,7 @@ def classify_image_category(filename: str, exif_data: Dict[str, Any]) -> ImageCa
         score = sum(1 for kw in keywords if kw in filename_lower)
         scores[category] = score
 
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda c: scores[c])
     if scores[best] == 0:
         return ImageCategoryEnum.other
     return best
@@ -172,7 +172,7 @@ def process_image(
     """Process image file and return structured result."""
     logger.info("processing_image", filename=filename)
 
-    result = {
+    result: Dict[str, Any] = {
         "filename": filename,
         "detected_type": "image",
         "width": None,

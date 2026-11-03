@@ -35,7 +35,7 @@ def list_scrapers() -> list[str]:
 def health_check_all() -> Dict[str, Any]:
     """Run health checks on all scrapers and return status."""
     settings = get_settings()
-    results = {}
+    results: Dict[str, Any] = {}
     for name, scraper_cls in _SCRAPER_REGISTRY.items():
         scraper = scraper_cls()
         try:

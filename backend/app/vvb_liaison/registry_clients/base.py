@@ -22,7 +22,7 @@ class RegistryAuthenticationError(RegistryClientError):
 
 class RegistryAPIError(RegistryClientError):
     """API returned error status."""
-    def __init__(self, message: str, status_code: int = None, response_body: Dict = None):
+    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[Dict] = None):
         super().__init__(message)
         self.status_code = status_code
         self.response_body = response_body or {}
@@ -64,7 +64,7 @@ class BaseRegistryClient(ABC):
     ) -> Dict[str, Any]:
         """Make HTTP request with retry logic."""
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        last_error = None
+        last_error: Optional[Exception] = None
         
         for attempt in range(self.max_retries):
             try:
@@ -105,7 +105,7 @@ class BaseRegistryClient(ABC):
                     await asyncio.sleep(self.retry_delay * (2 ** attempt))
                 
             except RegistryAPIError as e:
-                if e.status_code >= 500:
+                if e.status_code is not None and e.status_code >= 500:
                     last_error = e
                     logger.warning(
                         "registry_request_retry",

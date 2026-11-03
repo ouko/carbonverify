@@ -66,7 +66,7 @@ def detect_provider(payload: Dict[str, Any]) -> str:
                 score += 1
         scores[provider] = score
 
-    best = max(scores, key=scores.get)
+    best = max(scores, key=lambda p: scores[p])
     return best if scores[best] >= 2 else "generic_gsm"
 
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List
+from typing import List, Optional
 import uuid
 
 from app.database import get_db
@@ -49,7 +49,7 @@ VALID_REPORT_TRANSITIONS = {
 
 @router.get("/", response_model=List[ReportOut])
 async def list_reports(
-    project_id: uuid.UUID = None,
+    project_id: Optional[uuid.UUID] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -300,11 +300,11 @@ async def submit_report_to_registry(
         finally:
             await client.close()
     elif registry == "gold_standard":
-        client = GoldStandardRegistryClient(api_key=settings.GOLD_STANDARD_API_KEY or None)
+        gs_client = GoldStandardRegistryClient(api_key=settings.GOLD_STANDARD_API_KEY or None)
         try:
-            registry_result = await client.submit_monitoring_report(str(report.project_id), report_data)
+            registry_result = await gs_client.submit_monitoring_report(str(report.project_id), report_data)
         finally:
-            await client.close()
+            await gs_client.close()
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported registry: {registry}")
 

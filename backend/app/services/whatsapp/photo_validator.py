@@ -21,7 +21,7 @@ class PhotoValidator:
 
     def validate(self, image_bytes: bytes, project_boundary: Optional[Dict] = None) -> Dict[str, Any]:
         """Run all validation checks on an image."""
-        checks = {
+        checks: Dict[str, Any] = {
             "format_valid": False,
             "size_valid": False,
             "quality_valid": False,
@@ -112,7 +112,7 @@ class PhotoValidator:
     def _extract_gps(self, img: Image.Image) -> Optional[Dict[str, float]]:
         """Extract GPS coordinates from EXIF data."""
         try:
-            exif = img._getexif()
+            exif = getattr(img, "_getexif", img.getexif)()
             if not exif:
                 return None
 
@@ -155,7 +155,7 @@ class PhotoValidator:
     def _extract_timestamp(self, img: Image.Image) -> Optional[str]:
         """Extract timestamp from EXIF data."""
         try:
-            exif = img._getexif()
+            exif = getattr(img, "_getexif", img.getexif)()
             if exif:
                 for tag_id, value in exif.items():
                     if TAGS.get(tag_id) == "DateTimeOriginal":
@@ -172,7 +172,12 @@ class PhotoValidator:
             min_lon = boundary.get("min_longitude")
             max_lon = boundary.get("max_longitude")
 
-            if all(v is not None for v in [min_lat, max_lat, min_lon, max_lon]):
+            if (
+                min_lat is not None
+                and max_lat is not None
+                and min_lon is not None
+                and max_lon is not None
+            ):
                 return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
 
             # Fallback: check against center + radius

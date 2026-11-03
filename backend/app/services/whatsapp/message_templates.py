@@ -3,7 +3,7 @@
 Supports English (en) and Swahili (sw) with auto-detection fallback.
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 # ─── Flow Titles ──────────────────────────────────────────────────────────────
 
@@ -240,7 +240,7 @@ STATUS_RESPONSE = {
 
 # ─── Survey Questions (Methodology-Aware) ─────────────────────────────────────
 
-SURVEY_QUESTIONS = {
+SURVEY_QUESTIONS: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
     "TPDDTEC_v4": {
         "en": [
             {

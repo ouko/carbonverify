@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional, Tuple, cast
 
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -17,7 +18,7 @@ logger = get_logger(__name__)
 class FlexibleHTTPBearer(HTTPBearer):
     """HTTPBearer that accepts any authorization scheme (Bearer, ApiKey, etc.)."""
 
-    async def __call__(self, request: Request) -> HTTPAuthorizationCredentials:
+    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
         authorization = request.headers.get("Authorization")
         if not authorization:
             if self.auto_error:
@@ -47,7 +48,7 @@ security = FlexibleHTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
-    request: Request = None,
+    request: Request = cast(Request, None),  # optional; FastAPI injects when annotated as Request
 ) -> User:
     token = credentials.credentials
     payload = decode_token(token)
@@ -123,7 +124,7 @@ async def get_current_user_with_session(
 
 async def get_current_user_or_api_key(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    request: Request = None,
+    request: Request = cast(Request, None),  # optional; FastAPI injects when annotated as Request
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
@@ -205,7 +206,7 @@ require_viewer = RoleChecker(["admin", "operator", "developer", "viewer"])
 async def validate_refresh_token(
     refresh_token: str,
     db: AsyncSession,
-) -> User:
+) -> Tuple[User, RefreshToken]:
     """
     Validate a refresh token with rotation support.
 
@@ -220,6 +221,8 @@ async def validate_refresh_token(
         raise HTTPException(status_code=401, detail="Refresh token expired")
 
     user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
     token_hash = hash_token(refresh_token)
 
     result = await db.execute(
@@ -274,7 +277,7 @@ async def _revoke_all_user_tokens(user_id: str, db: AsyncSession) -> None:
 
 async def require_mfa_if_enabled(
     user: User = Depends(get_current_user),
-    request: Request = None,
+    request: Request = cast(Request, None),  # optional; FastAPI injects when annotated as Request
 ) -> User:
     """
     Enforce MFA for users who have MFA enabled.

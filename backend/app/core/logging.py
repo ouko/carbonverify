@@ -38,7 +38,7 @@ def _sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     """Recursively sanitize a dictionary for safe logging."""
     if not isinstance(data, dict):
         return data
-    result = {}
+    result: Dict[str, Any] = {}
     for key, value in data.items():
         if isinstance(value, dict):
             result[key] = _sanitize_dict(value)

@@ -1,7 +1,7 @@
 """fNRB (fraction of Non-Renewable Biomass) Calculator Module."""
 
 import math
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 
 from app.calculations.constants import (
     fNRB_REFERENCE_POINTS as DEFAULT_REFERENCE_POINTS,
@@ -42,7 +42,7 @@ def spatial_interpolation(
     if reference_points is None:
         reference_points = DEFAULT_REFERENCE_POINTS
 
-    distances = []
+    distances: List[Tuple[float, Dict[str, Any]]] = []
     for (ref_lat, ref_lon), data in reference_points.items():
         dist = haversine_distance(target_lat, target_lon, ref_lat, ref_lon)
         if dist <= max_distance_km:

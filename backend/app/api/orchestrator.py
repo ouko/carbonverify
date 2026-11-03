@@ -47,8 +47,8 @@ async def trigger_project_state(
 ):
     """Trigger a state transition for a project."""
     result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
+    db_project = result.scalar_one_or_none()
+    if not db_project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     orchestrator = KimiClawOrchestrator(db)
@@ -321,8 +321,8 @@ async def generate_executive_summary(
     from app.models import CalculationRun
 
     result = await db.execute(select(Project).where(Project.id == project_id))
-    project = result.scalar_one_or_none()
-    if not project:
+    db_project = result.scalar_one_or_none()
+    if not db_project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     calc_result = await db.execute(select(CalculationRun).where(CalculationRun.id == calculation_run_id))

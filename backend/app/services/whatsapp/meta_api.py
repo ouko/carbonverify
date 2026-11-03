@@ -75,7 +75,7 @@ class WhatsAppMetaAPI:
             return {"success": False, "error": "WhatsApp credentials not configured"}
 
         url = f"{self.base_url}/{self.phone_number_id}/messages"
-        payload = {
+        payload: Dict[str, Any] = {
             "messaging_product": "whatsapp",
             "to": self._format_phone(to),
             "type": "template",
@@ -111,7 +111,7 @@ class WhatsAppMetaAPI:
             return {"success": False, "error": "WhatsApp credentials not configured"}
 
         url = f"{self.base_url}/{self.phone_number_id}/messages"
-        payload = {
+        payload: Dict[str, Any] = {
             "messaging_product": "whatsapp",
             "to": self._format_phone(to),
             "type": media_type,

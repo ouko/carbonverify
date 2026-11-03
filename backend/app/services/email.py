@@ -1,7 +1,7 @@
 """Async email service with AWS SES primary and SMTP fallback."""
 
 import asyncio
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from app.config import get_settings
 from app.core.logging import get_logger
@@ -46,7 +46,7 @@ class EmailService:
 
         client = boto3.client("ses", region_name=settings.AWS_REGION)
         destination = {"ToAddresses": [to]}
-        message = {
+        message: Dict[str, Any] = {
             "Subject": {"Data": subject},
             "Body": {"Text": {"Data": body_text}},
         }

@@ -141,7 +141,7 @@ def validate_vm0050(
         risk_flags.append("missing_lab_test")
 
     # Requirement 2: Usage rate cap based on monitoring method
-    cap = VM0050_USAGE_RATE_CAPS.get(usage_monitoring_method, 0.75)
+    cap = VM0050_USAGE_RATE_CAPS.get(usage_monitoring_method or "", 0.75)
     if usage_rate is not None:
         if usage_rate <= cap:
             score += 20

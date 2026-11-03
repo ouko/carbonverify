@@ -45,7 +45,7 @@ def _get_or_launch_browser(headless: bool = False) -> Browser:
     with _browser_lock:
         if _browser_instance is None or _browser_instance.is_connected() is False:
             _playwright_instance = sync_playwright().start()
-            launch_kwargs = {
+            launch_kwargs: Dict[str, Any] = {
                 "headless": effective_headless,
                 "args": [
                     "--disable-blink-features=AutomationControlled",
@@ -126,7 +126,7 @@ def playwright_fetch(
             - status: HTTP status code.
             - url: Final URL after redirects.
     """
-    last_error = None
+    last_error: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
         browser = _get_or_launch_browser(headless=headless)
         api_response: Optional[Dict[str, Any]] = None

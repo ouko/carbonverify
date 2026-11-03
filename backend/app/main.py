@@ -99,7 +99,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type] # slowapi's handler is typed for RateLimitExceeded; Starlette dispatches by exception class, so this is safe
 app.add_middleware(RequestIDMiddleware)
 
 

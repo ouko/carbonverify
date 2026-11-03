@@ -1,6 +1,6 @@
 """Registry polling and status tracking system."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 from datetime import datetime, timezone
 
 from app.vvb_liaison.registry_clients.verra import VerraRegistryClient
@@ -54,7 +54,7 @@ class RegistryPoller:
             
             logger.info("polling_project", registry=registry, project_id=project_id)
             
-            result = await self.poll_project(registry, project_id)
+            result = await self.poll_project(cast(str, registry), cast(str, project_id))
             result["project_id"] = project_id
             result["registry"] = registry
             result["previous_status"] = last_status
@@ -149,11 +149,11 @@ def generate_follow_up_email(
     report_id: str,
     current_status: str,
     days_pending: int,
-    emissions_reduction: float,
+    emissions_reduction: Optional[float],
     monitoring_period_start: str,
     monitoring_period_end: str,
     methodology: str,
-    compliance_score: float,
+    compliance_score: Optional[float],
 ) -> Dict[str, Any]:
     """Generate follow-up email content."""
     from jinja2 import Environment, FileSystemLoader
@@ -169,7 +169,7 @@ def generate_follow_up_email(
         report_id=report_id,
         current_status=current_status,
         days_pending=days_pending,
-        emissions_reduction=round(emissions_reduction, 1),
+        emissions_reduction=round(emissions_reduction, 1) if emissions_reduction is not None else "N/A",
         monitoring_period_start=monitoring_period_start,
         monitoring_period_end=monitoring_period_end,
         methodology=methodology,

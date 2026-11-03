@@ -23,7 +23,7 @@ class CrossReferenceValidator:
             })
         return tables
     
-    def extract_citations(self) -> List[str]:
+    def extract_citations(self) -> Dict[str, List[int]]:
         """Extract all in-text citations like 'Table X' or 'Figure Y'."""
         # Remove captions first to avoid self-citation
         text_without_captions = re.sub(r'<p class="caption">[^<]+</p>', '', self.html)

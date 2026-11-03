@@ -1,7 +1,7 @@
 """Permission registry and role-to-permission mappings for CarbonVerify."""
 
 from enum import Enum as PyEnum
-from typing import List, Set
+from typing import Any, Dict, List, Set, Union
 
 
 class Permission(str, PyEnum):
@@ -180,7 +180,7 @@ def get_permissions_for_role(role: str) -> Set[str]:
     return perms
 
 
-def has_permission(user_role: str, user_permissions: list, required: str) -> bool:
+def has_permission(user_role: str, user_permissions: Union[Dict[Any, Any], List[Any]], required: str) -> bool:
     """Check if a user has a specific permission (via role or explicit grant)."""
     # Admin always has everything
     if user_role == "admin":

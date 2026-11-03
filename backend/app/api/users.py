@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from typing import List, Optional
+from typing import List, Optional, cast
 import uuid
 from datetime import datetime, timezone
 
@@ -324,7 +324,7 @@ async def grant_permission(
     perms = list(user.permissions or [])
     if payload.permission not in perms:
         perms.append(payload.permission)
-        user.permissions = perms
+        user.permissions = cast(dict, perms)
         await db.commit()
         await db.refresh(user)
 
@@ -348,7 +348,7 @@ async def revoke_permission(
     perms = list(user.permissions or [])
     if permission in perms:
         perms.remove(permission)
-        user.permissions = perms
+        user.permissions = cast(dict, perms)
         await db.commit()
         await db.refresh(user)
 

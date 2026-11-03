@@ -1,7 +1,7 @@
 """Async SQLAlchemy engine + session factory with read replica support."""
 
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, AsyncIterator, Optional
+from typing import Any, AsyncGenerator, AsyncIterator, Dict, Optional
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -18,7 +18,7 @@ Base = declarative_base()
 
 settings = get_settings()
 
-_engine_kwargs = {
+_engine_kwargs: Dict[str, Any] = {
     "echo": settings.ENVIRONMENT == "development",
     "future": True,
 }

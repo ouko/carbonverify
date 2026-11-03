@@ -1,5 +1,7 @@
 """Kimi Claw multi-agent orchestration agents."""
 
+from typing import Callable, Dict
+
 from app.agents.base import AgentResult, BaseAgent
 from app.agents.calculation_agent import CalculationAgent
 from app.agents.client_success_agent import ClientSuccessAgent
@@ -9,7 +11,7 @@ from app.agents.reporting_agent import ReportingAgent
 from app.agents.validation_agent import ValidationAgent
 from app.agents.vvb_liaison_agent import VVBLiaisonAgent
 
-AGENT_REGISTRY = {
+AGENT_REGISTRY: Dict[str, Callable[..., BaseAgent]] = {
     "ingestion": IngestionAgent,
     "validation": ValidationAgent,
     "calculation": CalculationAgent,

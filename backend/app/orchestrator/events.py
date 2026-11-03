@@ -216,4 +216,4 @@ class EventLogger:
             .order_by(OrchestratorEvent.created_at.desc())
             .limit(limit)
         )
-        return result.scalars().all()
+        return list(result.scalars().all())

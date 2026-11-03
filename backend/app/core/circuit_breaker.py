@@ -4,7 +4,7 @@ import asyncio
 import time
 from enum import Enum
 from functools import wraps
-from typing import Callable, Optional, TypeVar
+from typing import Awaitable, Callable, Optional, TypeVar
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -45,7 +45,7 @@ class CircuitBreaker:
         self.last_failure_time: Optional[float] = None
         self._lock = asyncio.Lock()
 
-    async def call(self, func: Callable[..., T], *args, **kwargs) -> T:
+    async def call(self, func: Callable[..., Awaitable[T]], *args, **kwargs) -> T:
         """Execute function with circuit breaker protection."""
         async with self._lock:
             if self.state == CircuitState.OPEN:

@@ -92,10 +92,10 @@ class AgentPubSub:
         except Exception as exc:
             logger.error("pubsub_listen_loop_error", error=str(exc))
 
-    def add_listener(self, callback: Callable[[str, dict[str, Any]], None]):
+    def add_listener(self, callback: Callable[[str, dict[str, Any]], Any]):
         self._listeners.append(callback)
 
-    def remove_listener(self, callback: Callable[[str, dict[str, Any]], None]):
+    def remove_listener(self, callback: Callable[[str, dict[str, Any]], Any]):
         if callback in self._listeners:
             self._listeners.remove(callback)
 
@@ -103,14 +103,20 @@ class AgentPubSub:
         """Publish an orchestrator event to all subscribers."""
         if self._redis is None:
             await self.connect()
+        client = self._redis
+        if client is None:
+            return
         message = json.dumps({"type": event_type, **payload})
-        await self._redis.publish("orchestrator:events", message)
+        await client.publish("orchestrator:events", message)
         logger.debug("pubsub_event_published", event_type=event_type)
 
     async def publish_agent_result(self, agent_type: str, project_id: str, result: dict[str, Any]):
         """Publish an agent execution result."""
         if self._redis is None:
             await self.connect()
+        client = self._redis
+        if client is None:
+            return
         message = json.dumps(
             {
                 "agent_type": agent_type,
@@ -119,16 +125,19 @@ class AgentPubSub:
                 "timestamp": asyncio.get_event_loop().time(),
             }
         )
-        await self._redis.publish("agent:results", message)
+        await client.publish("agent:results", message)
         logger.debug("pubsub_agent_result_published", agent_type=agent_type, project_id=project_id)
 
     async def publish_project_update(self, project_id: str, update: dict[str, Any]):
         """Publish a project-specific update for WebSocket clients."""
         if self._redis is None:
             await self.connect()
+        client = self._redis
+        if client is None:
+            return
         channel = f"project:{project_id}"
         message = json.dumps({"project_id": project_id, **update})
-        await self._redis.publish(channel, message)
+        await client.publish(channel, message)
 
 
 # Global singleton

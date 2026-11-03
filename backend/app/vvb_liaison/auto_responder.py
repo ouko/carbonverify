@@ -7,7 +7,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 # Knowledge base of common VVB queries and response templates
-KNOWLEDGE_BASE = {
+KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
     "fnrb_source": {
         "patterns": ["fNRB", "non-renewable biomass", "source of fNRB", "how was fNRB determined"],
         "response_template": (

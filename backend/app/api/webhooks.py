@@ -1,6 +1,7 @@
 import asyncio
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Optional, cast
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Header, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,8 +98,8 @@ async def receive_iot_webhook(
         data=processing_result,
         data_type="iot",
         project_confidence_threshold=project.confidence_threshold,
-        monitoring_period_start=project.crediting_period_start,
-        monitoring_period_end=project.crediting_period_end,
+        monitoring_period_start=cast(Optional[datetime], project.crediting_period_start),
+        monitoring_period_end=cast(Optional[datetime], project.crediting_period_end),
     )
 
     # Determine validation status

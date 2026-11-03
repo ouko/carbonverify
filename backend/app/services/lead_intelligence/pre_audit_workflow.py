@@ -1,11 +1,13 @@
 """Default pre-audit validation workflow template."""
 
+from typing import List, cast
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.validation_engine.models import ValidationWorkflow
-from app.validation_engine.schemas import WorkflowGraph
+from app.validation_engine.schemas import WorkflowGraph, WorkflowStep
 
 logger = get_logger(__name__)
 
@@ -19,7 +21,7 @@ def build_pre_audit_graph() -> WorkflowGraph:
         description="Pre-audit registry-imported project documents for completeness and consistency.",
         entry_step="document_presence_gate",
         variables={},
-        steps=[
+        steps=cast(List[WorkflowStep], [
             {
                 "id": "document_presence_gate",
                 "name": "Required Documents Present",
@@ -86,7 +88,7 @@ def build_pre_audit_graph() -> WorkflowGraph:
                 "next_on_success": ["end"],
                 "next_on_failure": ["end"],
             },
-        ],
+        ]),
     )
 
 

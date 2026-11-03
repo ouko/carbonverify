@@ -205,6 +205,14 @@ CALL_METHOD
     async def close(self):
         await self._client.aclose()
 
+    async def query_ledger(self, **params: Any) -> Dict[str, Any]:
+        """Query the Radix ledger (not yet implemented).
+
+        Referenced by the validation engine's external_api step executor;
+        raises until ledger queries are supported.
+        """
+        raise NotImplementedError("Radix ledger queries are not supported yet")
+
 
 class AuditTrailAnchor:
     """High-level service for anchoring CarbonVerify audit events to Radix."""

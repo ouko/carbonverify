@@ -159,7 +159,7 @@ class WhatsAppBot:
         q_id = current_question["id"]
 
         # Validate response based on question type
-        validation_result = {"valid": True, "value": text, "errors": []}
+        validation_result: Dict[str, Any] = {"valid": True, "value": text, "errors": []}
 
         if q_type == "number":
             validation_result = intent_classifier.validate_numeric_response(
