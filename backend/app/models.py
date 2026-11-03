@@ -1,29 +1,29 @@
 import uuid
-from datetime import datetime, date, timezone
-from typing import List, Optional
+from datetime import date, datetime, timezone
 from enum import Enum as PyEnum
+from typing import List, Optional
 
 from sqlalchemy import (
-    String,
-    Text,
-    Float,
+    ARRAY,
     BigInteger,
+    Boolean,
+    CheckConstraint,
     Date,
     DateTime,
-    Boolean,
-    ForeignKey,
     Enum,
-    Integer,
-    ARRAY,
-    CheckConstraint,
-    UniqueConstraint,
+    Float,
+    ForeignKey,
     Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
     text,
 )
-from app.core.encrypted_types import EncryptedString
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.encrypted_types import EncryptedString
 from app.database import Base
 
 
@@ -538,6 +538,9 @@ class HumanReviewQueue(Base):
     suggested_action: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     confidence_gap: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     human_decision: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    decision_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_decisions.id", ondelete="SET NULL"), nullable=True
+    )
     learning_feedback: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     time_in_queue_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     response_time_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -588,6 +591,37 @@ class OrchestratorEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     project: Mapped["Project"] = relationship("Project", back_populates="orchestrator_events")
+
+
+class AgentDecision(Base):
+    """Immutable, Merkle-chained audit trail of agent orchestration decisions."""
+
+    __tablename__ = "agent_decisions"
+
+    __table_args__ = (
+        Index("ix_agent_decisions_project_id", "project_id"),
+        Index("ix_agent_decisions_action", "action"),
+        Index("ix_agent_decisions_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    decision_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
+    project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    agent_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    reasoning: Mapped[str] = mapped_column(Text, nullable=False)
+    input_summary: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    context_package: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    prev_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    record_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    actor: Mapped[str] = mapped_column(String(255), nullable=False)
+    review_queue_item_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("human_review_queue.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 # ─── WhatsApp Bot & Field Operations Models ───────────────────────────────────

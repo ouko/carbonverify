@@ -1,57 +1,55 @@
 """CarbonVerify FastAPI application entry point."""
 
+from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request, Depends
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError, ValidationException
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
-from contextlib import asynccontextmanager
+from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
+from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, REGISTRY
-import prometheus_client
-import logging
 
-from app.config import get_settings
-from app.core.logging import configure_logging, get_logger
-from app.core.request_id import RequestIDMiddleware
-from app.core.client_ip import get_client_ip
-from app.core import request_context
-from app.database import engine
-from app.auth.dependencies import get_current_user, require_admin
-from app.security.siem_streaming import get_siem_streamer
-from app.api.auth import router as auth_router
-from app.api.users import router as users_router
-from app.api.projects import router as projects_router
-from app.api.data_sources import router as data_sources_router
-from app.api.calculations import router as calculations_router
-from app.api.reports import router as reports_router
-from app.api.review_queue import router as review_queue_router
-from app.api.dashboard import router as dashboard_router
-from app.api.health import router as health_router
-from app.api.websocket import router as websocket_router
-from app.api.uploads import router as uploads_router
-from app.api.webhooks import router as webhooks_router
-from app.api.vvb_liaison import router as vvb_router
-from app.api.orchestrator import router as orchestrator_router
-from app.api.whatsapp import router as whatsapp_router
-from app.api.audit import router as audit_router
-from app.api.compliance import router as compliance_router
-from app.api.brokerage import router as brokerage_router
-from app.api.tokenization import router as tokenization_router
-from app.api.corporate import router as corporate_router
-from app.api.leads import router as leads_router
-from app.api.validation_engine import router as validation_engine_router
 from app.api.admin import router as admin_router
 from app.api.api_keys import router as api_keys_router
-from app.api.oauth import router as oauth_router
+from app.api.applications import router as applications_router
+from app.api.audit import router as audit_router
+from app.api.auth import router as auth_router
+from app.api.brokerage import router as brokerage_router
+from app.api.calculations import router as calculations_router
+from app.api.compliance import router as compliance_router
+from app.api.corporate import router as corporate_router
+from app.api.dashboard import router as dashboard_router
+from app.api.data_sources import router as data_sources_router
+from app.api.decisions import router as decisions_router
+from app.api.health import router as health_router
+from app.api.leads import router as leads_router
 from app.api.methodology_generator import router as methodology_generator_router
 from app.api.methodology_templates import router as methodology_templates_router
-from app.api.applications import router as applications_router
+from app.api.oauth import router as oauth_router
+from app.api.orchestrator import router as orchestrator_router
+from app.api.projects import router as projects_router
+from app.api.reports import router as reports_router
+from app.api.review_queue import router as review_queue_router
+from app.api.tokenization import router as tokenization_router
+from app.api.uploads import router as uploads_router
+from app.api.users import router as users_router
+from app.api.validation_engine import router as validation_engine_router
+from app.api.vvb_liaison import router as vvb_router
+from app.api.webhooks import router as webhooks_router
+from app.api.websocket import router as websocket_router
+from app.api.whatsapp import router as whatsapp_router
+from app.auth.dependencies import require_admin
+from app.config import get_settings
+from app.core import request_context
+from app.core.client_ip import get_client_ip
+from app.core.logging import configure_logging, get_logger
+from app.core.request_id import RequestIDMiddleware
+from app.database import engine
+from app.security.siem_streaming import get_siem_streamer
 
 settings = get_settings()
 logger = get_logger(__name__)
@@ -204,6 +202,7 @@ app.include_router(vvb_router)
 app.include_router(orchestrator_router)
 app.include_router(whatsapp_router)
 app.include_router(audit_router)
+app.include_router(decisions_router)
 app.include_router(compliance_router)
 app.include_router(methodology_generator_router)
 app.include_router(methodology_templates_router)

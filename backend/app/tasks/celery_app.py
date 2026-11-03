@@ -9,7 +9,7 @@ celery_app = Celery(
     "carbonverify",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.validation_engine.tasks"],
+    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.tasks.lifecycle_jobs", "app.validation_engine.tasks"],
 )
 
 celery_app.conf.update(
@@ -34,6 +34,7 @@ celery_app.conf.update(
         # Validation and compliance tasks route to dedicated queues with DLQ semantics
         "app.validation_engine.tasks.*": {"queue": "validation"},
         "app.tasks.compliance_jobs.*": {"queue": "compliance"},
+        "app.tasks.lifecycle_jobs.*": {"queue": "default"},
     },
     task_default_exchange="default",
     task_default_queue="default",
@@ -95,6 +96,14 @@ celery_app.conf.update(
             "task": "app.tasks.pre_audit_jobs.re_audit_changed_projects",
             "schedule": 86400.0,  # daily
         },
+        "lifecycle-scan": {
+            "task": "app.tasks.lifecycle_jobs.lifecycle_scan",
+            "schedule": 300.0,  # every 5 minutes
+        },
+        "human-review-sla-sweep": {
+            "task": "app.tasks.lifecycle_jobs.human_review_sla_sweep",
+            "schedule": 3600.0,  # hourly
+        },
     },
 )
 
@@ -111,8 +120,8 @@ celery_app.conf.broker_transport_options = {
 @worker_shutdown.connect
 def _on_worker_shutdown(signal=None, sender=None, **kwargs):
     """Graceful shutdown: close persistent Playwright browser and clean up resources."""
-    from app.services.lead_intelligence.playwright_utils import close_persistent_browser
     from app.core.logging import get_logger
+    from app.services.lead_intelligence.playwright_utils import close_persistent_browser
 
     logger = get_logger(__name__)
     logger.info("celery_worker_shutdown", signal=signal, sender=str(sender))

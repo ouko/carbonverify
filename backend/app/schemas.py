@@ -1,12 +1,19 @@
-import uuid
 import re
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any, Literal
+import uuid
+from datetime import date, datetime
 from enum import Enum as PyEnum
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, model_validator
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.models import SourceTypeEnum
-
 
 # ─── Shared ───────────────────────────────────────────────────────────────────
 
@@ -1069,3 +1076,35 @@ class GeneratedMethodologyStatusUpdate(BaseModel):
         "draft", "under_review", "approved", "rejected", "revision_requested"
     ]
     rejection_reason: Optional[str] = Field(None, max_length=2000)
+
+
+# ─── Agent Decision Audit Trail ────────────────────────────────────────────────
+
+class AgentDecisionOut(ORMBase):
+    id: uuid.UUID
+    decision_id: uuid.UUID
+    project_id: Optional[uuid.UUID] = None
+    agent_type: str
+    action: str
+    confidence_score: Optional[float] = None
+    reasoning: str
+    input_summary: Optional[dict] = None
+    context_package: Optional[dict] = None
+    prev_hash: Optional[str] = None
+    record_hash: str
+    created_at: datetime
+    actor: str
+    review_queue_item_id: Optional[uuid.UUID] = None
+
+
+class AgentDecisionListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    decisions: List[AgentDecisionOut]
+
+
+class VerifyChainResponse(BaseModel):
+    valid: bool
+    checked: int
+    first_broken_id: Optional[uuid.UUID] = None
