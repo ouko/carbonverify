@@ -458,6 +458,30 @@ Celery configuration: [`backend/app/tasks/celery_app.py`](backend/app/tasks/cele
 | `scrape_registries` | Daily | Scrape carbon registries for leads |
 | `score_leads` | Weekly | Re-calculate stuck scores |
 | `check_lead_deadlines` | Daily | Alert on approaching crediting period ends |
+| `lifecycle_scan` | Every 5 min | Drive project state machines forward autonomously |
+| `human_review_sla_sweep` | Hourly | Auto-approve human-review items past 24h SLA |
+| `remediation_sweep` | Every 15 min | Re-run stale failed auto-remediations |
+| `dispatch_p0_escalations` | Every 60 s | Re-send undelivered P0 alerts (WhatsApp/SMS ≤60s) |
+| `send_p1_escalations` | Every 30 min | Dispatch P1 email/push escalations within 2h SLA |
+| `daily_escalation_digest` | Daily | Aggregate P2 + recent P0/P1 into operator digest |
+| `run_synthetic_validation` | Every 15 min | Run 3 synthetic E2E journeys + record health snapshot |
+| `check_methodology_updates` | Daily | Flag knowledge-base documents due for refresh |
+| `generate_weekly_learning_report` | Weekly | Persist agent calibration / retraining report |
+
+---
+
+## Autonomous Agent Layer
+
+Added 2026-11. Target operating model: **90% of workflows run without human touch, 9% queue for one-click approval, 1% escalate in real time.**
+
+- **Orchestration** (`backend/app/orchestrator/`): `KimiClawOrchestrator` dispatches the 7 agents below on lifecycle transitions. Confidence scoring routes every decision: ≥0.95 auto-advance (learned per-agent thresholds from the learning loop may raise this), 0.85–0.95 queues a `HumanReviewQueue` item with 24h SLA (auto-approved by `human_review_sla_sweep` if unactioned), <0.85 pauses and raises an escalation. `advance_project` walks states with a visited-state loop guard; `lifecycle_scan` drives it on a 5-minute beat.
+- **Agents** (`backend/app/agents/`): Ingestion (real upload validation, duplicate/out-of-range/stale detection), Calculation (fNRB/quantification/leakage/uncertainty engines + LLM plausibility check), Reporting (quality gates + draft completeness), VVB Liaison (registry polling + clarification drafting), Quality Control (statistical sampling, IQR outliers), Risk/Validation (additionality screening, red flags, conservative cap), Client Success (churn risk, upsell triggers). All use Kimi tool-calling (`KimiAPIClient.reason/chat_with_tools`) with deterministic heuristic fallback when no API key; every result carries `reasoning` + `evidence`.
+- **Decision audit** (`agent_decisions` table, merkle-chained SHA-256): every routing and human resolution is recorded with explainable reasoning; `GET /api/v1/audit/{decision_id}`, `GET /api/v1/audit/decisions`, `POST /api/v1/audit/verify-chain`.
+- **Self-healing** (`backend/app/remediation/`): shared `RemediationEngine` with 6 rule strategies (auto-correct, backoff+circuit-break, deadlock jitter retry, conservative fallback, interpolate/exclude, KB draft response). Every attempt logs before/after state hashes; 3 failed attempts escalate with the full hash-bearing failure chain. Orchestrator attempts automatic remediation on agent failure before routing.
+- **Escalations** (`backend/app/escalations/`): `EscalationEvent` priorities P0 (all channels, ≤60s), P1 (email+push, ≤2h), P2 (daily digest). Channel adapters (WhatsApp/SMS/email/in-app pubsub) are no-op-safe without credentials. APIs under `/api/v1/escalations/` incl. composite `health/score`.
+- **Continuous validation** (`backend/app/validation_engine/`): three synthetic E2E journeys (project developer, field enumerator offline→sync, calculation-anomaly recovery) run every 15 minutes with Merkle proofs anchored to Radix; `ValidationHealthSnapshot` scores the system (journey success 60% / remediation resolution 20% / escalation backlog 20%); a 7-day-below-90 streak blocks deployment via `scripts/pre_deploy_check.py`.
+- **Knowledge & learning** (`backend/app/knowledge/`, `backend/app/learning/`): `MethodologyKnowledgeBase` (chunked methodology documents, pluggable embeddings — deterministic local by default, OpenAI-compatible optional — cosine search, RAG answers with citations, `/api/v1/knowledge/*`); `AgentLearningLoop` tracks human overrides, computes per-agent calibration (override rate, confidence-bucket accuracy), generates weekly retraining reports, and feeds learned thresholds back into the orchestrator (`/api/v1/learning/*`).
+- **Operator UI**: Command Center gained `/command-center/escalations` (P0/P1/P2 inbox, acknowledge/resolve, delivery timeline) and `/command-center/health` (system score gauge + component breakdown + confidence trend); the review Inbox shows agent reasoning, confidence, and financial impact from the decision audit.
 
 ---
 

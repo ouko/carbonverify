@@ -56,6 +56,12 @@ carbonverify/
 │   │   ├── reports/                # Jinja2 + WeasyPrint
 │   │   ├── tasks/                  # Celery tasks
 │   │   ├── validation_engine/      # Workflow Validation Engine (orchestrator, proofs, synthetic actors, remediation)
+│   │   ├── agents/                 # 7 autonomous agents (ingestion, calculation, reporting, vvb_liaison, quality_control, validation/risk, client_success)
+│   │   ├── orchestrator/           # KimiClawOrchestrator, decision audit chain (merkle), pub/sub events
+│   │   ├── remediation/            # Shared self-healing RemediationEngine (6 rule strategies, hash-logged attempts)
+│   │   ├── escalations/            # P0/P1/P2 escalation events + channel adapters (WhatsApp/SMS/email/in-app)
+│   │   ├── knowledge/              # MethodologyKnowledgeBase (chunking, embeddings, cosine search, RAG)
+│   │   ├── learning/               # AgentLearningLoop (override tracking, calibration, weekly retraining reports)
 │   │   └── vvb_liaison/            # Registry clients
 │   ├── alembic/                    # DB migrations
 │   └── tests/                      # pytest suite (~318 tests)
@@ -98,7 +104,7 @@ carbonverify/
 - **Router pattern**: Each domain has its own `api/{domain}.py` router, included in `main.py`
 - **RBAC**: Use `Depends(require_viewer)` / `require_operator` / `require_admin` from `auth/rbac.py`, or `require_permission("users:read")` for granular checks. API key auth uses `get_current_user_or_api_key` which checks `user._api_key_scopes`
 - **Celery tasks**: Place in `tasks/{domain}_jobs.py`, include in `celery_app.py` `include` list
-- **Tests**: Use `pytest-asyncio`, `AsyncClient` from `httpx`, fixtures in `conftest.py`. Current count: ~318 tests
+- **Tests**: Use `pytest-asyncio`, `AsyncClient` from `httpx`, fixtures in `conftest.py`. Current count: ~620 tests. Coverage gate: `pytest tests/ --cov --cov-report=term-missing` ≥80% on the autonomy packages (see `.coveragerc`)
 
 ### Frontend (TypeScript / React)
 
@@ -187,6 +193,19 @@ The `app/validation_engine/` package provides an enterprise-grade autonomous QA 
 - **AI-led evaluation**: `ai_evaluation` step type calls the Kimi API to score workflow artifacts against a configurable `pass_threshold`; produces `ai_evaluation_request` and `ai_evaluation_response` proof artifacts
 - **AI application pipeline**: `application_intake`, `document_collection`, and `document_ai_classification` step types power the public applicant intake flow (`/apply` → `POST /applications` → `ai_application_pipeline` workflow template). Uploads after the first run auto re-queue the pipeline; gap analysis stores `gap_findings` on the application and emails the applicant when the missing-document set changes; document-complete applications (`pre_audit`) get a `human_review_queue` item (`item_type: application`) for auditor pick-up; see `docs/AI_APPLICATION_PIPELINE.md`
 - **API endpoints**: All under `/validation/*` — workflows, runs, steps, proofs, certificates, synthetic actors, escalations. Application intake endpoints under `/applications/*`
+- **Synthetic E2E journeys (continuous validation)**: `synthetic_journey` workflows (`synthetic_developer_journey`, `synthetic_enumerator_journey`, `synthetic_calc_anomaly_recovery` in `validation_engine/synthetic_journeys.py`) run every 15 min via the `run_synthetic_validation` beat task; `ValidationHealthSnapshot` rows score journey success (60%) + remediation resolution (20%) + escalation backlog (20%); a 7-consecutive-day score <90 blocks deployment (`scripts/pre_deploy_check.py`)
+
+### Autonomous Agent Layer (90/9/1)
+
+Added 2026-11. Every business process is owned by an AI agent; humans only approve queued judgment calls or handle escalations.
+
+- **Confidence routing** (single source of truth in `orchestrator/_handle_confidence_result` and `advance_project`): ≥0.95 auto-advance (per-agent learned thresholds from `app/learning` may raise this), 0.85–0.95 → `HumanReviewQueue` with 24h SLA (hourly `human_review_sla_sweep` auto-approves stale items), <0.85 → pause + `EscalationEvent`.
+- **Decision audit**: every routing/human action is an `AgentDecision` row (merkle-chained SHA-256 via `orchestrator/audit_chain.py`). Exposed at `GET /api/v1/audit/{decision_id}`. Never write agent audit records outside `record_decision`.
+- **Agent contract**: classes in `AGENT_REGISTRY` constructed as `cls(project_id, db_session)` with `execute(trigger, context) -> AgentResult`; `output_data` must always include `reasoning` (human-readable) and `evidence` (dict). LLM access via `BaseAgent.reason_with_llm` / `KimiAPIClient.reason()` — deterministic `{"_fallback": True}` when no `KIMI_API_KEY`; never raise on LLM failure.
+- **Self-healing**: `app/remediation/RemediationEngine.remediate(category, target_type, target_id, failing_state, ...)` — 6 strategies, injectable `attempt_fn`/`sleeper`/`draft_fn`, before/after state hashes per attempt, 3-strike escalation with full failure chain in `context_package`.
+- **Escalations**: `EscalationService.raise_escalation(...)` auto-derives priority from severity (≥0.9 P0, ≥0.7 P1, else P2). Channel adapters are no-op-safe without credentials; dispatch failures are recorded in `channels_sent`, never raised.
+- **New API prefixes**: `/api/v1/audit`, `/api/v1/remediation`, `/api/v1/escalations`, `/api/v1/knowledge`, `/api/v1/learning`, `/api/v1/validation/health`. The legacy `/audit` router coexists with `/api/v1/audit`.
+- **Acceptance tests** (must stay green; CI step "Success criteria" enforces): `tests/test_autonomous_e2e.py`, `tests/test_remediation_injection.py`, `tests/test_operator_scale.py`. Coverage gate: `pytest tests/ --cov --cov-report=term-missing` (`.coveragerc`) ≥80% on autonomy packages — requires `concurrency = greenlet,thread` for accurate async coverage.
 
 ### Celery Graceful Shutdown
 
