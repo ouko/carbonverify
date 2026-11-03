@@ -115,6 +115,12 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_TLS: bool = True
 
+    # Human escalation notifications (Phase 3) — empty means log-only adapters
+    ESCALATION_NOTIFY_EMAIL: str = ""  # comma-separated operator inboxes
+    ESCALATION_NOTIFY_WHATSAPP: str = ""  # E.164 operator number for WhatsApp alerts
+    ESCALATION_NOTIFY_SMS: str = ""  # E.164 operator number for SMS alerts
+    ESCALATION_SMS_WEBHOOK_URL: str = ""  # pluggable SMS provider HTTP hook
+
     # OAuth / SSO
     OAUTH_GOOGLE_CLIENT_ID: str = ""
     OAUTH_GOOGLE_CLIENT_SECRET: str = ""

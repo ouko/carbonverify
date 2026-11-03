@@ -9,7 +9,7 @@ celery_app = Celery(
     "carbonverify",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.tasks.lifecycle_jobs", "app.validation_engine.tasks"],
+    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.tasks.lifecycle_jobs", "app.tasks.escalation_jobs", "app.validation_engine.tasks"],
 )
 
 celery_app.conf.update(
@@ -35,6 +35,7 @@ celery_app.conf.update(
         "app.validation_engine.tasks.*": {"queue": "validation"},
         "app.tasks.compliance_jobs.*": {"queue": "compliance"},
         "app.tasks.lifecycle_jobs.*": {"queue": "default"},
+        "app.tasks.escalation_jobs.*": {"queue": "default"},
     },
     task_default_exchange="default",
     task_default_queue="default",
@@ -103,6 +104,23 @@ celery_app.conf.update(
         "human-review-sla-sweep": {
             "task": "app.tasks.lifecycle_jobs.human_review_sla_sweep",
             "schedule": 3600.0,  # hourly
+        },
+        "dispatch-p0-escalations": {
+            "task": "app.tasks.escalation_jobs.dispatch_p0_escalations",
+            "schedule": 60.0,  # every minute
+        },
+        "send-p1-escalations": {
+            "task": "app.tasks.escalation_jobs.send_p1_escalations",
+            "schedule": 1800.0,  # every 30 minutes
+        },
+        "daily-escalation-digest": {
+            "task": "app.tasks.escalation_jobs.daily_escalation_digest",
+            "schedule": 86400.0,  # daily
+        },
+        # Shared remediation engine sweep (self-healing): re-run stale failures.
+        "remediation-sweep": {
+            "task": "app.tasks.lifecycle_jobs.remediation_sweep",
+            "schedule": 900.0,  # every 15 minutes
         },
     },
 )

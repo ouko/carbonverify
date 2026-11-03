@@ -12,6 +12,7 @@ to the session fixture via the ``patch_db_context`` conftest fixture.
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Dict
 
 from sqlalchemy import select
 
@@ -160,4 +161,81 @@ def human_review_sla_sweep(self):
         return result
     except Exception as exc:
         logger.error("human_review_sla_sweep_failed", error=str(exc))
+        raise self.retry(exc=exc, countdown=300)
+
+
+REMEDIATION_SWEEP_MAX_AGE = timedelta(hours=1)
+REMEDIATION_SWEEP_BATCH = 50
+
+
+@celery_app.task(bind=True, max_retries=3)
+def remediation_sweep(self):
+    """Re-run failed remediations whose latest attempt is older than 1 hour.
+
+    Each stale target gets a fresh attempt budget (``attempts_so_far=0``);
+    the failing state is recovered from the last attempt's persisted detail.
+    Bounded at 50 targets per run. The engine itself escalates targets whose
+    fresh round also fails.
+    """
+    from app.remediation.engine import RemediationEngine
+    from app.remediation.models import RemediationAttempt
+
+    async def _sweep():
+        reruns = 0
+        async with app_database.get_db_context() as db:
+            cutoff = datetime.now(timezone.utc) - REMEDIATION_SWEEP_MAX_AGE
+            result = await db.execute(
+                select(RemediationAttempt)
+                .where(
+                    RemediationAttempt.status == "failed",
+                    RemediationAttempt.created_at < cutoff,
+                )
+                .order_by(RemediationAttempt.created_at.desc())
+                .limit(REMEDIATION_SWEEP_BATCH)
+            )
+            rows = result.scalars().all()
+
+            # Deduplicate to the most recent failed attempt per target.
+            latest_by_target: Dict[tuple, RemediationAttempt] = {}
+            for row in rows:
+                key = (row.rule_key, row.target_type, row.target_id)
+                latest_by_target.setdefault(key, row)
+
+            for (rule_key, target_type, target_id), row in latest_by_target.items():
+                failing_state = (row.detail or {}).get("failing_state")
+                if not isinstance(failing_state, dict):
+                    logger.warning(
+                        "remediation_sweep_skipped",
+                        rule_key=rule_key,
+                        target_type=target_type,
+                        target_id=target_id,
+                        reason="no failing_state snapshot on attempt",
+                    )
+                    continue
+                engine = RemediationEngine(db)
+                outcome = await engine.remediate(
+                    rule_key,
+                    target_type,
+                    target_id,
+                    failing_state,
+                    project_id=row.project_id,
+                    attempts_so_far=0,
+                )
+                reruns += 1
+                logger.info(
+                    "remediation_sweep_rerun",
+                    rule_key=rule_key,
+                    target_type=target_type,
+                    target_id=target_id,
+                    status=outcome.status,
+                )
+
+        return {"stale_targets": len(latest_by_target), "rerun": reruns}
+
+    try:
+        result = run_async(_sweep())
+        logger.info("remediation_sweep_completed", **result)
+        return result
+    except Exception as exc:
+        logger.error("remediation_sweep_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=300)

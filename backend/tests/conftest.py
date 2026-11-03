@@ -52,8 +52,9 @@ class UUIDAsString(TypeDecorator):
 # Patch PostgreSQL-specific types for SQLite compatibility
 import app.models as models_module  # noqa: E402
 import app.validation_engine.models as validation_models_module  # noqa: E402
+import app.escalations.models as escalation_models_module  # noqa: E402
 
-for models_mod in [models_module, validation_models_module]:
+for models_mod in [models_module, validation_models_module, escalation_models_module]:
     for attr_name in dir(models_mod):
         obj = getattr(models_mod, attr_name)
         if isinstance(obj, type) and hasattr(obj, '__tablename__'):

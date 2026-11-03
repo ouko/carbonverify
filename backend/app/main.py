@@ -25,6 +25,7 @@ from app.api.corporate import router as corporate_router
 from app.api.dashboard import router as dashboard_router
 from app.api.data_sources import router as data_sources_router
 from app.api.decisions import router as decisions_router
+from app.api.escalations import router as escalations_router
 from app.api.health import router as health_router
 from app.api.leads import router as leads_router
 from app.api.methodology_generator import router as methodology_generator_router
@@ -33,6 +34,7 @@ from app.api.oauth import router as oauth_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.projects import router as projects_router
 from app.api.reports import router as reports_router
+from app.api.remediation import router as remediation_router
 from app.api.review_queue import router as review_queue_router
 from app.api.tokenization import router as tokenization_router
 from app.api.uploads import router as uploads_router
@@ -203,6 +205,7 @@ app.include_router(orchestrator_router)
 app.include_router(whatsapp_router)
 app.include_router(audit_router)
 app.include_router(decisions_router)
+app.include_router(escalations_router)
 app.include_router(compliance_router)
 app.include_router(methodology_generator_router)
 app.include_router(methodology_templates_router)
@@ -215,6 +218,9 @@ app.include_router(applications_router)
 app.include_router(admin_router)
 app.include_router(api_keys_router)
 app.include_router(oauth_router)
+# Shared self-healing remediation engine (added separately from the parallel
+# router work above — keep this include in its own block).
+app.include_router(remediation_router)
 
 
 def _json_safe(value: Any) -> Any:

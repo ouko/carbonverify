@@ -349,6 +349,10 @@ class KimiClawOrchestrator:
             decision=tier,
         )
 
+        # Self-healing: one automatic remediation pass for obvious failure
+        # categories before normal routing. Defensive by design — never breaks dispatch.
+        await self._try_automatic_remediation(project_id, agent_type, agent_run_id, result)
+
         if tier == "auto_advance":
             logger.info("orchestrator_auto_advance", project_id=str(project_id), agent_type=agent_type)
             # Trigger next state automatically
@@ -439,6 +443,106 @@ class KimiClawOrchestrator:
                 "priority_score": round(queue_item.priority_score, 2) if queue_item.priority_score else None,
                 "sla_deadline": queue_item.sla_deadline.isoformat() if queue_item.sla_deadline else None,
             })
+
+            # Phase 3: also raise an EscalationEvent for the realtime
+            # notification path (P0 for CRITICAL priority-5, else P1).
+            try:
+                from app.escalations.service import PRIORITY_P0, EscalationService
+
+                escalation_service = EscalationService(self.db)
+                await escalation_service.raise_escalation(
+                    source=f"agent:{agent_type}",
+                    title=f"{agent_type} agent requires human attention",
+                    detail=reason,
+                    context_package={
+                        "context": context,
+                        "output_data": result.output_data,
+                        "agent_run_id": str(agent_run_id),
+                        "queue_item_id": str(queue_item.id),
+                    },
+                    priority=PRIORITY_P0 if priority == 5 else 1,
+                    project_id=project_id,
+                    severity_score=round(max(0.0, min(1.0, 1.0 - score)), 4),
+                )
+            except Exception as exc:  # noqa: BLE001 — escalation must not break dispatch
+                logger.error(
+                    "escalation_event_creation_failed",
+                    project_id=str(project_id),
+                    agent_type=agent_type,
+                    error=str(exc),
+                )
+
+    async def _try_automatic_remediation(
+        self,
+        project_id: uuid.UUID,
+        agent_type: str,
+        agent_run_id: uuid.UUID,
+        result: AgentResult,
+    ) -> None:
+        """Attempt one automatic remediation pass for obvious failure categories.
+
+        Errors mentioning timeouts/rate limits map to ``api_timeout_rate_limit``;
+        anomaly evidence maps to ``calculation_anomaly``; everything else is
+        skipped. Fully defensive: any failure is logged and swallowed so agent
+        dispatch is never broken by the remediation engine.
+        """
+        try:
+            has_errors = bool(result.errors)
+            low_confidence = result.confidence_score < 0.85
+            if not (has_errors or low_confidence):
+                return
+
+            category: Optional[str] = None
+            error_text = " ".join(str(e) for e in result.errors).lower()
+            if "timeout" in error_text or "rate limit" in error_text or "429" in error_text:
+                category = "api_timeout_rate_limit"
+            else:
+                evidence = result.evidence or {}
+                if any(evidence.get(key) for key in ("anomalies", "red_flags", "flags")):
+                    category = "calculation_anomaly"
+            if category is None:
+                return
+
+            from app.remediation.engine import RemediationEngine
+
+            engine = RemediationEngine(self.db)
+            failing_state: Dict[str, Any] = {
+                "agent_type": agent_type,
+                "agent_run_id": str(agent_run_id),
+                "errors": list(result.errors),
+                "confidence_score": result.confidence_score,
+                "evidence": result.evidence,
+            }
+            if category == "api_timeout_rate_limit":
+                failing_state["service"] = "kimi_api"
+            outcome = await engine.remediate(
+                category,
+                target_type="agent_run",
+                target_id=str(agent_run_id),
+                failing_state=failing_state,
+                project_id=project_id,
+            )
+            logger.info(
+                "orchestrator_auto_remediation",
+                project_id=str(project_id),
+                agent_type=agent_type,
+                category=category,
+                status=outcome.status,
+                attempts_used=outcome.attempts_used,
+            )
+            await self.event_logger.log_confidence_check(
+                project_id=project_id,
+                agent_type=agent_type,
+                confidence_score=result.confidence_score,
+                decision=f"auto_remediation:{category}:{outcome.status}",
+            )
+        except Exception as exc:  # noqa: BLE001 — remediation must never break dispatch
+            logger.warning(
+                "orchestrator_auto_remediation_failed",
+                project_id=str(project_id),
+                agent_type=agent_type,
+                error=str(exc),
+            )
 
     @staticmethod
     def _decision_reasoning(
