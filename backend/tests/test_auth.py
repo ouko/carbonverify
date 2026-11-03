@@ -271,7 +271,6 @@ class TestMFABackupCodes:
     @pytest.mark.asyncio
     async def test_login_with_backup_code(self, client, test_user, db_session):
         import pyotp
-        import hashlib
         secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret)
         code = totp.now()
@@ -315,7 +314,6 @@ class TestMFABackupCodes:
     @pytest.mark.asyncio
     async def test_backup_code_consumed(self, client, test_user, db_session):
         import pyotp
-        import hashlib
         secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret)
         code = totp.now()

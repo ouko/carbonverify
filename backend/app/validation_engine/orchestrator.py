@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -27,7 +27,6 @@ from app.validation_engine.proofs import ProofGenerator
 from app.validation_engine.synthetic import SyntheticActorFactory
 from app.validation_engine.executors import StepExecutorRegistry
 from app.validation_engine.remediation import RemediationEngine
-from app.database import AsyncSessionLocal
 
 
 def _canonical_json(data: Any) -> str:

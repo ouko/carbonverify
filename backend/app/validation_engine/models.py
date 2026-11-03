@@ -543,7 +543,8 @@ class ValidationHealthSnapshot(Base):
 
     Appended every synthetic-validation cycle (15 minutes). The
     ``consecutive_below_threshold`` counter feeds the deploy gate: a streak of
-    7 or more snapshots below the threshold blocks deployment.
+    7 or more UTC calendar days whose worst (minimum) snapshot score is below
+    the threshold blocks deployment.
     """
 
     __tablename__ = "validation_health_snapshots"
@@ -557,7 +558,8 @@ class ValidationHealthSnapshot(Base):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     # Per-journey run statistics: {"journey_name": {"completed": n, "failed": n}}
     run_stats: Mapped[dict] = mapped_column(PortableJSON, default=dict, nullable=False)
-    # Running count of consecutive snapshots below the health threshold (90)
+    # Running count of consecutive UTC days (worst daily snapshot score) below
+    # the health threshold (90)
     consecutive_below_threshold: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False

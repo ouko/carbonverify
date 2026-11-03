@@ -1,6 +1,6 @@
 """Pydantic schemas for JSON-defined workflow graphs and API payloads."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 

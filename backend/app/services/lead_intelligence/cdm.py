@@ -5,15 +5,17 @@ Incapsula bot protection. Playwright with non-headless mode is required
 to bypass the challenge and submit the search form.
 """
 
-import time
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import TYPE_CHECKING, List, Dict, Any
 
 from bs4 import BeautifulSoup
 
 from app.services.lead_intelligence.base import BaseRegistryScraper
 from app.core.logging import get_logger
 from app.config import get_settings
+
+if TYPE_CHECKING:
+    from app.models import Lead
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -106,10 +108,8 @@ def _parse_cdm_results(html: str) -> List[Dict[str, Any]]:
         # CDM result row format:
         # [Registered date, Title, Host Parties, Other Parties, Methodology, Reductions, Ref]
         try:
-            registered_date = texts[0]
             title = texts[1]
             host_parties = texts[2]
-            other_parties = texts[3]
             methodology = texts[4]
             reductions = texts[5]
             ref = texts[6] if len(texts) > 6 else ""
@@ -152,8 +152,11 @@ def _scrape_cdm_with_playwright(country: str) -> List[Dict[str, Any]]:
     Incapsula blocks headless browsers, so we use headless=False.
     Uses the persistent browser singleton to avoid ~40s launch cost.
     """
+    import importlib.util
+
     try:
-        from playwright_stealth import Stealth
+        if importlib.util.find_spec("playwright_stealth") is None:
+            raise ImportError("playwright_stealth not installed")
         from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
     except ImportError:
         logger.warning("playwright_not_installed")
@@ -241,8 +244,7 @@ class CDMScraper(BaseRegistryScraper):
             return {"status": "demo", "message": "Demo mode active — set LEAD_SCRAPER_MODE=live to enable real scraping"}
 
         try:
-            from playwright_stealth import Stealth
-            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
+            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser, _new_stealth_page
 
             browser = _get_or_launch_browser(headless=False)
             page = _new_stealth_page(browser)

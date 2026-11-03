@@ -198,8 +198,6 @@ class TestApiKeyScopeValidation:
 
     @pytest.mark.asyncio
     async def test_expired_api_key_rejected(self, client, admin_user, db_session):
-        import hashlib
-        import secrets
         from datetime import datetime, timezone, timedelta
         from app.models import ApiKey
 

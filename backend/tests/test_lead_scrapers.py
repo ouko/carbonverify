@@ -31,8 +31,8 @@ class TestVerraScraper:
         scraper = VerraScraper()
         leads = scraper.scrape(country="Kenya")
         assert len(leads) > 0
-        assert all(l["registry_source"] == "verra" for l in leads)
-        assert all("project_name" in l for l in leads)
+        assert all(lead["registry_source"] == "verra" for lead in leads)
+        assert all("project_name" in lead for lead in leads)
 
     def test_scrape_filter_by_country(self):
         scraper = VerraScraper()
@@ -45,7 +45,7 @@ class TestGoldStandardScraper:
         scraper = GoldStandardScraper()
         leads = scraper.scrape(country="Kenya")
         assert len(leads) > 0
-        assert all(l["registry_source"] == "gold_standard" for l in leads)
+        assert all(lead["registry_source"] == "gold_standard" for lead in leads)
 
 
 class TestCDMScraper:
@@ -53,7 +53,7 @@ class TestCDMScraper:
         scraper = CDMScraper()
         leads = scraper.scrape(country="Kenya")
         assert len(leads) > 0
-        assert all(l["registry_source"] == "cdm" for l in leads)
+        assert all(lead["registry_source"] == "cdm" for lead in leads)
 
 
 class TestFactory:

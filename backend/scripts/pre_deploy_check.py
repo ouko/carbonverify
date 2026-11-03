@@ -4,9 +4,10 @@
 Checks deployment readiness against a running API:
 
 1. ``GET /api/v1/escalations/health/score`` — overall score must be >= 90.
-2. ``GET /api/v1/validation/health`` — no 7-consecutive-day-below-90 streak in
-   validation health snapshots, and every synthetic journey passed in the last
-   24 hours (at least one completed run, zero failed runs per journey).
+2. ``GET /api/v1/validation/health`` — no 7-consecutive-DAY below-90 streak in
+   validation health (each UTC calendar day scores its worst snapshot; the
+   streak walks those daily scores), and every synthetic journey passed in the
+   last 24 hours (at least one completed run, zero failed runs per journey).
 
 Usage:
     python scripts/pre_deploy_check.py [--base-url URL] [--token TOKEN]
@@ -31,6 +32,7 @@ import argparse
 import os
 import subprocess
 import sys
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -51,6 +53,45 @@ ACCEPTANCE_TEST_FILES = [
 ]
 
 
+def _daily_min_scores(history: List[Dict[str, Any]]) -> Dict[date, int]:
+    """Worst (minimum) snapshot score per UTC calendar day.
+
+    Snapshots arrive every 15 minutes; the deploy gate is daily, so each day
+    is scored by its minimum snapshot score (conservative: one bad window
+    marks the whole day below threshold).
+    """
+    scores: Dict[date, int] = {}
+    for snapshot in history:
+        created_at = snapshot.get("created_at")
+        if not created_at:
+            continue
+        timestamp = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        day = timestamp.astimezone(UTC).date()
+        score = int(snapshot.get("score"))
+        if day not in scores or score < scores[day]:
+            scores[day] = score
+    return scores
+
+
+def daily_below_threshold_streak(history: List[Dict[str, Any]]) -> int:
+    """Consecutive UTC days (worst daily score) below ``SCORE_THRESHOLD``,
+    ending today. Today counts only when a snapshot for it exists; if the
+    latest day's score is at/above the threshold the streak is 0."""
+    scores = _daily_min_scores(history)
+    today = datetime.now(UTC).date()
+    day_score = scores.get(today)
+    if day_score is None or day_score >= SCORE_THRESHOLD:
+        return 0
+    streak = 0
+    day = today
+    while scores.get(day) is not None and scores[day] < SCORE_THRESHOLD:
+        streak += 1
+        day -= timedelta(days=1)
+    return streak
+
+
 def evaluate_gate(
     system_health: Optional[Dict[str, Any]],
     validation_health: Optional[Dict[str, Any]],
@@ -68,17 +109,18 @@ def evaluate_gate(
             f"overall health score {score} is below the required {SCORE_THRESHOLD}"
         )
 
-    # 2. Validation snapshots: 7-day below-threshold streak blocks deploys.
+    # 2. Validation health: 7 consecutive below-threshold DAYS block deploys.
+    # Streak is computed from daily worst-of-day scores, not raw snapshots.
     latest = (validation_health or {}).get("latest")
     history = (validation_health or {}).get("history") or []
     if not latest and not history:
         reasons.append("no validation health snapshots recorded")
     else:
-        streak = int((latest or {}).get("consecutive_below_threshold") or 0)
+        streak = daily_below_threshold_streak(history)
         if streak >= STREAK_LIMIT:
             reasons.append(
                 f"validation health has been below {SCORE_THRESHOLD} for "
-                f"{streak} consecutive snapshots (limit {STREAK_LIMIT})"
+                f"{streak} consecutive days (limit {STREAK_LIMIT})"
             )
 
     # 3. Synthetic journeys must all be passing in the last 24 hours.
@@ -119,6 +161,17 @@ def selftest() -> int:
     """Validate the checker's logic against stubbed data (no server needed)."""
     failures: List[str] = []
 
+    def _history(daily_scores: List[int]) -> List[Dict[str, Any]]:
+        """Snapshot history with one noon snapshot per day, ending today."""
+        today = datetime.now(UTC).date()
+        history = []
+        for offset, score in enumerate(daily_scores):
+            day = today - timedelta(days=len(daily_scores) - 1 - offset)
+            history.append(
+                {"score": score, "created_at": f"{day.isoformat()}T12:00:00+00:00"}
+            )
+        return history
+
     journeys_pass = {
         "synthetic_developer_journey": {"completed": 3, "failed": 0},
         "synthetic_enumerator_journey": {"completed": 3, "failed": 0},
@@ -128,7 +181,7 @@ def selftest() -> int:
         {"score": 95, "components": {}},
         {
             "latest": {"score": 95, "consecutive_below_threshold": 2},
-            "history": [],
+            "history": _history([95, 95, 95]),
             "journeys": journeys_pass,
         },
     )
@@ -139,16 +192,42 @@ def selftest() -> int:
     if not any("below the required" in r for r in low_score):
         failures.append("low overall score was not flagged")
 
+    # 7 consecutive days below 90 (worst daily score) must block, even
+    # though only 7 snapshots exist (one per day).
     streak_blocked = evaluate_gate(
         {"score": 95, "components": {}},
         {
             "latest": {"score": 70, "consecutive_below_threshold": 7},
-            "history": [],
+            "history": _history([70, 70, 70, 70, 70, 70, 70]),
             "journeys": journeys_pass,
         },
     )
-    if not any("consecutive snapshots" in r for r in streak_blocked):
-        failures.append("7-snapshot below-threshold streak was not flagged")
+    if not any("consecutive days" in r for r in streak_blocked):
+        failures.append("7-day below-threshold streak was not flagged")
+
+    # A single healthy day (today >= 90) resets the streak.
+    streak_reset = evaluate_gate(
+        {"score": 95, "components": {}},
+        {
+            "latest": {"score": 95, "consecutive_below_threshold": 0},
+            "history": _history([70, 70, 70, 70, 70, 70, 95]),
+            "journeys": journeys_pass,
+        },
+    )
+    if streak_reset:
+        failures.append(f"expected streak reset to pass, got: {streak_reset}")
+
+    # Six bad days is under the limit and must not block.
+    six_days = evaluate_gate(
+        {"score": 95, "components": {}},
+        {
+            "latest": {"score": 70, "consecutive_below_threshold": 6},
+            "history": _history([70, 70, 70, 70, 70, 70]),
+            "journeys": journeys_pass,
+        },
+    )
+    if six_days:
+        failures.append(f"expected 6-day streak to pass, got: {six_days}")
 
     failed_journey = {**journeys_pass, "synthetic_enumerator_journey": {"completed": 2, "failed": 1}}
     journey_blocked = evaluate_gate(

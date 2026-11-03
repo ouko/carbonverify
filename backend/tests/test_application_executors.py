@@ -366,7 +366,6 @@ async def test_gap_notification_sent_when_gaps_resolve(
 ):
     mock_email = _mock_email_service(monkeypatch)
 
-    from app.models import Application
     from app.validation_engine.executors import DocumentAiClassificationExecutor
     from app.validation_engine.schemas import DocumentAiClassificationConfig
     from app.validation_engine.models import ValidationRun

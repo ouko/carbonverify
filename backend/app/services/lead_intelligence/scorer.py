@@ -1,6 +1,6 @@
 """Stuck-ness scoring algorithm for carbon registry leads."""
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
 from app.core.logging import get_logger

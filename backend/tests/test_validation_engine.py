@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core.encryption import compute_searchable_hash
@@ -19,13 +18,10 @@ from app.validation_engine.models import (
     HumanEscalation,
     RemediationAction,
     RemediationStatus,
-    SyntheticActor,
     SyntheticActorType,
     ValidationProof,
     ValidationRemediation,
     ValidationRun,
-    ValidationRunTransition,
-    ValidationStepExecution,
     ValidationWorkflow,
     WorkflowRunStatus,
     WorkflowStepType,

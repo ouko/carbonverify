@@ -47,3 +47,36 @@ Already exists and is reused, not rebuilt:
 - New-code coverage: `pytest --cov=app.agents --cov=app.orchestrator --cov=app.services.remediation --cov=app.services.escalation --cov=app.knowledge --cov-report=term-missing` ≥80% on each new module group.
 - Frontend: `cd frontend && npm run lint && npx tsc --noEmit && npm test && npm run build`
 - Success criteria proved by: `tests/test_autonomous_e2e.py` (full journey no-touch), `tests/test_remediation_injection.py` (fault injection, assert >85% auto-resolved, zero data loss), validation health score endpoint reporting >90.
+
+---
+
+## Execution record (2026-11-03)
+
+**Shipped** — commits `0ac7821..5fb93c5` (5 commits), plus follow-up `924c419` (security/lint audit remediation) on the same day:
+
+| Plan phase | Commit | Status |
+|------------|--------|--------|
+| P1a decision audit + lifecycle driver | (folded into a127e9f/4fb2c8b per feature) | ✅ Shipped: `agent_decisions` merkle chain (`app/orchestrator/audit_chain.py`), `/api/v1/audit/{decision_id}` + `/decisions` + `/verify-chain` (`app/api/decisions.py`), `lifecycle_scan` beat (5 min), `human_review_sla_sweep` (hourly, auto-approves stale priority ≤3 items) |
+| P1b Kimi tool-calling agents | `d947222` | ✅ Shipped: `KimiAPIClient.chat_with_tools`, 7 real agent implementations with structured `reasoning` + `evidence`, deterministic `{"_fallback": true}` when no `KIMI_API_KEY` |
+| P2 shared remediation | `a127e9f` | ✅ Shipped as `app/remediation/` (not `app/services/remediation.py`): 6 rule strategies, hash-logged before/after attempts, 3-strike escalation, auto-remediation hook in dispatch, `remediation-sweep` beat, `/api/v1/remediation/*` |
+| P3 escalations + Command Center UI | `4fb2c8b` | ✅ Shipped as `app/escalations/` + `app/tasks/escalation_jobs.py`: P0/P1/P2 priorities, WhatsApp/SMS/email/in-app adapters (no-op-safe), P0 60s redispatch + P1 2h SLA + daily digest beat tasks, `/command-center/escalations`, `/command-center/health` |
+| P4 continuous validation + deploy gate | `4fb2c8b` | ✅ Shipped: 3 synthetic journeys (`validation_engine/synthetic_journeys.py`), 15-min `run-synthetic_validation` beat, `ValidationHealthSnapshot` (60/20/20 weights, threshold 90), `backend/scripts/pre_deploy_check.py`, CI "Success criteria" + "Deploy-gate self-test" steps |
+| P5 knowledge base + learning loop | `4fb2c8b` | ✅ Shipped as `app/knowledge/` + `app/learning/`: chunked JSONB embeddings with deterministic local embedder (OpenAI-compatible override), RAG query with citations, weekly retraining report beat, calibration + overrides endpoints, learned thresholds fed back into orchestrator |
+| Verification | `2b00844` | ✅ Shipped: `tests/test_autonomous_e2e.py`, `tests/test_remediation_injection.py`, `tests/test_operator_scale.py`, `backend/.coveragerc` (≥80% gate, greenlet/thread concurrency) |
+
+**Measured results (verified 2026-11-03, at HEAD `924c419`):**
+
+- Full backend suite: **621 passed, 9 skipped** (630 collected; clean run without coverage). Coverage-gated run: 638 passed / 1 flaky failure (`test_e2e_journeys.py::test_project_onboarding_journey_over_http`, passes in isolation — flake under coverage instrumentation).
+- Coverage on the gated autonomy scope: **93%** total (`pytest tests/ --cov`), ≥80% on every package; lowest packages: `app/tasks/lifecycle_jobs.py` 82%, `app/tasks/validation_jobs.py` 83%, `app/remediation/rules.py` 90%, `app/learning/service.py` 92%.
+- Acceptance suite (CI "Success criteria") green; deploy-gate `--offline-selftest` green.
+
+**Deviations from the plan worth noting:**
+
+1. Auto-advance is driven by the `lifecycle_scan` beat task (+ `advance_project_task`) rather than the orchestrator consuming its own `auto_advance_ready` events; loop protection is the visited-state set + `max_steps`, and `lifecycle_scan` only considers projects touched in the last 7 days.
+2. The "7-day below-90" deploy block from the planning discussions is implemented as **7 consecutive below-threshold snapshots** (snapshots every 15 minutes), not 7 days — `STREAK_LIMIT = 7` in `validation_engine/health.py`.
+3. Knowledge-base documents are ingested via the API only; `check-methodology-updates` is a stub-safe daily check, not a scraper.
+4. Decision-audit API landed in `app/api/decisions.py` (prefix `/api/v1/audit`); the legacy hash-chain audit router remains at `/audit/*`.
+5. Changelog initially described an "OrchestratorAgent" driver and "620 total tests"; corrected to the `lifecycle_scan` driver and 621 passing / 630 collected during the documentation audit.
+6. No `app/services/remediation.py` / `app/services/escalation.py` — both are top-level packages per AGENTS.md structure.
+
+**Docs added/updated with this work:** `README.md` (autonomy section + `/api/v1` endpoint groups), `docs/AUTONOMOUS_PLATFORM.md` (new operator runbook), `docs/WORKFLOW_VALIDATION_ENGINE.md` (continuous validation section), `docs/DEPLOYMENT.md` + `infrastructure/docs/DEPLOYMENT.md` (escalation/embedder/deploy-gate env vars + full beat schedule), `.env.example` (missing autonomy variables), `ARCHITECTURE.md` / `CHANGELOG.md` / `AGENTS.md` accuracy fixes.

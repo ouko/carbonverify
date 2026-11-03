@@ -7,7 +7,7 @@ attempt to access project data; falls back to demo data when blocked.
 
 import time
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
 
 import httpx
 from bs4 import BeautifulSoup
@@ -15,6 +15,9 @@ from bs4 import BeautifulSoup
 from app.services.lead_intelligence.base import BaseRegistryScraper
 from app.core.logging import get_logger
 from app.config import get_settings
+
+if TYPE_CHECKING:
+    from app.models import Lead
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -111,8 +114,11 @@ def _scrape_gold_standard_with_playwright(country: str) -> List[Dict[str, Any]]:
     Playwright navigates the public project listing page as a fallback.
     Uses the persistent browser singleton to avoid ~40s launch cost.
     """
+    import importlib.util
+
     try:
-        from playwright_stealth import Stealth
+        if importlib.util.find_spec("playwright_stealth") is None:
+            raise ImportError("playwright_stealth not installed")
         from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
     except ImportError:
         logger.warning("playwright_not_installed")
@@ -298,8 +304,7 @@ class GoldStandardScraper(BaseRegistryScraper):
 
         # Try Playwright health check
         try:
-            from playwright_stealth import Stealth
-            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser
+            from app.services.lead_intelligence.playwright_utils import _get_or_launch_browser, _new_stealth_page
 
             browser = _get_or_launch_browser(headless=False)
             page = _new_stealth_page(browser)

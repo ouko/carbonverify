@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.services.clamav_scanner import ClamAVScanner, ScanStatus, ScanResult
+from app.services.clamav_scanner import ClamAVScanner, ScanStatus
 
 
 class TestClamAVScanner:

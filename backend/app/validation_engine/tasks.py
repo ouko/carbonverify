@@ -29,10 +29,10 @@ def execute_validation_run(self, run_id: str):
     to COMPLETED or FAILED, including proof generation and Radix anchoring.
     """
     import asyncio
-    return asyncio.run(_execute_validation_run_async(run_id))
+    return asyncio.run(_execute_validation_run_async(self, run_id))
 
 
-async def _execute_validation_run_async(run_id: str):
+async def _execute_validation_run_async(self, run_id: str):
     async with AsyncSessionLocal() as db:
         try:
             result = await db.execute(
@@ -82,10 +82,10 @@ def anchor_run_to_radix(self, run_id: str):
     from the main workflow execution.
     """
     import asyncio
-    return asyncio.run(_anchor_run_async(run_id))
+    return asyncio.run(_anchor_run_async(self, run_id))
 
 
-async def _anchor_run_async(run_id: str):
+async def _anchor_run_async(self, run_id: str):
     async with AsyncSessionLocal() as db:
         try:
             result = await db.execute(
@@ -125,7 +125,6 @@ def cleanup_archived_runs(days: int = 30):
 
 async def _cleanup_archived_async(days: int):
     async with AsyncSessionLocal() as db:
-        from sqlalchemy import func
         from app.validation_engine.models import ValidationProof, ValidationRunTransition, ValidationStepExecution
         from app.services.s3 import get_s3_client
         from app.config import get_settings

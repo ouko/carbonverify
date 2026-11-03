@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
-  ShieldAlert, CheckCircle, XCircle, Clock, CheckCheck, Send, Filter,
+  ShieldAlert, ShieldCheck, CheckCircle, XCircle, Clock, CheckCheck, Send, Filter,
 } from 'lucide-react'
 import {
   useEscalations,
@@ -40,6 +40,12 @@ function formatDuration(seconds: number | null) {
   return `${(seconds / 3600).toFixed(1)}h`
 }
 
+/** Extract a human-readable message from an Axios/React Query error without swallowing it. */
+function errorMessage(error: unknown): string {
+  const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+  return detail || (error as Error)?.message || 'Unknown error'
+}
+
 function ContextJson({ data }: { data: Record<string, unknown> }) {
   const entries = Object.entries(data || {})
   if (entries.length === 0) return <p className="text-xs text-surface-400">No context attached</p>
@@ -61,7 +67,10 @@ export function EscalationsPage() {
   const [priorityTab, setPriorityTab] = useState<'all' | 0 | 1 | 2>('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Local copy of the selected escalation (InboxPage localItems pattern) so the
+  // detail panel does not snap shut when polling/WebSocket refetch moves the
+  // item out of the filtered server-side list after ack/resolve.
+  const [selected, setSelected] = useState<EscalationEvent | null>(null)
   const [resolving, setResolving] = useState(false)
   const [resolutionNotes, setResolutionNotes] = useState('')
 
@@ -77,20 +86,40 @@ export function EscalationsPage() {
   useCommandWebSocket()
 
   const items = data?.items || []
-  const sources = Array.from(new Set(items.map((e) => e.source))).sort()
+  // Accumulate sources across refetches so the dropdown does not shrink to the
+  // sources present in the currently filtered page of items.
+  const seenSources = useRef<Set<string>>(new Set())
+  items.forEach((e) => seenSources.current.add(e.source))
+  const sources = Array.from(seenSources.current).sort()
   const filtered = sourceFilter === 'all'
     ? items
     : items.filter((e) => e.source === sourceFilter)
-  const selected: EscalationEvent | null = items.find((e) => e.id === selectedId) || null
+  const selectedInList = selected !== null && items.some((e) => e.id === selected.id)
+
+  // Keep the local copy in sync with server data while the item is in the list.
+  useEffect(() => {
+    if (!selected) return
+    const fresh = items.find((e) => e.id === selected.id)
+    if (fresh && fresh !== selected) setSelected(fresh)
+  }, [items, selected])
 
   const handleAcknowledge = (id: string) => {
-    acknowledgeMutation.mutate(id)
+    acknowledgeMutation.mutate(id, {
+      onSuccess: (updated) => {
+        if (selected?.id === id) setSelected(updated)
+      },
+    })
   }
 
   const handleResolve = (id: string) => {
     resolveMutation.mutate(
       { id, notes: resolutionNotes },
-      { onSettled: () => { setResolving(false); setResolutionNotes('') } }
+      {
+        onSuccess: (updated) => {
+          if (selected?.id === id) setSelected(updated)
+        },
+        onSettled: () => { setResolving(false); setResolutionNotes('') },
+      }
     )
   }
 
@@ -177,7 +206,7 @@ export function EscalationsPage() {
           </div>
 
           <div className="flex-1 overflow-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="sticky top-0 bg-surface-50 dark:bg-surface-900">
                 <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
                   <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Priority</th>
@@ -194,19 +223,30 @@ export function EscalationsPage() {
                     <td colSpan={6} className="px-4 py-8">
                       <div className="card p-8 text-center">
                         <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
-                        <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+                        <p className="text-sm text-surface-500 mt-2">{errorMessage(error)}</p>
                       </div>
                     </td>
                   </tr>
                 ) : isLoading ? (
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-surface-400">Loading...</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-surface-400">No escalations</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                        <ShieldCheck className="w-6 h-6 text-surface-400 dark:text-surface-500" />
+                      </div>
+                      <p className="text-sm text-surface-400">
+                        {statusFilter === 'all' && priorityTab === 'all' && sourceFilter === 'all'
+                          ? 'No escalations — all systems operating normally'
+                          : 'No escalations match the current filters'}
+                      </p>
+                    </div>
+                  </td></tr>
                 ) : (
                   filtered.map((event) => (
                     <tr
                       key={event.id}
-                      onClick={() => setSelectedId(event.id)}
+                      onClick={() => setSelected(event)}
                       className={`cursor-pointer transition-colors hover:bg-surface-50/50 dark:hover:bg-surface-800/30 ${
                         selected?.id === event.id ? 'bg-primary-50/50 dark:bg-primary-950/10' : ''
                       }`}
@@ -250,12 +290,17 @@ export function EscalationsPage() {
                   </span>
                   <span className={`badge text-[10px] ${statusBadge(selected.status)}`}>{selected.status}</span>
                 </div>
-                <button onClick={() => setSelectedId(null)} aria-label="Close" className="p-1 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                <button onClick={() => setSelected(null)} aria-label="Close" className="p-1 rounded-lg text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
                   <XCircle className="h-4 w-4" />
                 </button>
               </div>
             </div>
             <div className="space-y-4 p-5">
+              {!selectedInList && (
+                <p className="text-[11px] text-surface-400 dark:text-surface-500">
+                  This escalation no longer matches the active filters — showing last known state.
+                </p>
+              )}
               <div>
                 <h3 className="text-sm font-semibold text-surface-900 dark:text-surface-100">{selected.title}</h3>
                 <p className="mt-1 text-xs text-surface-500 dark:text-surface-400">
@@ -321,6 +366,12 @@ export function EscalationsPage() {
                 </div>
               )}
 
+              {(acknowledgeMutation.isError || resolveMutation.isError) && (
+                <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                  {errorMessage(acknowledgeMutation.error || resolveMutation.error)}
+                </p>
+              )}
+
               <div className="flex gap-2 pt-2">
                 {selected.status === 'open' && (
                   <button
@@ -344,17 +395,24 @@ export function EscalationsPage() {
 
               {selected.status !== 'resolved' && resolving && (
                 <div className="space-y-2 rounded-xl border border-surface-200 dark:border-surface-700 p-3">
+                  <label
+                    htmlFor="resolution-notes"
+                    className="block text-xs font-medium text-surface-600 dark:text-surface-300"
+                  >
+                    Resolution notes <span className="text-red-500 dark:text-red-400">(required)</span>
+                  </label>
                   <textarea
+                    id="resolution-notes"
                     value={resolutionNotes}
                     onChange={(e) => setResolutionNotes(e.target.value)}
-                    placeholder="Resolution notes..."
+                    placeholder="What was done to resolve this escalation?"
                     rows={3}
                     className="input-modern text-sm"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleResolve(selected.id)}
-                      disabled={resolveMutation.isPending}
+                      disabled={resolveMutation.isPending || resolutionNotes.trim().length === 0}
                       className="btn-green flex-1 px-3 py-2 text-sm"
                     >
                       <CheckCheck className="h-4 w-4" /> Confirm Resolve

@@ -4,17 +4,19 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.config import get_settings
 from app.core.logging import get_logger
 from app.database import AsyncSessionLocal
-from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadProjectStatusEnum
+from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadProjectStatusEnum, LeadWorkflowStatusEnum, Project
 from app.services.lead_intelligence.factory import get_scraper
 from app.services.lead_intelligence.document_fetcher import (
     RegistryDocumentFetcher,
     compute_document_fingerprint,
 )
+from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
+from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
 from app.tasks.celery_app import celery_app
 
 logger = get_logger(__name__)
@@ -155,11 +157,6 @@ def fetch_all_pending_documents(self) -> None:
         logger.error("fetch_all_pending_documents_failed", error=str(exc))
         raise self.retry(exc=exc, countdown=60)
 
-
-
-from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
-from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
-from app.models import LeadWorkflowStatusEnum, Project
 
 
 @celery_app.task(bind=True, max_retries=3)

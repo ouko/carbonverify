@@ -4,7 +4,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +15,7 @@ from slowapi.util import get_remote_address
 from app.database import get_db
 from app.models import ApiKey, User, AuditActionEnum
 from app.schemas import ApiKeyCreateRequest, ApiKeyOut, ApiKeyCreateResponse
-from app.auth.dependencies import get_current_user, require_permission
-from app.auth.api_key_auth import validate_api_key
+from app.auth.dependencies import require_permission
 from app.security.audit_logging import AuditLogger
 from app.permissions import list_all_permissions
 from app.core.logging import get_logger

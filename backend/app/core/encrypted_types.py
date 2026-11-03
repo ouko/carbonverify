@@ -1,6 +1,5 @@
 """SQLAlchemy encrypted column types for PII."""
 
-from typing import Optional
 from sqlalchemy import TypeDecorator
 from sqlalchemy.dialects.postgresql import VARCHAR
 

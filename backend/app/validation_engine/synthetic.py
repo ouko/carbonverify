@@ -212,7 +212,7 @@ class SyntheticActorFactory:
             select(SyntheticActor)
             .where(
                 SyntheticActor.actor_type == actor_type,
-                SyntheticActor.active == True,
+                SyntheticActor.active.is_(True),
             )
             .order_by(SyntheticActor.usage_count.asc())
             .limit(1)
@@ -271,7 +271,7 @@ class SyntheticActorFactory:
         actor_type: Optional[SyntheticActorType] = None,
     ) -> List[SyntheticActor]:
         """List available synthetic actors, optionally filtered by type."""
-        query = select(SyntheticActor).where(SyntheticActor.active == True)
+        query = select(SyntheticActor).where(SyntheticActor.active.is_(True))
         if actor_type:
             query = query.where(SyntheticActor.actor_type == actor_type)
         result = await db.execute(query)

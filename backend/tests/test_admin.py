@@ -1,9 +1,5 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
 
-from app.main import app
-from app.database import get_db
-from app.auth.dependencies import get_current_user
 from app.models import User, UserRoleEnum
 from app.core.encryption import compute_searchable_hash
 

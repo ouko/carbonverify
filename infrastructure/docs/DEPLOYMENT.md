@@ -269,6 +269,49 @@ kubectl get pods -n carbonverify -o wide
 
 ---
 
+## Celery Beat Schedule
+
+All scheduled tasks are defined in `backend/app/tasks/celery_app.py` and run through the `LeaderElectionScheduler` (Redis lock — exactly one beat instance dispatches at a time, even with multiple replicas). The beat pod **must** be running for the autonomous platform to work: lifecycle advancement, SLA sweeps, escalation dispatch, and continuous validation are all beat-driven.
+
+| Beat task | Task function | Schedule | Purpose |
+|-----------|---------------|----------|---------|
+| `check-flagged-data-sources` | `app.tasks.jobs.check_flagged_data_sources` | 5 min | Flag low-confidence data sources for review |
+| `generate-overdue-reports` | `app.tasks.jobs.generate_overdue_reports` | 1 h | Auto-generate monitoring reports that are due |
+| `poll-registry-statuses` | `app.tasks.report_jobs.poll_registry_statuses` | Daily | Sync Verra/Gold Standard registry statuses |
+| `send-registry-follow-ups` | `app.tasks.report_jobs.send_registry_follow_ups` | Daily | Chase VVB submissions past the 14-day SLA |
+| `scrape-registries` | `app.tasks.lead_jobs.scrape_registries` | Daily | Lead Intelligence: scrape carbon registries |
+| `score-leads` | `app.tasks.lead_jobs.score_leads` | Weekly | Recompute lead stuck scores |
+| `check-lead-deadlines` | `app.tasks.lead_jobs.check_lead_deadlines` | Daily | Deadline proximity alerts for leads |
+| `fetch-all-pending-documents` | `app.tasks.pre_audit_jobs.fetch_all_pending_documents` | Daily | Incremental PDD/monitoring-report fetch |
+| `run-pre-audit-pipeline` | `app.tasks.pre_audit_jobs.run_pre_audit_pipeline` | Daily | Convert qualified leads + run AI pre-audit |
+| `re-audit-changed-projects` | `app.tasks.pre_audit_jobs.re_audit_changed_projects` | Daily | Re-score projects whose documents changed |
+| `lifecycle-scan` | `app.tasks.lifecycle_jobs.lifecycle_scan` | 5 min | **Autonomy**: enqueue lifecycle advancement for high-confidence projects |
+| `human-review-sla-sweep` | `app.tasks.lifecycle_jobs.human_review_sla_sweep` | 1 h | **Autonomy**: auto-approve stale (≥24h) priority ≤3 review items |
+| `remediation-sweep` | `app.tasks.lifecycle_jobs.remediation_sweep` | 15 min | **Autonomy**: re-run failed remediation attempts older than 1h (max 50/run) |
+| `dispatch-p0-escalations` | `app.tasks.escalation_jobs.dispatch_p0_escalations` | 1 min | **Autonomy**: redispatch open P0 escalations until a channel succeeds |
+| `send-p1-escalations` | `app.tasks.escalation_jobs.send_p1_escalations` | 30 min | **Autonomy**: retry P1 channel delivery within the 2h SLA |
+| `daily-escalation-digest` | `app.tasks.escalation_jobs.daily_escalation_digest` | Daily | **Autonomy**: digest email of open P2 + last 24h P0/P1 |
+| `check-methodology-updates` | `app.tasks.knowledge_jobs.check_methodology_updates` | Daily | **Autonomy**: knowledge-base refresh check (documents are ingested via API only, never scraped) |
+| `generate-weekly-learning-report` | `app.tasks.learning_jobs.generate_weekly_learning_report` | Weekly | **Autonomy**: agent retraining brief (override-ranked, threshold suggestions) |
+| `run-synthetic-validation` | `app.tasks.validation_jobs.run_synthetic_validation` | 15 min | **Autonomy**: queue 3 synthetic E2E journeys + append health snapshot |
+| `cleanup-archived-validation-runs` | `app.validation_engine.tasks.cleanup_archived_runs` | Daily | Purge archived validation runs |
+| `check-stalled-escalations` | `app.validation_engine.tasks.check_stalled_escalations` | 15 min | Auto-escalate stalled validation-engine human escalations (L1→L4) |
+
+### Pre-deploy gate
+
+The autonomous platform gates releases on its own health. Before any production deploy, run:
+
+```bash
+cd backend
+python scripts/pre_deploy_check.py --base-url https://api.carbonverify.io --token <operator-jwt>
+# and/or block on the acceptance suite:
+python scripts/pre_deploy_check.py --with-tests
+```
+
+Exit non-zero blocks the release. The gate fails when the composite health score (`/api/v1/escalations/health/score`) is below 90, when validation health has 7 consecutive below-90 snapshots (`/api/v1/validation/health`), or when any synthetic journey failed to complete in the last 24 hours. Defaults can be set via `DEPLOY_CHECK_BASE_URL` / `DEPLOY_CHECK_TOKEN`. See `docs/AUTONOMOUS_PLATFORM.md` for the operator runbook.
+
+---
+
 ## CI/CD Pipeline
 
 ### GitHub Actions Workflow

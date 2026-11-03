@@ -1,7 +1,7 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from unittest.mock import patch, MagicMock, AsyncMock, Mock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 from app.models import Lead, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum
 from app.services.lead_intelligence.document_fetcher import RegistryDocumentFetcher
@@ -222,7 +222,7 @@ async def test_fetch_document_sends_conditional_headers(async_db_session, sample
 
     fetcher = RegistryDocumentFetcher()
     with patch.object(fetcher.client, "get", new_callable=AsyncMock) as mock_get, \
-         patch.object(fetcher, "_upload_to_s3", new_callable=AsyncMock) as mock_upload, \
+         patch.object(fetcher, "_upload_to_s3", new_callable=AsyncMock), \
          patch("app.services.lead_intelligence.document_fetcher.get_scanner", return_value=mock_scanner):
         mock_response = MagicMock()
         mock_response.content = b"PDF content"

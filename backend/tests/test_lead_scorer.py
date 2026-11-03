@@ -2,7 +2,6 @@
 
 from datetime import date, timedelta
 
-import pytest
 
 from app.services.lead_intelligence.scorer import score_lead, priority_from_score
 

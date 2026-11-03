@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 from app.models import Application, ApplicationStatusEnum
-from app.schemas import ApplicationCreate, ApplicationOut
+from app.schemas import ApplicationCreate
 
 
 @pytest.mark.asyncio

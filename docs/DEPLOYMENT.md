@@ -280,6 +280,14 @@ The production compose includes an nginx reverse proxy with CSP/HSTS headers and
 | `VERRA_API_KEY` | `...` | Verra registry API key |
 | `GOLD_STANDARD_API_KEY` | `...` | Gold Standard registry API key |
 | `KENYA_NATIONAL_REGISTRY_API_KEY` | `...` | Kenya National Carbon Registry API key |
+| `KIMI_API_BASE` / `KIMI_MODEL` | `https://api.moonshot.cn/v1` / `moonshot-v1-8k` | Kimi API overrides (optional) |
+| `KNOWLEDGE_EMBEDDER_URL` / `_MODEL` / `_API_KEY` | OpenAI-compatible endpoint | Optional embeddings backend for the methodology knowledge base; empty = offline hashing embedder |
+| `ESCALATION_NOTIFY_EMAIL` | `ops@carbonverify.io,oncall@...` | Operator inboxes for P0/P1 escalation alerts (comma-separated; optional, log-only when empty) |
+| `ESCALATION_NOTIFY_WHATSAPP` + `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` | E.164 number + Meta credentials | P0 WhatsApp alerts (optional) |
+| `ESCALATION_NOTIFY_SMS` + `ESCALATION_SMS_WEBHOOK_URL` | E.164 number + provider hook | P0 SMS alerts (optional) |
+| `DEPLOY_CHECK_BASE_URL` / `DEPLOY_CHECK_TOKEN` | `https://api.carbonverify.io` + bearer token | Defaults for `backend/scripts/pre_deploy_check.py` (optional) |
+
+The autonomous platform also requires the Celery beat scheduler to run — it drives lifecycle advancement, SLA sweeps, escalation dispatch/digests, and 15-minute synthetic validation. See the beat schedule table in `infrastructure/docs/DEPLOYMENT.md`.
 
 ---
 

@@ -23,7 +23,7 @@ from app.models import (
     User,
 )
 from app.services.lead_intelligence.document_text import extract_text_async
-from app.services.lead_intelligence.lead_converter import LeadToProjectConverter, LeadConversionError
+from app.services.lead_intelligence.lead_converter import LeadToProjectConverter
 from app.services.lead_intelligence.pre_audit_runner import PreAuditRunner
 from app.tasks.pre_audit_jobs import run_pre_audit_pipeline
 from app.services.lead_intelligence.system_developer import (
@@ -52,7 +52,7 @@ async def test_get_or_create_system_developer(async_db_session):
 
 @pytest.mark.asyncio
 async def test_extract_text_async_pdf():
-    with patch("app.services.lead_intelligence.document_text.extract_text_pdfplumber", return_value="PDF text") as mock_pdf:
+    with patch("app.services.lead_intelligence.document_text.extract_text_pdfplumber", return_value="PDF text"):
         text = await extract_text_async(b"pdf", "application/pdf")
     assert text == "PDF text"
 

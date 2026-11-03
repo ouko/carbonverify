@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Log retention: maximum log level for production to control volume
 # NOTE: Use configure_logging() to read from Settings, not os.getenv directly.

@@ -10,12 +10,15 @@ Score formula (0-100, higher is healthier):
 - Remediation resolution rate (shared remediation engine attempts) — weight 20%
 - Escalation backlog (open escalation events) — weight 20%
 
-Snapshots below ``HEALTH_THRESHOLD`` (90) increment ``consecutive_below_threshold``;
-a snapshot at or above the threshold resets it to 0. The deploy gate blocks on a
-streak of ``STREAK_LIMIT`` (7) consecutive below-threshold snapshots.
+Snapshots are still recorded every 15 minutes, but the deploy gate semantics
+are DAILY: each UTC calendar day is scored by its WORST (minimum) snapshot.
+``consecutive_below_threshold`` counts consecutive UTC days (ending today)
+whose daily score is below ``HEALTH_THRESHOLD`` (90); a day at or above the
+threshold resets it to 0. The deploy gate blocks on a streak of
+``STREAK_LIMIT`` (7) consecutive below-threshold days.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -80,11 +83,45 @@ def compute_health_score(
     return round(max(0.0, min(100.0, score)))
 
 
-def next_streak(previous: int | None, score: int) -> int:
-    """Increment the below-threshold streak, or reset at/above the threshold."""
-    if score < HEALTH_THRESHOLD:
-        return (previous or 0) + 1
-    return 0
+def utc_day(created_at: datetime) -> date:
+    """UTC calendar day for a snapshot timestamp (naive values are assumed UTC)."""
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    return created_at.astimezone(UTC).date()
+
+
+def streak_from_daily_scores(scores: dict[date, int]) -> int:
+    """Consecutive below-threshold days ending today (UTC).
+
+    Today counts once its daily score is present; a missing today means the
+    streak resets (there is no evidence today is below the threshold yet).
+    """
+    today = datetime.now(UTC).date()
+    day_score = scores.get(today)
+    if day_score is None or day_score >= HEALTH_THRESHOLD:
+        return 0
+    streak = 0
+    day = today
+    while scores.get(day) is not None and scores[day] < HEALTH_THRESHOLD:
+        streak += 1
+        day -= timedelta(days=1)
+    return streak
+
+
+async def daily_scores(db: AsyncSession, days: int = 8) -> dict[date, int]:
+    """Worst (minimum) snapshot score per UTC calendar day for the last ``days``
+    days. The minimum is used so one bad 15-minute window marks the whole day
+    below threshold (conservative, per the deploy-gate product spec)."""
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    result = await db.execute(
+        select(ValidationHealthSnapshot).where(ValidationHealthSnapshot.created_at >= cutoff)
+    )
+    scores: dict[date, int] = {}
+    for snapshot in result.scalars().all():
+        day = utc_day(snapshot.created_at)
+        if day not in scores or snapshot.score < scores[day]:
+            scores[day] = snapshot.score
+    return scores
 
 
 async def compute_journey_stats(
@@ -140,15 +177,12 @@ async def compute_and_store_snapshot(db: AsyncSession) -> ValidationHealthSnapsh
 
     score = compute_health_score(run_stats, resolution_rate, open_escalations)
 
-    latest_result = await db.execute(
-        select(ValidationHealthSnapshot)
-        .order_by(ValidationHealthSnapshot.created_at.desc())
-        .limit(1)
-    )
-    latest = latest_result.scalar_one_or_none()
-    streak = next_streak(
-        latest.consecutive_below_threshold if latest else 0, score
-    )
+    # Daily streak: completed days plus today's snapshots so far, with the
+    # score being stored folded into today's daily (worst-of-day) score.
+    day_scores = await daily_scores(db, days=STREAK_LIMIT + 1)
+    today = datetime.now(UTC).date()
+    day_scores[today] = min(day_scores.get(today, score), score)
+    streak = streak_from_daily_scores(day_scores)
 
     snapshot = ValidationHealthSnapshot(
         score=score,

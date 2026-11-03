@@ -318,7 +318,6 @@ async def grant_permission(
     if payload.permission not in all_perms:
         raise HTTPException(status_code=400, detail=f"Unknown permission: {payload.permission}")
 
-    from app.permissions import has_permission
     if not has_permission(current_user.role.value, current_user.permissions or [], payload.permission):
         raise HTTPException(status_code=403, detail="You cannot grant a permission you do not possess")
 

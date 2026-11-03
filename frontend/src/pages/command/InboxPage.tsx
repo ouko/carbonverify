@@ -177,7 +177,7 @@ export function InboxPage() {
         </div>
 
         <div className="flex-1 overflow-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="sticky top-0 bg-surface-50 dark:bg-surface-900">
               <tr className="border-b border-surface-200/60 dark:border-surface-800/40">
                 <th className="px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400">Priority</th>

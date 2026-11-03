@@ -2,7 +2,6 @@
 
 import pytest
 import pytest_asyncio
-import uuid
 
 from app.models import User, OAuthAccount, UserRoleEnum
 from app.auth.security import get_password_hash

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 
 from app.database import get_db
-from app.models import Lead, User, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum, LeadPriorityEnum, LeadProjectStatusEnum, LeadWorkflowStatusEnum, ProjectPreAudit, ScraperRun, AuditActionEnum
+from app.models import Lead, User, LeadDocument, LeadDocumentStatusEnum, LeadRegistrySourceEnum, LeadProjectStatusEnum, LeadWorkflowStatusEnum, ProjectPreAudit, ScraperRun, AuditActionEnum
 from app.schemas import (
     LeadCreate,
     LeadUpdate,

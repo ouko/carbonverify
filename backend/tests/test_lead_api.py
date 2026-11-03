@@ -5,7 +5,6 @@ They are skipped until auth fixtures are available.
 """
 
 import pytest
-import uuid
 
 pytestmark = pytest.mark.skip(reason="Auth fixtures not available in test suite")
 
@@ -41,7 +40,7 @@ class TestListLeads:
         res = await client.get("/leads/?priority=high", headers=auth_headers)
         assert res.status_code == 200
         data = res.json()
-        assert all(l["priority"] == "high" for l in data)
+        assert all(lead["priority"] == "high" for lead in data)
 
     @pytest.mark.asyncio
     async def test_filter_by_country(self, client, auth_headers):

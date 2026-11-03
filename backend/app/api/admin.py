@@ -55,8 +55,8 @@ async def get_admin_stats(
     """Get system-wide admin statistics."""
     # Total users + status breakdown
     total_coro = db.scalar(select(func.count(User.id)))
-    active_coro = db.scalar(select(func.count(User.id)).where(User.is_active == True))
-    inactive_coro = db.scalar(select(func.count(User.id)).where(User.is_active == False))
+    active_coro = db.scalar(select(func.count(User.id)).where(User.is_active.is_(True)))
+    inactive_coro = db.scalar(select(func.count(User.id)).where(User.is_active.is_(False)))
     locked_coro = db.scalar(
         select(func.count(User.id)).where(
             User.locked_until.isnot(None),
@@ -82,7 +82,7 @@ async def get_admin_stats(
     week_start = today_start - timedelta(days=today_start.weekday())
     new_today_coro = db.scalar(select(func.count(User.id)).where(User.created_at >= today_start))
     new_week_coro = db.scalar(select(func.count(User.id)).where(User.created_at >= week_start))
-    mfa_coro = db.scalar(select(func.count(User.id)).where(User.mfa_enabled == True))
+    mfa_coro = db.scalar(select(func.count(User.id)).where(User.mfa_enabled.is_(True)))
     new_today, new_this_week, mfa_count = await asyncio.gather(
         new_today_coro, new_week_coro, mfa_coro
     )

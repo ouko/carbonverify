@@ -9,6 +9,7 @@ import uuid
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
@@ -288,8 +289,6 @@ async def get_transaction_summary(
     summary = await engine.get_transaction_summary(transaction_id)
     return summary
 
-
-from pydantic import BaseModel
 
 class CancelTransactionRequest(BaseModel):
     reason: str

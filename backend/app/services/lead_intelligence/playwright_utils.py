@@ -9,10 +9,9 @@ from playwright.sync_api import sync_playwright, Page, Browser, Response, Timeou
 from playwright_stealth import Stealth
 
 from app.core.logging import get_logger
+from app.config import get_settings
 
 logger = get_logger(__name__)
-
-from app.config import get_settings
 
 _settings = get_settings()
 # Proxy rotation support

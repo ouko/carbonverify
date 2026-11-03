@@ -7,6 +7,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel
 from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.core.client_ip import get_client_ip as _get_client_ip_helper
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_
@@ -14,7 +15,7 @@ from sqlalchemy import select, update, and_
 from app.core.encryption import compute_searchable_hash, legacy_searchable_hash
 from app.database import get_db
 from app.models import User, RefreshToken, UserInvite, UserRoleEnum, AuditActionEnum
-from app.schemas import Token, LoginRequest, RefreshRequest, UserCreate, UserOut, MFAVerifyRequest, MFAConfirmResponse, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
+from app.schemas import Token, LoginRequest, UserCreate, UserOut, MFAVerifyRequest, MFAConfirmResponse, PasswordChangeRequest, ForgotPasswordRequest, ResetPasswordRequest, UserInviteCreate, UserInviteOut, InviteAcceptRequest
 from app.auth.security import (
     verify_password,
     verify_and_update_password,
@@ -32,8 +33,6 @@ from app.auth.mfa import (
 from app.auth.sessions import SessionManager
 from app.auth.dependencies import validate_refresh_token, get_current_user, require_admin
 from app.security.audit_logging import AuditLogger
-import secrets
-import hashlib
 import string
 from app.services.email import get_email_service
 from app.config import get_settings
@@ -210,7 +209,7 @@ async def login(
             select(User).where(
                 and_(
                     User.email_hash.is_(None),
-                    User.is_active == True,
+                    User.is_active.is_(True),
                 )
             ).limit(50)
         )
@@ -835,7 +834,7 @@ async def reset_password(
         select(User).where(
             User.password_reset_token_hash == token_hash,
             User.password_reset_expires_at > datetime.now(timezone.utc),
-            User.is_active == True,
+            User.is_active.is_(True),
         )
     )
     user = result.scalar_one_or_none()

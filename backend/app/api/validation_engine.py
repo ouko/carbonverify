@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy import select
@@ -116,7 +116,7 @@ async def list_workflows(
     """List all validation workflows."""
     query = select(ValidationWorkflow)
     if active_only:
-        query = query.where(ValidationWorkflow.active == True)
+        query = query.where(ValidationWorkflow.active.is_(True))
     result = await db.execute(query.order_by(ValidationWorkflow.created_at.desc()).offset(skip).limit(limit))
     workflows = result.scalars().all()
     return [
@@ -797,7 +797,7 @@ async def get_agent_performance(
     """Aggregate agent performance metrics for the Command Center Agents page."""
     from sqlalchemy import func
 
-    actors = await db.execute(select(SyntheticActor).where(SyntheticActor.active == True))
+    actors = await db.execute(select(SyntheticActor).where(SyntheticActor.active.is_(True)))
     actor_list = actors.scalars().all()
 
     result = []

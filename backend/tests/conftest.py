@@ -78,7 +78,7 @@ sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
 sqlite3.register_converter("uuid", lambda s: uuid.UUID(s.decode() if isinstance(s, bytes) else s))
 
 
-from app.core.encryption import compute_searchable_hash
+from app.core.encryption import compute_searchable_hash  # noqa: E402 — app imports must follow env setup above
 
 def _create_mock_user(role: UserRoleEnum = UserRoleEnum.admin, suffix: str = ""):
     email = f"test{suffix}@carbonverify.io"

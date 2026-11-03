@@ -2,14 +2,13 @@
 
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.services.kimi_api import KimiAPIClient
-from app.models import GeneratedMethodology, MethodologyVersion, MethodologyTemplate
+from app.models import MethodologyVersion, MethodologyTemplate
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

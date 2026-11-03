@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { BrowserRouter } from 'react-router-dom'
 import { EscalationsPage } from '../pages/command/EscalationsPage'
 import {
   useEscalations,
@@ -110,14 +111,14 @@ describe('EscalationsPage', () => {
     renderWithRouter(<EscalationsPage />)
     fireEvent.click(screen.getByText('Confidence below threshold'))
     fireEvent.click(screen.getByRole('button', { name: /acknowledge/i }))
-    expect(acknowledgeMutate).toHaveBeenCalledWith('esc-1')
+    expect(acknowledgeMutate).toHaveBeenCalledWith('esc-1', expect.any(Object))
   })
 
   it('prompts for notes and calls resolve mutation with notes', async () => {
     renderWithRouter(<EscalationsPage />)
     fireEvent.click(screen.getByText('Confidence below threshold'))
     fireEvent.click(screen.getByRole('button', { name: /^resolve$/i }))
-    fireEvent.change(screen.getByPlaceholderText('Resolution notes...'), {
+    fireEvent.change(screen.getByPlaceholderText('What was done to resolve this escalation?'), {
       target: { value: 'Fixed the threshold config' },
     })
     fireEvent.click(screen.getByRole('button', { name: /confirm resolve/i }))
@@ -127,5 +128,84 @@ describe('EscalationsPage', () => {
         expect.any(Object)
       )
     })
+  })
+
+  it('requires resolution notes before confirm resolve is enabled', () => {
+    renderWithRouter(<EscalationsPage />)
+    fireEvent.click(screen.getByText('Confidence below threshold'))
+    fireEvent.click(screen.getByRole('button', { name: /^resolve$/i }))
+    const confirm = screen.getByRole('button', { name: /confirm resolve/i })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(screen.getByPlaceholderText('What was done to resolve this escalation?'), {
+      target: { value: 'Restarted the run' },
+    })
+    expect(confirm).toBeEnabled()
+  })
+
+  it('shows a friendly empty state when there are no escalations at all', () => {
+    (useEscalations as any).mockReturnValue({
+      data: { items: [], total: 0, skip: 0, limit: 50 },
+      isLoading: false,
+      isError: false,
+      error: null,
+    })
+    renderWithRouter(<EscalationsPage />)
+    expect(screen.getByText('No escalations — all systems operating normally')).toBeInTheDocument()
+  })
+
+  it('shows a filter-specific empty state when filters exclude everything', () => {
+    (useEscalations as any).mockReturnValue({
+      data: { items: [], total: 0, skip: 0, limit: 50 },
+      isLoading: false,
+      isError: false,
+      error: null,
+    })
+    renderWithRouter(<EscalationsPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'P0' }))
+    expect(screen.getByText('No escalations match the current filters')).toBeInTheDocument()
+  })
+
+  it('keeps the detail panel open with a hint when the selected item leaves the filtered list', () => {
+    (useEscalations as any).mockReturnValue({
+      data: { items: mockEvents, total: 2, skip: 0, limit: 50 },
+      isLoading: false,
+      isError: false,
+      error: null,
+    })
+    const { rerender } = renderWithRouter(<EscalationsPage />)
+    fireEvent.click(screen.getByText('Confidence below threshold'))
+    expect(screen.getByText('Context Package')).toBeInTheDocument()
+
+    // Simulate a refetch (poll/WebSocket invalidation) where the acknowledged
+    // item no longer matches the active filters.
+    ;(useEscalations as any).mockReturnValue({
+      data: { items: [mockEvents[1]], total: 1, skip: 0, limit: 50 },
+      isLoading: false,
+      isError: false,
+      error: null,
+    })
+    rerender(
+      <BrowserRouter>
+        <EscalationsPage />
+      </BrowserRouter>
+    )
+
+    expect(screen.getByText('Context Package')).toBeInTheDocument()
+    expect(screen.getByText('Confidence below threshold')).toBeInTheDocument()
+    expect(
+      screen.getByText(/no longer matches the active filters/)
+    ).toBeInTheDocument()
+  })
+
+  it('surfaces acknowledge and resolve mutation errors', () => {
+    (useResolveEscalation as any).mockReturnValue({
+      mutate: resolveMutate,
+      isPending: false,
+      isError: true,
+      error: { response: { data: { detail: 'Escalation already resolved' } } },
+    })
+    renderWithRouter(<EscalationsPage />)
+    fireEvent.click(screen.getByText('Confidence below threshold'))
+    expect(screen.getByRole('alert')).toHaveTextContent('Escalation already resolved')
   })
 })

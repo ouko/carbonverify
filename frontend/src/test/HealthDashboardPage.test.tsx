@@ -54,4 +54,18 @@ describe('HealthDashboardPage', () => {
 
     expect(screen.getByText('Failed to load data')).toBeInTheDocument()
   })
+
+  it('renders an error state for the confidence trend without blocking the page', () => {
+    (useHealthScore as any).mockReturnValue({ data: health, isLoading: false, isError: false, error: null })
+    ;(useDecisionConfidenceTrend as any).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    })
+
+    renderWithRouter(<HealthDashboardPage />)
+
+    expect(screen.getByText('82')).toBeInTheDocument()
+    expect(screen.getByText('Failed to load confidence trend')).toBeInTheDocument()
+  })
 })

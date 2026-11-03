@@ -95,7 +95,7 @@ async def get_or_create_pre_audit_workflow(db: AsyncSession) -> ValidationWorkfl
     result = await db.execute(
         select(ValidationWorkflow)
         .where(ValidationWorkflow.name == PRE_AUDIT_WORKFLOW_NAME)
-        .where(ValidationWorkflow.active == True)
+        .where(ValidationWorkflow.active.is_(True))
         .order_by(ValidationWorkflow.version.desc())
         .limit(1)
     )
@@ -104,7 +104,8 @@ async def get_or_create_pre_audit_workflow(db: AsyncSession) -> ValidationWorkfl
         return workflow
 
     graph = build_pre_audit_graph()
-    import hashlib, json
+    import hashlib
+    import json
     graph_hash = hashlib.sha256(
         json.dumps(graph.model_dump(), sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()

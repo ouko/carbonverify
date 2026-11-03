@@ -98,6 +98,19 @@ def validate_gps_coordinates(lat: Optional[float], lon: Optional[float]) -> List
     return errors
 
 
+def _as_utc_aware(dt: datetime) -> datetime:
+    """Normalize a datetime for comparison; naive values are assumed UTC.
+
+    Field-collected CSVs routinely carry timezone-naive timestamps, and
+    monitoring period bounds arrive as plain ``date`` objects — comparing
+    either against timezone-aware ``datetime.now(timezone.utc)`` raised
+    ``TypeError`` and wedged uploads in 'processing' forever.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def validate_temporal_consistency(
     timestamps: List[datetime],
     monitoring_period_start: Optional[datetime] = None,
@@ -109,7 +122,7 @@ def validate_temporal_consistency(
         errors.append("No timestamps provided for temporal validation")
         return errors
 
-    sorted_ts = sorted(timestamps)
+    sorted_ts = sorted(_as_utc_aware(ts) for ts in timestamps)
     if len(sorted_ts) >= 2:
         # Check for future dates
         now = datetime.now(timezone.utc)
@@ -119,12 +132,22 @@ def validate_temporal_consistency(
 
         # Check for data outside monitoring period
         if monitoring_period_start:
-            early = [ts for ts in sorted_ts if ts < monitoring_period_start]
+            period_start = _as_utc_aware(
+                datetime.combine(monitoring_period_start, datetime.min.time())
+                if not isinstance(monitoring_period_start, datetime)
+                else monitoring_period_start
+            )
+            early = [ts for ts in sorted_ts if ts < period_start]
             if early:
                 errors.append(f"{len(early)} records before monitoring period start")
 
         if monitoring_period_end:
-            late = [ts for ts in sorted_ts if ts > monitoring_period_end]
+            period_end = _as_utc_aware(
+                datetime.combine(monitoring_period_end, datetime.max.time())
+                if not isinstance(monitoring_period_end, datetime)
+                else monitoring_period_end
+            )
+            late = [ts for ts in sorted_ts if ts > period_end]
             if late:
                 errors.append(f"{len(late)} records after monitoring period end")
 

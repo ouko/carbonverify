@@ -7,8 +7,6 @@ from sqlalchemy import select
 from app.tasks.compliance_jobs import (
     _erase_enumerator,
     _erase_user,
-    _erase_household,
-    _erase_developer,
     _mark_dsr_rejected,
     ANONYMIZED_ACTOR_ID,
 )

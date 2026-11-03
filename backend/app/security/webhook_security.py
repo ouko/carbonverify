@@ -2,7 +2,6 @@
 
 import hashlib
 import hmac
-import time
 from typing import Optional
 
 import redis.asyncio as redis

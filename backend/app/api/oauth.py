@@ -1,8 +1,6 @@
 """OAuth 2.0 / SSO endpoints for Google, Microsoft, and Okta."""
 
-import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession

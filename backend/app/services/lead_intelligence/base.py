@@ -1,7 +1,10 @@
 """Base scraper interface for carbon registry lead intelligence."""
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import TYPE_CHECKING, List, Dict, Any
+
+if TYPE_CHECKING:
+    from app.models import Lead
 
 
 class BaseRegistryScraper(ABC):

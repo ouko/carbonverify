@@ -255,6 +255,33 @@ The Workflow Builder (`/validation-workflows`) provides a visual, form-based int
 
 ---
 
+## Continuous validation: synthetic journeys & health snapshots
+
+Beyond operator-defined workflows, the engine runs **three pre-defined synthetic E2E journeys** continuously (defined in `backend/app/validation_engine/synthetic_journeys.py`):
+
+| Journey | What it exercises |
+|---------|-------------------|
+| `synthetic_developer_journey` | A project developer registers, creates a project, uploads data, and drives it through to the review state via the full lifecycle |
+| `synthetic_enumerator_journey` | A field enumerator's offline batch syncs without losing data or provenance |
+| `synthetic_calc_anomaly_recovery` | A calculation anomaly is detected, self-healed, and verified (state-hash and escalation checks) |
+
+Every 15 minutes the `run-synthetic-validation` beat task (`app.tasks.validation_jobs`) queues one run per journey (skipped while a previous run of the same journey is still in flight) and appends a `ValidationHealthSnapshot` row (`app/validation_engine/health.py`). The snapshot score (0–100) is:
+
+- **Synthetic journey success** (completed / (completed+failed), last 24h) — weight 60%
+- **Remediation resolution rate** (shared `RemediationEngine` attempts) — weight 20%
+- **Escalation backlog** (100 − 20 points per open escalation) — weight 20%
+
+Snapshots below **90** increment `consecutive_below_threshold`; a snapshot ≥90 resets it. A streak of **7 consecutive below-threshold snapshots** blocks deployment — the pre-deploy gate (`backend/scripts/pre_deploy_check.py`) reads `GET /api/v1/validation/health` and fails when the streak is reached or when any journey has failed or missing runs in the last 24 hours.
+
+```bash
+# Current score, streak, and per-journey 24h stats (auth required)
+curl "$API/api/v1/validation/health" -H "Authorization: Bearer $TOKEN"
+```
+
+Health history (7 days) is visible to operators in the Command Center at `/command-center/health`, alongside the composite system score from `/api/v1/escalations/health/score`.
+
+---
+
 ## Testing
 
 Run the validation engine tests:

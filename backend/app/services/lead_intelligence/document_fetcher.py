@@ -3,7 +3,7 @@
 import asyncio
 import hashlib
 from datetime import datetime, timezone
-from typing import Iterable, Optional
+from typing import Iterable
 
 import httpx
 

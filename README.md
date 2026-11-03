@@ -45,9 +45,10 @@
 | **AI Methodology Designer** | Generates registry-aligned draft methodologies for projects that do not fit existing Verra/Gold Standard methodologies; includes gap analysis, quantification scaffold, and human review workflow |
 | **VVB Liaison** | Automated registry submission (Verra / Gold Standard), status polling, SLA tracking, auto-drafted clarification responses |
 | **Lead Intelligence** | Playwright-based scraper for Verra, Gold Standard, and CDM registries; stuck-score algorithm; CRM-style lead pipeline |
-| **Command Center** | Operations dashboard with inbox, project grid, VVB pipeline, quality metrics, and agent performance monitoring |
+| **Command Center** | Operations dashboard with inbox, project grid, VVB pipeline, quality metrics, agent performance, **escalations inbox**, and **system health dashboard** |
 | **Provenance** | SHA-256 hash chain: raw source → extraction → transformations → validation → storage |
 | **Human Review Queue** | Flagged data and quality-gate failures route to operator review with approval workflows |
+| **Autonomous Agent Layer (90/9/1)** | 7 AI agents own the project lifecycle: ≥0.95 confidence auto-advances, 0.85–0.95 queues a 24h-SLA human approval, <0.85 escalates (P0/P1/P2 over WhatsApp/SMS/email/in-app). Every decision is merkle-chained in an immutable audit log; a self-healing remediation engine resolves routine failures; three synthetic E2E journeys run every 15 minutes and feed a deploy-blocking health gate |
 
 ---
 
@@ -204,7 +205,7 @@ npm run dev
 cd backend
 source .venv/bin/activate
 pytest tests/ -v
-# 355 tests covering calculation engine, reports, VVB pipeline, lead intelligence, auth, admin, uploads, security, compliance, tokenization, brokerage, AI methodology generator, and more
+# ~630 tests covering the calculation engine, reports, VVB pipeline, lead intelligence, auth, admin, uploads, security, compliance, tokenization, brokerage, AI methodology generator, autonomous agent layer, remediation, escalations, knowledge base, learning loop, and continuous validation
 ```
 
 ### Local Development Scripts
@@ -256,6 +257,13 @@ carbonverify/
 │   │   ├── services/           # File detection, validation, S3, provenance
 │   │   │   └── lead_intelligence/  # Registry scrapers + scoring
 │   │   ├── reports/            # Jinja2 templates + PDF compilation
+│   │   ├── agents/             # 7 autonomous agents (registry + base classes)
+│   │   ├── orchestrator/       # Lifecycle orchestrator, merkle decision audit, pub/sub
+│   │   ├── remediation/        # Shared self-healing RemediationEngine (6 strategies)
+│   │   ├── escalations/        # P0/P1/P2 escalation events + channel adapters
+│   │   ├── knowledge/          # Methodology knowledge base (chunking, embeddings, RAG)
+│   │   ├── learning/           # Agent learning loop (overrides, calibration, retraining)
+│   │   ├── validation_engine/  # Workflow validation engine + synthetic E2E journeys
 │   │   ├── tasks/              # Celery async jobs
 │   │   └── vvb_liaison/        # Registry clients + auto-responder + polling
 │   └── tests/
@@ -327,7 +335,7 @@ Upload (multipart) → Magic-bytes detection → S3 storage
 ```
 
 - **S3 path pattern:** `{project_id}/{source_type}/{timestamp}/{filename}`
-- **IoT webhooks:** `POST /api/v1/webhooks/iot/{project_id}` — auto-detects KOKO, BURN, generic GSM payloads
+- **IoT webhooks:** `POST /webhooks/iot/{project_id}` — auto-detects KOKO, BURN, generic GSM payloads
 - **Validation engine:** Confidence score 0–1; auto-flagged if <0.85
 - **Provenance:** SHA-256 hash chain maintained end-to-end
 
@@ -365,7 +373,7 @@ The AI Methodology Designer helps project developers and validators create regis
 | 5. Export | Download the approved draft as Markdown | `POST /{id}/export` | Markdown document ready for human editing |
 
 - **AI provider:** Kimi API (configurable via `KIMI_API_KEY`); falls back to a structured placeholder response when no key is configured so the UI can be tested end-to-end.
-- **Templates:** Built-in starting templates are seeded by `scripts/seed_demo_data.py` and stored in the `methodology_templates` table.
+- **Templates:** Built-in starting templates are seeded by `backend/scripts/seed_demo_data.py` and stored in the `methodology_templates` table.
 - **Guardrails:** Draft generation is blocked if the gap analysis concludes the project fits an existing methodology, preventing methodological double-counting.
 - **Audit:** Every status change is written to `audit_logs` with the previous and new status.
 
@@ -443,7 +451,20 @@ See `docs/PRE_AUDIT_OPTIMIZATION.md` for the full consultant workflow and regist
 | `POST` | `/leads/{id}/fetch-documents` | Queue document fetch for a lead |
 | `POST` | `/leads/{id}/convert-and-pre-audit` | Convert lead to project and run AI pre-audit immediately |
 
-### API Endpoints (Core)
+### Autonomous Agent Layer
+
+Every business process is owned by an AI agent; humans only approve queued judgment calls or handle escalations (the **90/9/1 model**: ~90% of transitions complete untouched, ~9% land in the human approval queue, ~1% escalates). Code lives in `backend/app/agents/` (7 agents), `backend/app/orchestrator/`, `backend/app/remediation/`, `backend/app/escalations/`, `backend/app/knowledge/`, `backend/app/learning/`. Full operator runbook: `docs/AUTONOMOUS_PLATFORM.md`.
+
+| Mechanism | How it works |
+|-----------|--------------|
+| Confidence routing | Agent results ≥0.95 auto-advance the lifecycle; 0.85–0.95 queue a `HumanReviewQueue` item (24h SLA, stale items auto-approve via hourly sweep); <0.85 pauses the project and raises an escalation. Learned per-agent thresholds from the learning loop can raise the 0.95 bar. |
+| Decision audit | Every routing and human action is an `AgentDecision` row, SHA-256 merkle-chained (`orchestrator/audit_chain.py`). Exposed at `GET /api/v1/audit/{decision_id}`; chain integrity via `POST /api/v1/audit/verify-chain`. |
+| Self-healing | Shared `RemediationEngine` (`remediation/`) applies 6 rule strategies (retry/backoff, rollback, skip, patch, circuit break, escalate) with hash-logged attempts; 3-strike failures escalate with a full context package. |
+| Escalations | `EscalationService` derives priority from severity (≥0.9 P0 realtime, ≥0.7 P1 2h SLA, else P2 daily digest). Channel adapters (WhatsApp/SMS/email/in-app) are no-op-safe without credentials. |
+| Continuous validation | Three synthetic E2E journeys run every 15 min; `ValidationHealthSnapshot` scores journey success (60%) + remediation resolution (20%) + escalation backlog (20%). A run of 7 consecutive below-90 snapshots blocks deployment via `backend/scripts/pre_deploy_check.py`. |
+| Knowledge & learning | `MethodologyKnowledgeBase` chunks/embeds methodology documents (pluggable embeddings, offline default) and answers RAG queries with citations; `AgentLearningLoop` tracks human overrides, computes calibration, and publishes weekly retraining reports. |
+
+
 
 > **Pagination:** All list endpoints support `skip` (offset) and `limit` (page size) query parameters. Defaults vary by endpoint (typically 50–100 items); maximum is 200–500. Example: `GET /projects?skip=0&limit=50`.
 > For the complete and current API spec, open `/docs` on a running backend.
@@ -490,6 +511,19 @@ See `docs/PRE_AUDIT_OPTIMIZATION.md` for the full consultant workflow and regist
 | `PATCH` | `/methodology-generator/{id}/status` | Update review status (operator+) |
 | `POST` | `/methodology-generator/{id}/export` | Export draft methodology as Markdown |
 | `POST` | `/webhooks/iot/{project_id}` | IoT data ingestion |
+
+### API Endpoints (Autonomous Platform)
+
+New `/api/v1/*` groups added with the autonomous layer. All require authentication (viewer+, some operator/admin); full specs in `/docs` on a running backend.
+
+| Prefix | Router | Description |
+|--------|--------|-------------|
+| `/api/v1/audit` | `api/decisions.py` | Decision audit chain: list decisions, fetch one (`/{decision_id}`), verify merkle chain integrity (`/verify-chain`). The legacy hash-chain audit log remains at `/audit/*` |
+| `/api/v1/escalations` | `api/escalations.py` | Escalation events: list/stats, composite `health/score`, get/acknowledge/resolve |
+| `/api/v1/remediation` | `api/remediation.py` | Self-healing engine: rules, attempts, stats, manual retry |
+| `/api/v1/knowledge` | `api/knowledge.py` | Methodology knowledge base: ingest/list/delete documents, vector search, RAG query |
+| `/api/v1/learning` | `api/learning.py` | Learning loop: calibration metrics, weekly retraining reports, human overrides |
+| `/api/v1/validation/health` | `api/validation_health.py` | Continuous-validation health snapshots (score, 7-snapshot streak, per-journey 24h stats) |
 
 ---
 
@@ -543,7 +577,9 @@ See `docs/PRE_AUDIT_OPTIMIZATION.md` for the full consultant workflow and regist
 
 | Route | Page | Description |
 |-------|------|-------------|
-| `/command-center/inbox` | Inbox | Priority queue / human review |
+| `/command-center/inbox` | Inbox | Priority queue / human review (shows agent reasoning from the decision audit) |
+| `/command-center/escalations` | Escalations Inbox | P0/P1/P2 escalation events with acknowledge/resolve and per-channel delivery timeline |
+| `/command-center/health` | Health Dashboard | Composite system health score with per-component breakdown |
 | `/command-center/projects` | Projects Grid | Grid view of all projects |
 | `/command-center/vvb` | VVB Pipeline | Validation & Verification Body pipeline |
 | `/command-center/quality` | Quality Metrics | Quality metrics dashboard |

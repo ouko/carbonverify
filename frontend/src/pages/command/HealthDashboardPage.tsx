@@ -18,6 +18,12 @@ function scoreTextClass(score: number) {
   return 'text-red-600 dark:text-red-400'
 }
 
+/** Extract a human-readable message from an Axios/React Query error without swallowing it. */
+function errorMessage(error: unknown): string {
+  const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+  return detail || (error as Error)?.message || 'Unknown error'
+}
+
 function ScoreGauge({ score }: { score: number }) {
   // Semi-circular arc: 180° sweep, score mapped 0-100 onto the arc
   const radius = 70
@@ -102,7 +108,12 @@ function ComponentCard({ title, icon, score, detail }: ComponentCardProps) {
           {detail && <p className="mt-2 text-xs text-surface-500 dark:text-surface-400">{detail}</p>}
         </>
       ) : (
-        <span className="badge badge-slate text-[10px]">not configured</span>
+        <>
+          <span className="badge badge-slate text-[10px]">not configured</span>
+          <p className="mt-2 text-xs text-surface-400 dark:text-surface-500">
+            Waiting for first data — this signal has not reported yet.
+          </p>
+        </>
       )}
     </div>
   )
@@ -110,7 +121,7 @@ function ComponentCard({ title, icon, score, detail }: ComponentCardProps) {
 
 export function HealthDashboardPage() {
   const { data: health, isLoading, isError, error } = useHealthScore()
-  const { data: trend } = useDecisionConfidenceTrend()
+  const { data: trend, isError: trendError } = useDecisionConfidenceTrend()
 
   if (isLoading) {
     return <div className="card p-8 text-center text-surface-400">Loading...</div>
@@ -119,7 +130,7 @@ export function HealthDashboardPage() {
     return (
       <div className="card p-8 text-center">
         <p className="text-red-600 dark:text-red-400 font-medium">Failed to load data</p>
-        <p className="text-sm text-surface-500 mt-2">{(error as any)?.response?.data?.detail || (error as Error)?.message || 'Unknown error'}</p>
+        <p className="text-sm text-surface-500 mt-2">{isError ? errorMessage(error) : 'Unknown error'}</p>
       </div>
     )
   }
@@ -185,10 +196,12 @@ export function HealthDashboardPage() {
       {/* Agent confidence trend */}
       <div className="card p-5">
         <h3 className="mb-4 text-sm font-semibold text-surface-900 dark:text-surface-100">Agent Confidence Trend (auto-advance decisions)</h3>
-        {trendData.length === 0 ? (
+        {trendError ? (
+          <p className="py-8 text-center text-sm text-red-600 dark:text-red-400">Failed to load confidence trend</p>
+        ) : trendData.length === 0 ? (
           <p className="py-8 text-center text-sm text-surface-400">No auto-advance decisions recorded yet</p>
         ) : (
-          <div className="h-64">
+          <div className="h-64" role="img" aria-label="Line chart of daily average agent confidence for auto-advance decisions">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.06} />

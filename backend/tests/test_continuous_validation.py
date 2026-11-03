@@ -9,6 +9,7 @@ import importlib
 import subprocess
 import sys
 import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,9 +24,11 @@ from app.validation_engine.health import (
     compute_and_store_snapshot,
     compute_health_score,
     compute_journey_stats,
+    daily_scores,
     escalation_backlog_percent,
     journey_success_percent,
-    next_streak,
+    streak_from_daily_scores,
+    utc_day,
 )
 from app.validation_engine.journey_service import (
     ensure_journey_service_registered,
@@ -92,6 +95,20 @@ async def _execute_journey(db_session, workflows, name: str) -> ValidationRun:
     await orchestrator.execute_workflow(str(run.id))
     result = await db_session.execute(select(ValidationRun).where(ValidationRun.id == run.id))
     return result.scalar_one()
+
+
+async def _seed_journey_run(
+    db_session, workflows, name: str, status: WorkflowRunStatus
+) -> ValidationRun:
+    run = ValidationRun(
+        workflow_id=workflows[name].id,
+        trigger_event="synthetic_test",
+        status=status,
+        input_data={"journey": name, "synthetic": True},
+    )
+    db_session.add(run)
+    await db_session.commit()
+    return run
 
 
 # ─── Template validation ──────────────────────────────────────────────────────
@@ -312,25 +329,52 @@ class TestHealthScoreMath:
     def test_clamped_to_bounds(self):
         assert compute_health_score({"j": {"completed": 0, "failed": 9}}, 0.0, 50) == 0
 
-    def test_next_streak(self):
-        assert next_streak(3, 85) == 4
-        assert next_streak(3, 90) == 0
-        assert next_streak(None, 89) == 1
-        assert next_streak(6, 100) == 0
+    def test_streak_from_daily_scores(self):
+        today = datetime.now(UTC).date()
+        day = timedelta(days=1)
+
+        # Seven consecutive below-threshold days ending today.
+        scores = {today - i * day: 70 for i in range(7)}
+        assert streak_from_daily_scores(scores) == 7
+
+        # A healthy latest day resets the streak.
+        scores[today] = 95
+        assert streak_from_daily_scores(scores) == 0
+
+        # Mixed pattern: only the trailing run counts.
+        scores = {
+            today: 70,
+            today - day: 70,
+            today - 2 * day: 95,
+            today - 3 * day: 70,
+        }
+        assert streak_from_daily_scores(scores) == 2
+
+        # Missing today → no evidence today is below threshold → 0.
+        scores = {today - day: 70, today - 2 * day: 70}
+        assert streak_from_daily_scores(scores) == 0
+
+        # Empty history → 0.
+        assert streak_from_daily_scores({}) == 0
+
+    def test_utc_day_normalizes_naive_and_aware(self):
+        today = datetime.now(UTC).date()
+        assert utc_day(datetime.now(UTC)) == today
+        assert utc_day(datetime.now(UTC).replace(tzinfo=None)) == today
 
     @pytest.mark.asyncio
-    async def test_snapshot_streak_increment_and_reset(self, db_session, journey_setup):
+    async def test_snapshot_streak_is_daily(self, db_session, journey_setup, monkeypatch):
         _, workflows = journey_setup
 
-        async def _seed_run(name: str, status: WorkflowRunStatus):
-            run = ValidationRun(
-                workflow_id=workflows[name].id,
-                trigger_event="synthetic_test",
-                status=status,
-                input_data={"journey": name, "synthetic": True},
-            )
-            db_session.add(run)
-            await db_session.commit()
+        # Yesterday was below threshold (seeded directly).
+        await _seed_historical_snapshot(db_session, score=70, days_ago=1)
+
+        forced: dict[str, int | None] = {"score": None}
+        real_compute = compute_health_score
+        monkeypatch.setattr(
+            "app.validation_engine.health.compute_health_score",
+            lambda *a, **k: forced["score"] if forced["score"] is not None else real_compute(*a, **k),
+        )
 
         # Unhealthy: a failed remediation (0% resolution) plus an open escalation.
         # Journeys have no runs, which counts as neutral (100%).
@@ -345,18 +389,22 @@ class TestHealthScoreMath:
         db_session.add(EscalationEvent(source="test", title="t", detail="d", priority=1))
         await db_session.commit()
 
+        forced["score"] = 70
         bad = await compute_and_store_snapshot(db_session)
         assert bad.score < 90
-        assert bad.consecutive_below_threshold == 1
+        assert bad.consecutive_below_threshold == 2  # yesterday + today
+
+        # A second below-threshold snapshot on the SAME UTC day does not
+        # increment the streak — the counter is per day, not per snapshot.
         bad2 = await compute_and_store_snapshot(db_session)
         assert bad2.consecutive_below_threshold == 2
 
-        # Healthy pass: all journeys completed, remediation half-resolved,
-        # escalation cleared. Score = 0.6*100 + 0.2*50 + 0.2*100 = 90 → reset.
-        await _seed_run("synthetic_developer_journey", WorkflowRunStatus.completed)
-        await _seed_run("synthetic_enumerator_journey", WorkflowRunStatus.completed)
-        await _seed_run("synthetic_calc_anomaly_recovery", WorkflowRunStatus.completed)
-        resolved = RemediationAttempt(
+        # Healthy state: all journeys completed, remediation half-resolved,
+        # escalation cleared. Score = 0.6*100 + 0.2*50 + 0.2*100 = 90.
+        await _seed_journey_run(db_session, workflows, "synthetic_developer_journey", WorkflowRunStatus.completed)
+        await _seed_journey_run(db_session, workflows, "synthetic_enumerator_journey", WorkflowRunStatus.completed)
+        await _seed_journey_run(db_session, workflows, "synthetic_calc_anomaly_recovery", WorkflowRunStatus.completed)
+        db_session.add(RemediationAttempt(
             rule_key="api_timeout_rate_limit",
             target_type="calculation",
             target_id="t-2",
@@ -364,19 +412,116 @@ class TestHealthScoreMath:
             attempt_number=1,
             before_state_hash="b" * 64,
             after_state_hash="c" * 64,
-        )
-        db_session.add(resolved)
+        ))
         event_result = await db_session.execute(select(EscalationEvent))
         event = event_result.scalar_one()
         event.status = EscalationStatus.resolved
         await db_session.commit()
 
-        good = await compute_and_store_snapshot(db_session)
-        assert good.score >= 90
-        assert good.consecutive_below_threshold == 0
+        # Even a >=90 snapshot later the SAME day does not reset: today's
+        # daily score is the worst of the day's snapshots (70).
+        forced["score"] = None
+        same_day = await compute_and_store_snapshot(db_session)
+        assert same_day.score >= 90
+        assert same_day.consecutive_below_threshold == 2
 
         journey_stats = await compute_journey_stats(db_session)
         assert journey_stats["synthetic_developer_journey"] == {"completed": 1, "failed": 0}
+
+
+# ─── Daily streak semantics (deploy gate) ─────────────────────────────────────
+
+async def _seed_historical_snapshot(
+    db_session: AsyncSession, score: int, days_ago: int, at_hour: int = 12
+) -> ValidationHealthSnapshot:
+    """Snapshot at noon ``days_ago`` days ago (deterministic, day-boundary safe)."""
+    created = datetime.now(UTC) - timedelta(days=days_ago)
+    snapshot = ValidationHealthSnapshot(
+        score=score,
+        run_stats={},
+        consecutive_below_threshold=0,
+        created_at=created.replace(hour=at_hour, minute=0, second=0, microsecond=0),
+    )
+    db_session.add(snapshot)
+    await db_session.commit()
+    return snapshot
+
+
+class TestDailyStreak:
+    @pytest.mark.asyncio
+    async def test_daily_scores_take_worst_snapshot_of_day(self, db_session):
+        await _seed_historical_snapshot(db_session, score=95, days_ago=1, at_hour=9)
+        await _seed_historical_snapshot(db_session, score=50, days_ago=1, at_hour=15)
+        await _seed_historical_snapshot(db_session, score=80, days_ago=2, at_hour=12)
+
+        scores = await daily_scores(db_session)
+        assert len(scores) == 2
+        yesterday = (datetime.now(UTC) - timedelta(days=1)).date()
+        day_before = (datetime.now(UTC) - timedelta(days=2)).date()
+        assert scores[yesterday] == 50  # min(95, 50)
+        assert scores[day_before] == 80
+
+    @pytest.mark.asyncio
+    async def test_seven_consecutive_bad_days_block(
+        self, db_session, journey_setup, monkeypatch
+    ):
+        # Six prior days all below 90, plus a below-threshold snapshot today
+        # → 7 consecutive daily scores < 90 (the deploy gate blocks at 7).
+        for days_ago in range(1, 7):
+            await _seed_historical_snapshot(db_session, score=70, days_ago=days_ago)
+
+        monkeypatch.setattr(
+            "app.validation_engine.health.compute_health_score",
+            lambda *a, **k: 70,
+        )
+        snapshot = await compute_and_store_snapshot(db_session)
+        assert snapshot.consecutive_below_threshold == 7
+
+    @pytest.mark.asyncio
+    async def test_healthy_day_resets_streak(
+        self, db_session, journey_setup, monkeypatch
+    ):
+        # Seven prior days below 90, but today's first snapshot is healthy.
+        for days_ago in range(1, 8):
+            await _seed_historical_snapshot(db_session, score=70, days_ago=days_ago)
+
+        monkeypatch.setattr(
+            "app.validation_engine.health.compute_health_score",
+            lambda *a, **k: 95,
+        )
+        snapshot = await compute_and_store_snapshot(db_session)
+        assert snapshot.consecutive_below_threshold == 0
+
+    @pytest.mark.asyncio
+    async def test_mixed_pattern_counts_trailing_run_only(
+        self, db_session, journey_setup, monkeypatch
+    ):
+        # day 3 ago: 70, day 2 ago: 70, day 1 ago: 95, today: 70 → streak 1.
+        await _seed_historical_snapshot(db_session, score=70, days_ago=3)
+        await _seed_historical_snapshot(db_session, score=70, days_ago=2)
+        await _seed_historical_snapshot(db_session, score=95, days_ago=1)
+
+        monkeypatch.setattr(
+            "app.validation_engine.health.compute_health_score",
+            lambda *a, **k: 70,
+        )
+        snapshot = await compute_and_store_snapshot(db_session)
+        assert snapshot.consecutive_below_threshold == 1
+
+    @pytest.mark.asyncio
+    async def test_multiple_bad_snapshots_one_day_count_once(
+        self, db_session, journey_setup, monkeypatch
+    ):
+        # Three below-threshold snapshots yesterday still count as one day.
+        for at_hour in (9, 12, 15):
+            await _seed_historical_snapshot(db_session, score=70, days_ago=1, at_hour=at_hour)
+
+        monkeypatch.setattr(
+            "app.validation_engine.health.compute_health_score",
+            lambda *a, **k: 70,
+        )
+        snapshot = await compute_and_store_snapshot(db_session)
+        assert snapshot.consecutive_below_threshold == 2  # yesterday + today
 
 
 # ─── Deploy gate ──────────────────────────────────────────────────────────────
@@ -397,10 +542,21 @@ _PASS_JOURNEYS = {
 }
 
 
-def _validation_payload(streak: int = 0, journeys=None):
+def _snapshot_history(daily_scores: list[int]) -> list[dict]:
+    """History of one noon snapshot per day, ending today (UTC)."""
+    today = datetime.now(UTC).date()
+    history = []
+    for offset, score in enumerate(daily_scores):
+        day = today - timedelta(days=len(daily_scores) - 1 - offset)
+        history.append({"score": score, "created_at": f"{day.isoformat()}T12:00:00+00:00"})
+    return history
+
+
+def _validation_payload(daily_scores=None, journeys=None):
+    history = _snapshot_history(daily_scores if daily_scores is not None else [95])
     return {
-        "latest": {"score": 95, "consecutive_below_threshold": streak},
-        "history": [],
+        "latest": history[-1],
+        "history": history,
         "journeys": journeys if journeys is not None else _PASS_JOURNEYS,
     }
 
@@ -414,8 +570,19 @@ class TestDeployGate:
         assert any("below the required" in r for r in reasons)
 
     def test_block_streak(self, gate_module):
-        reasons = gate_module.evaluate_gate({"score": 95}, _validation_payload(streak=7))
-        assert any("consecutive snapshots" in r for r in reasons)
+        # 7 consecutive days with daily (worst-of-day) score below 90.
+        reasons = gate_module.evaluate_gate({"score": 95}, _validation_payload([70] * 7))
+        assert any("consecutive days" in r for r in reasons)
+
+    def test_streak_reset_by_healthy_day(self, gate_module):
+        reasons = gate_module.evaluate_gate(
+            {"score": 95}, _validation_payload([70, 70, 70, 70, 70, 70, 95])
+        )
+        assert not any("consecutive days" in r for r in reasons)
+
+    def test_six_days_below_threshold_does_not_block(self, gate_module):
+        reasons = gate_module.evaluate_gate({"score": 95}, _validation_payload([70] * 6))
+        assert not any("consecutive days" in r for r in reasons)
 
     def test_block_failed_journey(self, gate_module):
         journeys = {**_PASS_JOURNEYS, "synthetic_enumerator_journey": {"completed": 1, "failed": 2}}

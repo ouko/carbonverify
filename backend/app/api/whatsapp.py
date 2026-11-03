@@ -6,6 +6,7 @@ import hashlib
 
 from fastapi import APIRouter, Request, HTTPException, status, Depends, Query
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
@@ -26,12 +27,11 @@ from app.services.whatsapp.meta_api import get_whatsapp_api
 from app.services.whatsapp.state_machine import conversation_state
 from app.security.webhook_security import check_replay_protection, build_request_identifier
 from app.core.logging import get_logger
+from app.config import get_settings
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 limiter = Limiter(key_func=get_remote_address)
-
-from app.config import get_settings
 
 _settings = get_settings()
 _VERIFY_TOKEN = _settings.WHATSAPP_VERIFY_TOKEN
@@ -134,8 +134,6 @@ async def list_enumerators(
         for e in enumerators
     ]
 
-
-from pydantic import BaseModel
 
 class CreateEnumeratorRequest(BaseModel):
     project_id: uuid.UUID
