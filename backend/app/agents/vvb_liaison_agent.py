@@ -107,7 +107,16 @@ class VVBLiaisonAgent(BaseAgent):
             response_text = drafted["response_text"]
             source = "knowledge_base"
             if drafted.get("category") == "unknown":
-                # Escalate unclassifiable queries to the Kimi drafting helper.
+                # Escalate unclassifiable queries to the Kimi drafting helper,
+                # enriching the draft with methodology knowledge-base passages
+                # when available (Phase 5; silently skipped on any failure).
+                kb_passages = await self._knowledge_passages(
+                    query, registry=self._determine_registry(project.methodology.value)
+                )
+                methodology_kb = "\n\n".join(
+                    f"[{item['document']['methodology_id']}] {item['chunk']['content'][:800]}"
+                    for item in kb_passages
+                ) or None
                 response_text = await self.kimi.draft_vvb_response(
                     query_text=query,
                     project_data={
@@ -116,6 +125,7 @@ class VVBLiaisonAgent(BaseAgent):
                         "status": report_status,
                         "emissions_reduction": calc_data.get("emissions_reduction_tco2e"),
                     },
+                    methodology_kb=methodology_kb,
                 )
                 source = "kimi_draft"
             answered += 1
@@ -176,6 +186,24 @@ class VVBLiaisonAgent(BaseAgent):
             reasoning=reasoning,
             evidence=evidence,
         )
+
+    async def _knowledge_passages(
+        self, question: str, registry: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Best-effort knowledge-base enrichment; never breaks the agent.
+
+        Silently returns [] when the knowledge base is not importable, errors,
+        or has no ingested documents.
+        """
+        if self.db is None:
+            return []
+        try:
+            from app.knowledge.service import KnowledgeBaseService
+
+            return await KnowledgeBaseService(self.db).search(question, registry=registry, k=3)
+        except Exception as exc:  # noqa: BLE001 — enrichment must never break the agent
+            logger.debug("knowledge_enrichment_unavailable", agent_type=self.agent_type, error=str(exc))
+            return []
 
     def _determine_registry(self, methodology: str) -> str:
         if "TPDDTEC" in methodology or "AMS" in methodology:

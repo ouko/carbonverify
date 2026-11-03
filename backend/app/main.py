@@ -27,7 +27,9 @@ from app.api.data_sources import router as data_sources_router
 from app.api.decisions import router as decisions_router
 from app.api.escalations import router as escalations_router
 from app.api.health import router as health_router
+from app.api.knowledge import router as knowledge_router
 from app.api.leads import router as leads_router
+from app.api.learning import router as learning_router
 from app.api.methodology_generator import router as methodology_generator_router
 from app.api.methodology_templates import router as methodology_templates_router
 from app.api.oauth import router as oauth_router
@@ -40,6 +42,7 @@ from app.api.tokenization import router as tokenization_router
 from app.api.uploads import router as uploads_router
 from app.api.users import router as users_router
 from app.api.validation_engine import router as validation_engine_router
+from app.api.validation_health import router as validation_health_router
 from app.api.vvb_liaison import router as vvb_router
 from app.api.webhooks import router as webhooks_router
 from app.api.websocket import router as websocket_router
@@ -218,9 +221,16 @@ app.include_router(applications_router)
 app.include_router(admin_router)
 app.include_router(api_keys_router)
 app.include_router(oauth_router)
+# Phase 5: methodology knowledge base (vector search + RAG) and the agent
+# learning loop (calibration + weekly retraining reports).
+app.include_router(knowledge_router)
+app.include_router(learning_router)
 # Shared self-healing remediation engine (added separately from the parallel
 # router work above — keep this include in its own block).
 app.include_router(remediation_router)
+# Phase 4: continuous validation health score history (kept as its own block
+# alongside the parallel router additions above).
+app.include_router(validation_health_router)
 
 
 def _json_safe(value: Any) -> Any:

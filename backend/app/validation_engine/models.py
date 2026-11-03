@@ -3,9 +3,10 @@
 import uuid
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from sqlalchemy import (
+    JSON,
     String,
     Text,
     Float,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     Integer,
     Index,
     UniqueConstraint,
+    Uuid,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -527,3 +529,36 @@ class HumanEscalation(Base):
     )
 
     run: Mapped["ValidationRun"] = relationship("ValidationRun", back_populates="escalations")
+
+
+# ─── Validation Health Snapshots ─────────────────────────────────────────────
+
+# Portable JSON column: native JSONB on PostgreSQL, generic JSON elsewhere so
+# SQLite ``create_all`` in tests keeps working without dialect patches.
+PortableJSON = JSON().with_variant(JSONB(), "postgresql")
+
+
+class ValidationHealthSnapshot(Base):
+    """Point-in-time composite health score for continuous validation.
+
+    Appended every synthetic-validation cycle (15 minutes). The
+    ``consecutive_below_threshold`` counter feeds the deploy gate: a streak of
+    7 or more snapshots below the threshold blocks deployment.
+    """
+
+    __tablename__ = "validation_health_snapshots"
+
+    __table_args__ = (
+        Index("ix_validation_health_snapshots_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    # Composite score 0-100
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Per-journey run statistics: {"journey_name": {"completed": n, "failed": n}}
+    run_stats: Mapped[dict] = mapped_column(PortableJSON, default=dict, nullable=False)
+    # Running count of consecutive snapshots below the health threshold (90)
+    consecutive_below_threshold: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )

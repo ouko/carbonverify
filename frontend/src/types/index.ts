@@ -463,3 +463,81 @@ export interface SyntheticActor {
   created_at: string
   last_used_at?: string
 }
+
+// ─── Escalations & Agent Decision Audit (Command Center) ─────────────────────
+
+export type EscalationStatus = 'open' | 'acknowledged' | 'resolved'
+
+export interface EscalationEvent {
+  id: string
+  project_id: string | null
+  source: string
+  title: string
+  detail: string
+  context_package: Record<string, unknown>
+  priority: 0 | 1 | 2
+  severity_score: number
+  status: EscalationStatus
+  channels_sent: Record<string, unknown>
+  created_at: string | null
+  acknowledged_at: string | null
+  acknowledged_by: string | null
+  resolved_at: string | null
+  resolved_by: string | null
+  resolution_notes: string | null
+}
+
+export interface EscalationListResponse {
+  items: EscalationEvent[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface EscalationStats {
+  total: number
+  by_status: Record<string, number>
+  by_priority: Record<string, number>
+  open_p0: number
+  avg_time_to_ack_seconds: number | null
+}
+
+export interface HealthComponentBreakdown {
+  score: number
+  [key: string]: number | undefined
+}
+
+export interface HealthScore {
+  score: number
+  components: {
+    agent_confidence?: number
+    open_escalations?: { score: number; open_p0: number; open_p1: number; open_p2: number }
+    review_queue_depth?: { score: number; pending: number }
+    remediation_resolution_rate?: { score: number; resolved: number; unresolved: number }
+    validation_health?: { score: number; completed: number; failed: number }
+  }
+}
+
+export interface AgentDecision {
+  id: string
+  decision_id: string
+  project_id: string | null
+  agent_type: string
+  action: string
+  confidence_score: number | null
+  reasoning: string
+  input_summary: Record<string, unknown> | null
+  context_package: Record<string, unknown> | null
+  prev_hash: string | null
+  record_hash: string
+  created_at: string
+  actor: string
+  review_queue_item_id: string | null
+}
+
+export interface AgentDecisionListResponse {
+  total: number
+  limit: number
+  offset: number
+  decisions: AgentDecision[]
+}

@@ -70,6 +70,10 @@ jobs:
           ENCRYPTION_KEY_HEX: "0000000000000000000000000000000000000000000000000000000000000000"
         run: pytest tests/ -v --tb=short
 
+      - name: Deploy-gate self-test
+        working-directory: ./backend
+        run: python scripts/pre_deploy_check.py --offline-selftest
+
   frontend-lint-and-test:
     name: Frontend Lint & Test
     runs-on: ubuntu-latest

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export interface Notification {
   id: string
-  type: 'human_review_required' | 'vvb_clarification_received' | 'calculation_anomaly_detected' | 'client_churn_risk' | 'deadline_warning' | 'agent_escalation'
+  type: 'human_review_required' | 'vvb_clarification_received' | 'calculation_anomaly_detected' | 'client_churn_risk' | 'deadline_warning' | 'agent_escalation' | 'escalation_acknowledged' | 'escalation_resolved'
   title: string
   message: string
   projectId?: string

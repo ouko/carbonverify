@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNotificationStore } from '../stores/notificationStore'
 import { useAuthStore } from '../stores/authStore'
 
@@ -13,6 +14,7 @@ export function useCommandWebSocket() {
   const ws = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<number | null>(null)
   const addNotification = useNotificationStore((s) => s.addNotification)
+  const queryClient = useQueryClient()
 
   const connect = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return
@@ -93,6 +95,32 @@ export function useCommandWebSocket() {
               timestamp: new Date().toISOString(),
               actionUrl: '/command-center/vvb',
             })
+          } else if (data.type === 'escalation_acknowledged') {
+            queryClient.invalidateQueries({ queryKey: ['escalations'] })
+            addNotification({
+              id: `esc-ack-${data.escalation_id || Date.now()}`,
+              type: 'escalation_acknowledged',
+              title: 'Escalation Acknowledged',
+              message: data.title ? `“${data.title}” acknowledged` : 'An escalation was acknowledged',
+              projectId: data.project_id,
+              severity: 'info',
+              read: false,
+              timestamp: new Date().toISOString(),
+              actionUrl: '/command-center/escalations',
+            })
+          } else if (data.type === 'escalation_resolved') {
+            queryClient.invalidateQueries({ queryKey: ['escalations'] })
+            addNotification({
+              id: `esc-res-${data.escalation_id || Date.now()}`,
+              type: 'escalation_resolved',
+              title: 'Escalation Resolved',
+              message: data.title ? `“${data.title}” resolved` : 'An escalation was resolved',
+              projectId: data.project_id,
+              severity: 'info',
+              read: false,
+              timestamp: new Date().toISOString(),
+              actionUrl: '/command-center/escalations',
+            })
           }
         } catch {
           // ignore invalid JSON
@@ -109,7 +137,7 @@ export function useCommandWebSocket() {
     } catch {
       reconnectTimer.current = window.setTimeout(connect, 5000)
     }
-  }, [addNotification])
+  }, [addNotification, queryClient])
 
   useEffect(() => {
     connect()

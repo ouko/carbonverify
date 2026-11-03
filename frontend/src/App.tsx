@@ -45,6 +45,8 @@ const ValidationWorkflowBuilderPage = lazy(() => import('./pages/ValidationWorkf
 const ValidationWorkflowRunsPage = lazy(() => import('./pages/ValidationWorkflowRunsPage').then(m => ({ default: m.default })));
 const CommandLayout = lazy(() => import('./components/CommandLayout').then(m => ({ default: m.default })));
 const InboxPage = lazy(() => import('./pages/command/InboxPage').then(m => ({ default: m.InboxPage })));
+const EscalationsPage = lazy(() => import('./pages/command/EscalationsPage').then(m => ({ default: m.EscalationsPage })));
+const HealthDashboardPage = lazy(() => import('./pages/command/HealthDashboardPage').then(m => ({ default: m.HealthDashboardPage })));
 const ProjectsGridPage = lazy(() => import('./pages/command/ProjectsGridPage').then(m => ({ default: m.ProjectsGridPage })));
 const VVBPipelinePage = lazy(() => import('./pages/command/VVBPipelinePage').then(m => ({ default: m.VVBPipelinePage })));
 const QualityMetricsPage = lazy(() => import('./pages/command/QualityMetricsPage').then(m => ({ default: m.QualityMetricsPage })));
@@ -112,6 +114,8 @@ function App() {
               </Route>
               <Route element={<Suspense fallback={<LoadingSpinner />}><CommandLayout /></Suspense>}>
                 <Route path="/command-center/inbox" element={<Suspense fallback={<LoadingSpinner />}><InboxPage /></Suspense>} />
+                <Route path="/command-center/escalations" element={<Suspense fallback={<LoadingSpinner />}><EscalationsPage /></Suspense>} />
+                <Route path="/command-center/health" element={<Suspense fallback={<LoadingSpinner />}><HealthDashboardPage /></Suspense>} />
                 <Route path="/command-center/projects" element={<Suspense fallback={<LoadingSpinner />}><ProjectsGridPage /></Suspense>} />
                 <Route path="/command-center/vvb" element={<Suspense fallback={<LoadingSpinner />}><VVBPipelinePage /></Suspense>} />
                 <Route path="/command-center/quality" element={<Suspense fallback={<LoadingSpinner />}><QualityMetricsPage /></Suspense>} />

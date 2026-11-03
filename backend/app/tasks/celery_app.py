@@ -9,7 +9,7 @@ celery_app = Celery(
     "carbonverify",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.tasks.lifecycle_jobs", "app.tasks.escalation_jobs", "app.validation_engine.tasks"],
+    include=["app.tasks.jobs", "app.tasks.report_jobs", "app.tasks.lead_jobs", "app.tasks.pre_audit_jobs", "app.tasks.compliance_jobs", "app.tasks.lifecycle_jobs", "app.tasks.escalation_jobs", "app.tasks.knowledge_jobs", "app.tasks.learning_jobs", "app.tasks.validation_jobs", "app.validation_engine.tasks"],
 )
 
 celery_app.conf.update(
@@ -36,6 +36,9 @@ celery_app.conf.update(
         "app.tasks.compliance_jobs.*": {"queue": "compliance"},
         "app.tasks.lifecycle_jobs.*": {"queue": "default"},
         "app.tasks.escalation_jobs.*": {"queue": "default"},
+        # Phase 5: knowledge base + learning loop jobs
+        "app.tasks.knowledge_jobs.*": {"queue": "default"},
+        "app.tasks.learning_jobs.*": {"queue": "default"},
     },
     task_default_exchange="default",
     task_default_queue="default",
@@ -120,6 +123,22 @@ celery_app.conf.update(
         # Shared remediation engine sweep (self-healing): re-run stale failures.
         "remediation-sweep": {
             "task": "app.tasks.lifecycle_jobs.remediation_sweep",
+            "schedule": 900.0,  # every 15 minutes
+        },
+        # Phase 5: methodology knowledge base refresh check (stub-safe;
+        # documents are ingested via API/admin upload only, never scraped).
+        "check-methodology-updates": {
+            "task": "app.tasks.knowledge_jobs.check_methodology_updates",
+            "schedule": 86400.0,  # daily
+        },
+        # Phase 5: weekly agent retraining report (learning loop).
+        "generate-weekly-learning-report": {
+            "task": "app.tasks.learning_jobs.generate_weekly_learning_report",
+            "schedule": 604800.0,  # weekly
+        },
+        # Phase 4: continuous synthetic validation + health snapshot (every 15 min).
+        "run-synthetic-validation": {
+            "task": "app.tasks.validation_jobs.run_synthetic_validation",
             "schedule": 900.0,  # every 15 minutes
         },
     },

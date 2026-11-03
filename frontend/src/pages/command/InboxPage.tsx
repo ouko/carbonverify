@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
   CheckCircle, XCircle, HelpCircle, ArrowUpCircle, UserCheck,
-  Clock, AlertTriangle, TrendingUp, Filter,
+  Clock, AlertTriangle, TrendingUp, Filter, FileSearch,
 } from 'lucide-react'
 import { useReviewQueue, useUpdateReviewQueueItem } from '../../hooks/useReviewQueue'
 import { useCommandWebSocket } from '../../hooks/useCommandWebSocket'
+import { useDecisionAudit } from '../../hooks/useDecisionAudit'
 
 export function InboxPage() {
   const { data: items, isLoading, isError, error } = useReviewQueue()
@@ -32,7 +33,17 @@ export function InboxPage() {
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [actingId, setActingId] = useState<string | null>(null)
+  const [auditOpen, setAuditOpen] = useState(false)
   useCommandWebSocket()
+
+  const isAgentRelated = (type: string) => type === 'agent_review' || type === 'data_anomaly'
+  const decisionAudit = useDecisionAudit(
+    auditOpen && selectedItem ? selectedItem.id : null,
+    auditOpen
+  )
+  const decision = decisionAudit.data
+  const decisionContext = decision?.context_package || {}
+  const estimatedCredits = decisionContext.estimated_credits ?? decisionContext.estimated_value
 
   useEffect(() => {
     if (items) {
@@ -196,7 +207,7 @@ export function InboxPage() {
                 filtered.map((item: any) => (
                   <tr
                     key={item.id}
-                    onClick={() => setSelectedItem(item)}
+                    onClick={() => { setSelectedItem(item); setAuditOpen(false) }}
                     className={`cursor-pointer transition-colors hover:bg-surface-50/50 dark:hover:bg-surface-800/30 ${
                       selectedItem?.id === item.id ? 'bg-primary-50/50 dark:bg-primary-950/10' : ''
                     }`}
@@ -316,6 +327,53 @@ export function InboxPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-1">Time in Queue</p>
               <p className="text-sm text-surface-700 dark:text-surface-300">{selectedItem.hoursInQueue} hours</p>
             </div>
+
+            {isAgentRelated(selectedItem.itemType) && (
+              <div className="rounded-xl border border-surface-200 dark:border-surface-700 p-4">
+                {!auditOpen ? (
+                  <button
+                    onClick={() => setAuditOpen(true)}
+                    className="btn-ghost w-full px-3 py-2 text-sm"
+                  >
+                    <FileSearch className="h-4 w-4" /> Decision Audit
+                  </button>
+                ) : decisionAudit.isLoading ? (
+                  <p className="text-xs text-surface-400 text-center py-2">Loading decision audit...</p>
+                ) : decisionAudit.isError ? (
+                  <p className="text-xs text-red-600 dark:text-red-400 text-center py-2">Failed to load decision audit</p>
+                ) : !decision ? (
+                  <p className="text-xs text-surface-400 text-center py-2">No decision record found for this item</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500">Agent Reasoning</p>
+                      <span className="badge badge-blue text-[10px]">{decision.agent_type}</span>
+                    </div>
+                    <p className="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap">{decision.reasoning}</p>
+                    {decision.confidence_score !== null && (
+                      <div>
+                        <div className="mt-1 h-2 w-full rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+                          <div
+                            className={`h-2 rounded-full ${decision.confidence_score < 0.85 ? 'bg-red-500' : 'bg-primary-500'}`}
+                            style={{ width: `${decision.confidence_score * 100}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-xs text-surface-500">Confidence: {Math.round(decision.confidence_score * 100)}%</p>
+                      </div>
+                    )}
+                    {estimatedCredits !== undefined && estimatedCredits !== null && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-1">Financial Impact</p>
+                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">
+                          {typeof estimatedCredits === 'number' ? estimatedCredits.toLocaleString() : String(estimatedCredits)} credits
+                        </p>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-surface-400 break-all">Record hash: {decision.record_hash}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-surface-400 dark:text-surface-500 mb-2">Activity Log</p>

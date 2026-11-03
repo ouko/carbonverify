@@ -88,23 +88,44 @@ class ValidationAgent(BaseAgent):
         # 3. Red-flag list.
         red_flags = await self._collect_red_flags(project, data_sources)
 
-        # 4. LLM false-positive review of the red-flag list.
+        # 4. LLM false-positive review of the red-flag list, optionally
+        # enriched with methodology knowledge-base passages (Phase 5). The
+        # enrichment is best-effort and silently skipped when the knowledge
+        # base is unavailable or empty.
+        llm_context: Dict[str, Any] = {
+            "project": {
+                "name": project.name,
+                "methodology": project.methodology.value,
+                "crediting_period_start": str(project.crediting_period_start),
+                "crediting_period_end": str(project.crediting_period_end),
+                "complexity_score": project.complexity_score,
+            },
+            "red_flags": red_flags,
+        }
+        knowledge = await self._knowledge_passages(
+            (
+                f"{project.methodology.value} methodology validation "
+                "additionality requirements"
+            ),
+            registry=self._methodology_registry(project.methodology.value),
+        )
+        if knowledge:
+            llm_context["methodology_knowledge"] = [
+                {
+                    "methodology_id": item["document"]["methodology_id"],
+                    "title": item["document"]["title"],
+                    "passage": item["chunk"]["content"][:800],
+                }
+                for item in knowledge
+            ]
+
         llm_review = await self.reason_with_llm(
             task_prompt=(
                 "Review this red-flag list for a carbon credit project. Identify "
                 "false positives (flags that are expected or benign for this kind "
                 "of project) and confirm the rest."
             ),
-            context={
-                "project": {
-                    "name": project.name,
-                    "methodology": project.methodology.value,
-                    "crediting_period_start": str(project.crediting_period_start),
-                    "crediting_period_end": str(project.crediting_period_end),
-                    "complexity_score": project.complexity_score,
-                },
-                "red_flags": red_flags,
-            },
+            context=llm_context,
             response_schema=RED_FLAG_REVIEW_SCHEMA,
         )
         confirmed_flags = red_flags
@@ -193,6 +214,31 @@ class ValidationAgent(BaseAgent):
         )
 
     # ─── Screening helpers ────────────────────────────────────────────────
+
+    @staticmethod
+    def _methodology_registry(methodology: str) -> str:
+        """Map a project methodology to its source registry for KB lookups."""
+        if "TPDD" in methodology or "AMS" in methodology:
+            return "gold_standard"
+        return "verra"
+
+    async def _knowledge_passages(
+        self, question: str, registry: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Best-effort knowledge-base enrichment; never breaks the agent.
+
+        Silently returns [] when the knowledge base is not importable, errors,
+        or has no ingested documents.
+        """
+        if self.db is None:
+            return []
+        try:
+            from app.knowledge.service import KnowledgeBaseService
+
+            return await KnowledgeBaseService(self.db).search(question, registry=registry, k=3)
+        except Exception as exc:  # noqa: BLE001 — enrichment must never break the agent
+            logger.debug("knowledge_enrichment_unavailable", agent_type=self.agent_type, error=str(exc))
+            return []
 
     def _validate_source(self, ds: DataSource) -> Dict[str, Any]:
         """Validate a single data source from its real processed data."""

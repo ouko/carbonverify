@@ -67,6 +67,8 @@ export default defineConfig({
       '/leads/': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/applications': { target: 'http://127.0.0.1:8001', changeOrigin: true },
       '/dashboard/': { target: 'http://127.0.0.1:8001', changeOrigin: true },
+      // Versioned API surface (escalations, decision audit, ...)
+      '/api/v1': { target: 'http://127.0.0.1:8001', changeOrigin: true },
     },
   },
 })

@@ -16,6 +16,8 @@ import {
   LogOut,
   ArrowLeft,
   Leaf,
+  ShieldAlert,
+  Activity,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useThemeStore } from '../stores/themeStore'
@@ -24,6 +26,8 @@ import { NotificationCenter } from './NotificationCenter'
 
 const navItems = [
   { to: '/command-center/inbox', icon: Inbox, label: 'Inbox', badgeKey: 'inbox' },
+  { to: '/command-center/escalations', icon: ShieldAlert, label: 'Escalations', badgeKey: 'escalations' },
+  { to: '/command-center/health', icon: Activity, label: 'Health', badgeKey: 'health' },
   { to: '/command-center/projects', icon: LayoutGrid, label: 'Projects', badgeKey: 'projects' },
   { to: '/command-center/vvb', icon: GitPullRequest, label: 'VVB Pipeline', badgeKey: 'vvb' },
   { to: '/command-center/quality', icon: BarChart3, label: 'Quality Metrics', badgeKey: 'quality' },

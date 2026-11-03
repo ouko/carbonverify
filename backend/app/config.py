@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     KIMI_API_BASE: str = "https://api.moonshot.cn/v1"
     KIMI_MODEL: str = "moonshot-v1-8k"
 
+    # Methodology knowledge base embeddings (OpenAI-compatible /embeddings endpoint).
+    # Empty → deterministic LocalHashEmbedder (offline, dependency-free).
+    KNOWLEDGE_EMBEDDER_URL: str = ""
+    KNOWLEDGE_EMBEDDER_MODEL: str = ""
+    KNOWLEDGE_EMBEDDER_API_KEY: str = ""
+
     # Radix DLT
     RADIX_GATEWAY_URL: str = "https://mainnet.radixdlt.com"
     RADIX_NETWORK_ID: int = 1  # 1 = mainnet, 2 = stokenet

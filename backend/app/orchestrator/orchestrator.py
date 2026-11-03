@@ -24,6 +24,13 @@ from app.orchestrator.audit_chain import record_decision
 from app.orchestrator.events import EventLogger
 from app.orchestrator.pubsub import agent_pubsub
 
+try:
+    from app.learning.service import get_effective_threshold
+except ImportError:  # pragma: no cover — learning loop must never block dispatch
+
+    async def get_effective_threshold(db: AsyncSession, agent_type: str) -> float:  # type: ignore[misc]
+        return 0.95
+
 logger = get_logger(__name__)
 
 # ─── State Machine Definition ─────────────────────────────────────────────────
@@ -218,11 +225,31 @@ class KimiClawOrchestrator:
         )
 
         agent_results = []
+        dispatched_agent_types = []
         for agent_type in agent_types:
             agent_result = await self.dispatch_agent(project_id, agent_type.value, trigger, {})
             agent_results.append(agent_result)
+            dispatched_agent_types.append(agent_type.value)
 
-        if all(r.status != "failed" and r.confidence_score >= 0.95 for r in agent_results):
+        # Per-agent auto-advance threshold: the learning loop may suggest a
+        # raised threshold from observed human overrides; falls back to 0.95.
+        advance_thresholds = []
+        for dispatched_type in dispatched_agent_types:
+            try:
+                advance_thresholds.append(await get_effective_threshold(self.db, dispatched_type))
+            except Exception as exc:  # noqa: BLE001 — calibration must never break advance
+                logger.warning(
+                    "effective_threshold_lookup_failed",
+                    project_id=str(project_id),
+                    agent_type=dispatched_type,
+                    error=str(exc),
+                )
+                advance_thresholds.append(0.95)
+
+        if all(
+            r.status != "failed" and r.confidence_score >= t
+            for r, t in zip(agent_results, advance_thresholds)
+        ):
             await self.event_logger.log_state_transition(
                 project_id=project_id,
                 from_state=state.value,
@@ -340,7 +367,23 @@ class KimiClawOrchestrator:
     ):
         """Route based on confidence score: auto-advance, human review, or escalate."""
         score = result.confidence_score
-        tier = "auto_advance" if score >= 0.95 else ("human_review" if score >= 0.85 else "escalate")
+        # The learning loop can raise the auto-advance threshold per agent
+        # based on observed human overrides; 0.95 is the platform default.
+        try:
+            auto_advance_threshold = await get_effective_threshold(self.db, agent_type)
+        except Exception as exc:  # noqa: BLE001 — calibration must never break routing
+            logger.warning(
+                "effective_threshold_lookup_failed",
+                project_id=str(project_id),
+                agent_type=agent_type,
+                error=str(exc),
+            )
+            auto_advance_threshold = 0.95
+        tier = (
+            "auto_advance"
+            if score >= auto_advance_threshold
+            else ("human_review" if score >= 0.85 else "escalate")
+        )
 
         await self.event_logger.log_confidence_check(
             project_id=project_id,
