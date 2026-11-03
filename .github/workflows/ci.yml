@@ -70,6 +70,16 @@ jobs:
           ENCRYPTION_KEY_HEX: "0000000000000000000000000000000000000000000000000000000000000000"
         run: pytest tests/ -v --tb=short
 
+      - name: Success criteria
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/carbonverify_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key-not-for-production
+          ENVIRONMENT: test
+          ENCRYPTION_KEY_HEX: "0000000000000000000000000000000000000000000000000000000000000000"
+        run: pytest tests/test_autonomous_e2e.py tests/test_remediation_injection.py tests/test_operator_scale.py -q
+
       - name: Deploy-gate self-test
         working-directory: ./backend
         run: python scripts/pre_deploy_check.py --offline-selftest

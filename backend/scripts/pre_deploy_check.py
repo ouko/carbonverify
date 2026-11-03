@@ -11,6 +11,7 @@ Checks deployment readiness against a running API:
 Usage:
     python scripts/pre_deploy_check.py [--base-url URL] [--token TOKEN]
     python scripts/pre_deploy_check.py --offline-selftest
+    python scripts/pre_deploy_check.py --with-tests
     python scripts/pre_deploy_check.py --local   # (optional, not implemented)
 
 Exit 0 = pass, exit 1 = block (reasons printed to stdout).
@@ -18,12 +19,19 @@ Exit 0 = pass, exit 1 = block (reasons printed to stdout).
 The scoring logic lives in importable functions (``evaluate_gate``) so CI can
 self-test the checker without a server via ``--offline-selftest``.
 
-Dependencies: standard library + httpx only.
+``--with-tests`` runs the success-criteria acceptance suite (autonomous E2E,
+remediation fault injection, operator scale) via pytest in a subprocess and
+blocks the deploy when any of them fail.
+
+Dependencies: standard library + httpx only (``--with-tests`` additionally
+invokes the backend virtualenv's pytest).
 """
 
 import argparse
 import os
+import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -34,6 +42,13 @@ STREAK_LIMIT = 7
 DEFAULT_BASE_URL = "http://localhost:8000"
 HEALTH_SCORE_PATH = "/api/v1/escalations/health/score"
 VALIDATION_HEALTH_PATH = "/api/v1/validation/health"
+
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
+ACCEPTANCE_TEST_FILES = [
+    "tests/test_autonomous_e2e.py",
+    "tests/test_remediation_injection.py",
+    "tests/test_operator_scale.py",
+]
 
 
 def evaluate_gate(
@@ -158,6 +173,26 @@ def selftest() -> int:
     return 0
 
 
+def run_acceptance_tests() -> int:
+    """Run the success-criteria acceptance suite; block on any failure."""
+    python = os.environ.get("PYTHON", sys.executable)
+    cmd = [python, "-m", "pytest", *ACCEPTANCE_TEST_FILES, "-q"]
+    print(f"running acceptance tests: {' '.join(cmd)} (cwd={BACKEND_ROOT})")
+    try:
+        proc = subprocess.run(cmd, cwd=str(BACKEND_ROOT))
+    except OSError as exc:
+        print(f"BLOCK: could not launch pytest: {exc}")
+        return 1
+    if proc.returncode != 0:
+        print(
+            "BLOCK: success-criteria acceptance tests failed "
+            f"(pytest exit {proc.returncode})"
+        )
+        return 1
+    print("PASS: success-criteria acceptance tests green")
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="CarbonVerify pre-deploy gate")
     parser.add_argument(
@@ -176,6 +211,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="validate the checker's logic against stubbed data without a server",
     )
     parser.add_argument(
+        "--with-tests",
+        action="store_true",
+        help="run the success-criteria acceptance test suite and block on failure",
+    )
+    parser.add_argument(
         "--local",
         action="store_true",
         help="also run an in-process synthetic journey (optional; not implemented)",
@@ -184,6 +224,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.offline_selftest:
         return selftest()
+
+    if args.with_tests:
+        return run_acceptance_tests()
 
     if args.local:
         print(

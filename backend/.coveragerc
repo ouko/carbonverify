@@ -1,0 +1,70 @@
+# Coverage gate for the autonomous layer (Success Criterion 5).
+# Scoped to the new autonomous packages and their API/task surfaces.
+# (coverage treats bare *.py entries in `source` as module names, so scoped
+# files are selected via directory sources + a report-level omit list.
+# `concurrency = greenlet,thread` is required: SQLAlchemy's async greenlets
+# otherwise lose all post-await line events in async endpoints.)
+[run]
+concurrency = greenlet,thread
+source =
+    app/agents
+    app/orchestrator
+    app/remediation
+    app/escalations
+    app/knowledge
+    app/learning
+    app/api
+    app/tasks
+    app/validation_engine
+
+[report]
+show_missing = True
+skip_covered = False
+omit =
+    app/api/__init__.py
+    app/api/admin.py
+    app/api/api_keys.py
+    app/api/applications.py
+    app/api/audit.py
+    app/api/auth.py
+    app/api/brokerage.py
+    app/api/calculations.py
+    app/api/compliance.py
+    app/api/corporate.py
+    app/api/dashboard.py
+    app/api/data_sources.py
+    app/api/health.py
+    app/api/leads.py
+    app/api/methodology_generator.py
+    app/api/methodology_templates.py
+    app/api/oauth.py
+    app/api/orchestrator.py
+    app/api/projects.py
+    app/api/reports.py
+    app/api/review_queue.py
+    app/api/tokenization.py
+    app/api/uploads.py
+    app/api/users.py
+    app/api/validation_engine.py
+    app/api/vvb_liaison.py
+    app/api/webhooks.py
+    app/api/websocket.py
+    app/api/whatsapp.py
+    app/tasks/__init__.py
+    app/tasks/beat_scheduler.py
+    app/tasks/celery_app.py
+    app/tasks/compliance_jobs.py
+    app/tasks/jobs.py
+    app/tasks/lead_jobs.py
+    app/tasks/pre_audit_jobs.py
+    app/tasks/report_jobs.py
+    app/validation_engine/__init__.py
+    app/validation_engine/executors.py
+    app/validation_engine/models.py
+    app/validation_engine/orchestrator.py
+    app/validation_engine/proofs.py
+    app/validation_engine/remediation.py
+    app/validation_engine/schemas.py
+    app/validation_engine/state_machine.py
+    app/validation_engine/synthetic.py
+    app/validation_engine/tasks.py
