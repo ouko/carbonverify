@@ -6,12 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install system dependencies for data processing pipelines
+# (pango/harfbuzz are required by WeasyPrint 70 for PDF report rendering)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     libmagic1 \
     poppler-utils \
     tesseract-ocr \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libharfbuzz-subset0 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

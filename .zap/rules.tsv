@@ -1,10 +1,48 @@
 # OWASP ZAP Scan Rules
-# Format: rule_id\talert_level\treason
+# Format: rule_id<TAB>alert_level<TAB>reason
 # alert_level: IGNORE, WARN, FAIL
+#
+# Tuned for a FastAPI JSON API scanned directly (no nginx) in CI.
+# The zap jobs fail on Medium+ findings by default; the FAIL lines below
+# pin the real vulnerability classes so that contract stays explicit.
 
-# Ignore known false positives for CarbonVerify
+# --- False positives / accepted risks for this stack -----------------------
+
+# Informational: Suspicious comments in static assets (app serves no static assets)
 10027	IGNORE	Informational: Suspicious comments in static assets
+# Informational: Timestamp disclosure — Date/Server headers are standard; ISO
+# timestamps in JSON payloads are application data, not information leakage
 10096	IGNORE	Informational: Timestamp disclosure in headers
+# Informational: Incomplete or no cache-control header set — JSON API responses;
+# per-endpoint caching policy is an application design choice, not a vuln
 10015	IGNORE	Informational: Incomplete or no cache-control header set
+# Informational: Base64 Disclosure — the API legitimately transports
+# base64-encoded tokens and blob identifiers in JSON responses
+10094	IGNORE	Informational: Base64 Disclosure in API responses
+# Informational: Hash Disclosure — the API legitimately returns SHA-256 hashes
+# (audit-chain merkle roots, proof artifacts, searchable-hash fields)
+10097	IGNORE	Informational: Hash Disclosure in API responses
+# Medium: HTTP Only Site — CI scans the app container directly over plain HTTP
+# on localhost; TLS terminates at the nginx reverse proxy in real deployments
+10106	WARN	HTTP-only target is expected in CI; TLS terminates at nginx in deploys
+
+# --- Kept visible but non-blocking ----------------------------------------
+
+# Active scan: Proxy disclosure
 40025	WARN	Active scan: Proxy disclosure
+# App error pages are JSON {"detail": ...} with no stack traces; still worth
+# eyeballing in the report in case a 500 ever leaks internals
 90022	WARN	Application Error Disclosure
+
+# --- Real classes that must keep failing the build -------------------------
+
+40012	FAIL	Cross Site Scripting (Reflected)
+40018	FAIL	SQL Injection
+40019	FAIL	SQL Injection - MySQL
+40020	FAIL	SQL Injection - Hypersonic
+40021	FAIL	SQL Injection - Oracle
+40022	FAIL	SQL Injection - PostgreSQL
+40023	FAIL	SQL Injection - MsSQL
+6	FAIL	Path Traversal
+7	FAIL	Remote File Inclusion
+40043	FAIL	Log4Shell

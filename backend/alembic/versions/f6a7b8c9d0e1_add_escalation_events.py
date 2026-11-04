@@ -23,6 +23,7 @@ def upgrade() -> None:
     escalation_status = postgresql.ENUM(
         'open', 'acknowledged', 'resolved',
         name='escalation_event_status',
+        create_type=False,  # created explicitly below; prevents CREATE TABLE re-emitting CREATE TYPE
     )
     escalation_status.create(op.get_bind(), checkfirst=True)
 

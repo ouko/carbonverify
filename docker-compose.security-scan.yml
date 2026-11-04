@@ -1,6 +1,8 @@
 # Docker Compose override for security scanning in CI.
-# Builds production-like images but exposes the API port so ZAP can reach it.
-# Usage: docker-compose -f docker-compose.production.yml -f docker-compose.security-scan.yml up -d --build
+# Layers on top of docker-compose.yml and exposes the API port so ZAP can reach it.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.security-scan.yml up -d --build db redis app
+# (nginx is intentionally NOT started: it bind-mounts host TLS certificates
+# that do not exist in CI, and celery/clamav/frontend are irrelevant to the scan.)
 
 services:
   app:

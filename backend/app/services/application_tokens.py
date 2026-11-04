@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt
 
 from app.config import get_settings
 
@@ -31,5 +31,5 @@ def verify_applicant_token(token: str) -> uuid.UUID | None:
             return None
         app_id = uuid.UUID(payload.get("sub"))
         return app_id
-    except (JWTError, ValueError, TypeError):
+    except (jwt.PyJWTError, ValueError, TypeError):
         return None
