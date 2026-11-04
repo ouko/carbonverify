@@ -70,6 +70,7 @@ jobs:
           target: 'http://localhost:8000'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a'
+          allow_issue_writing: false
 
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
@@ -135,6 +136,7 @@ jobs:
           target: 'http://localhost:8000/openapi.json'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a'
+          allow_issue_writing: false
 
       - name: Upload ZAP API report
         uses: actions/upload-artifact@v4

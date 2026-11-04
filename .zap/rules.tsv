@@ -46,3 +46,12 @@
 6	FAIL	Path Traversal
 7	FAIL	Remote File Inclusion
 40043	FAIL	Log4Shell
+# Informational: Sec-Fetch-* (90005-90008) are fetch-metadata REQUEST headers;
+# a JSON API has no legitimate reason to reflect them on responses
+90005	IGNORE	Informational: Sec-Fetch-Dest is a request header, not applicable to API responses
+90006	IGNORE	Informational: Sec-Fetch-Mode is a request header, not applicable to API responses
+90007	IGNORE	Informational: Sec-Fetch-Site is a request header, not applicable to API responses
+90008	IGNORE	Informational: Sec-Fetch-User is a request header, not applicable to API responses
+# Low: Cross-Origin-Resource-Policy — JSON API consumed under explicit CORS
+# policy; responses are not embedded as cross-origin resources
+90004	IGNORE	Low: CORP not applicable to a CORS-controlled JSON API
