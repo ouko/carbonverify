@@ -139,7 +139,8 @@ jobs:
       - name: Build frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: .
+          file: frontend/Dockerfile
           push: false
           tags: carbonverify-frontend:latest
           cache-from: type=gha
