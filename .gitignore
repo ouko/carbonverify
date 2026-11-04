@@ -58,3 +58,7 @@ htmlcov/
 # Kubernetes secrets
 infrastructure/k8s/base/secrets.yaml
 .worktrees/
+
+# crash dumps
+core
+core.*
