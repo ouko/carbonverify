@@ -55,3 +55,6 @@
 # Low: Cross-Origin-Resource-Policy — JSON API consumed under explicit CORS
 # policy; responses are not embedded as cross-origin resources
 90004	IGNORE	Low: CORP not applicable to a CORS-controlled JSON API
+# Low: Storable and Cacheable Content (10049) — companion to 10015 above;
+# JSON API cache policy is an application design choice, not a vulnerability
+10049	IGNORE	Low: cache policy for JSON API responses is a design choice
